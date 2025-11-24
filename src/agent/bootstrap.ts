@@ -16,6 +16,7 @@ export async function bootstrapSddForProject(
     cfg: KotefConfig,
     rootDir: string,
     goal: string,
+    chatFn = callChat
 ): Promise<void> {
     console.log(`Bootstrapping SDD for ${rootDir} with goal: "${goal}"`);
 
@@ -57,9 +58,9 @@ export async function bootstrapSddForProject(
         .replace('{{goal}}', goal)
         .replace('{{research}}', researchSummary);
 
-    const archResponse = await callChat(cfg, [{ role: 'system', content: sysPromptArch }], {
+    const archResponse = await chatFn(cfg, [{ role: 'system', content: sysPromptArch }], {
         model: cfg.modelStrong,
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' } as any
     });
 
     let artifacts: any = {};
@@ -76,9 +77,9 @@ export async function bootstrapSddForProject(
         .replace('{{goal}}', goal)
         .replace('{{architect}}', artifacts.architect_md || '');
 
-    const ticketResponse = await callChat(cfg, [{ role: 'system', content: sysPromptTickets }], {
+    const ticketResponse = await chatFn(cfg, [{ role: 'system', content: sysPromptTickets }], {
         model: cfg.modelStrong,
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' } as any
     });
 
     let tickets: any[] = [];

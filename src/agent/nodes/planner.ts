@@ -3,7 +3,7 @@ import { KotefConfig } from '../../core/config.js';
 import { ChatMessage, callChat } from '../../core/llm.js';
 import { loadPrompt } from '../../core/prompts.js';
 
-export function plannerNode(cfg: KotefConfig) {
+export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const promptTemplate = await loadPrompt('meta_agent');
 
@@ -37,9 +37,9 @@ export function plannerNode(cfg: KotefConfig) {
       Test Results: ${JSON.stringify(state.testResults || {})}`
         });
 
-        const response = await callChat(cfg, messages, {
+        const response = await chatFn(cfg, messages, {
             model: cfg.modelFast, // Planner uses fast model
-            response_format: { type: 'json_object' }
+            response_format: { type: 'json_object' } as any
         });
 
         const assistantMsg = response.messages[response.messages.length - 1];

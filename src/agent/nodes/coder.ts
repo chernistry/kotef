@@ -5,7 +5,7 @@ import { loadPrompt } from '../../core/prompts.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
 import { readFile, writePatch } from '../../tools/fs.js';
 
-export function coderNode(cfg: KotefConfig) {
+export function coderNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const promptTemplate = await loadPrompt('coder');
 
@@ -75,7 +75,7 @@ export function coderNode(cfg: KotefConfig) {
         let fileChanges = state.fileChanges || {};
 
         while (turns < maxTurns) {
-            const response = await callChat(cfg, currentMessages, {
+            const response = await chatFn(cfg, currentMessages, {
                 model: cfg.modelStrong, // Coder uses strong model
                 tools: tools as any // Cast to avoid strict type mismatch if any
             });

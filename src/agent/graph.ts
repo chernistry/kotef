@@ -6,7 +6,15 @@ import { researcherNode } from './nodes/researcher.js';
 import { coderNode } from './nodes/coder.js';
 import { verifierNode } from './nodes/verifier.js';
 
-export function buildKotefGraph(cfg: KotefConfig) {
+import { callChat } from '../core/llm.js';
+
+export interface AgentDeps {
+    chatFn?: typeof callChat;
+}
+
+export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
+    const chatFn = deps.chatFn || callChat;
+
     // Define the state channels
     const graph = new StateGraph<AgentState>({
         channels: {
@@ -70,9 +78,9 @@ export function buildKotefGraph(cfg: KotefConfig) {
     // Ah, maybe I need to import START/END and use them correctly?
     // Add nodes
     // Casting to any to avoid strict type checking issues with LangGraph generics in this version
-    graph.addNode("planner" as any, plannerNode(cfg));
+    graph.addNode("planner" as any, plannerNode(cfg, chatFn));
     graph.addNode("researcher" as any, researcherNode(cfg));
-    graph.addNode("coder" as any, coderNode(cfg));
+    graph.addNode("coder" as any, coderNode(cfg, chatFn));
     graph.addNode("verifier" as any, verifierNode(cfg));
 
     // Add edges
