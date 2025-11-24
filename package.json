@@ -12,7 +12,8 @@
         "test": "tsx --test test/**/*.test.ts",
         "test:e2e": "npm run build && tsx --test test/e2e.test.ts",
         "lint": "eslint src test --ext .ts",
-        "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+        "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+        "eval:prompts": "npm run build && tsx scripts/eval_prompts.ts"
     },
     "keywords": [
         "ai",

@@ -1,0 +1,9 @@
+{
+  "id": "04-cli-uppercase",
+  "goal": "Add an uppercase option to formatMessage so callers can request uppercased output (e.g., --upper flag).",
+  "fixtureDir": "devdata/fixtures/04-cli-uppercase",
+  "expected": {
+    "testsCommand": "npm test",
+    "notes": "Preserve existing prefix behavior; keep API simple and dependency-free."
+  }
+}

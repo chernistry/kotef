@@ -1,0 +1,9 @@
+{
+  "id": "01-add-function",
+  "goal": "Implement add(a, b) in src/math.js so tests pass (support negatives and floats).",
+  "fixtureDir": "devdata/fixtures/01-add-function",
+  "expected": {
+    "testsCommand": "npm test",
+    "notes": "Return the numeric sum; keep implementation minimal and dependency-free."
+  }
+}

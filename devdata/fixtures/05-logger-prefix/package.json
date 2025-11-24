@@ -1,0 +1,8 @@
+{
+  "name": "kotef-fixture-05-logger-prefix",
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "test": "node --test"
+  }
+}

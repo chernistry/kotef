@@ -51,6 +51,12 @@ There’s a `.sdd/` with tickets in `./.sdd/backlog/tickets/open/` — pick one,
 
 PRs, experiments, and “this design is cursed, here’s better” issues are all welcome.
 
+## Prompt evals (quick and dirty)
+
+- `npm run eval:prompts` runs a 5-task dev set from `devdata/` against the built CLI and drops a JSON report in `devdata/results/`.
+- Set `KOTEF_EVAL_SKIP_AGENT=1` if you just want to smoke-test the harness without calling an LLM.
+- Use the reports to compare prompt/model tweaks and watch for regressions.
+
 ## License
 
 The core of **kotef** is open source under the [Apache 2.0 License](./LICENSE).

@@ -1,0 +1,9 @@
+{
+  "id": "02-range-fix",
+  "goal": "Fix range(start, end) so it returns [start, ..., end) (end exclusive) and handles empty ranges cleanly.",
+  "fixtureDir": "devdata/fixtures/02-range-fix",
+  "expected": {
+    "testsCommand": "npm test",
+    "notes": "Keep API stable; validate numeric inputs."
+  }
+}

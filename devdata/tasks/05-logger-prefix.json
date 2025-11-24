@@ -1,0 +1,9 @@
+{
+  "id": "05-logger-prefix",
+  "goal": "Prefix logger output with timestamp and level ([INFO]/[ERROR]) so logs are structured.",
+  "fixtureDir": "devdata/fixtures/05-logger-prefix",
+  "expected": {
+    "testsCommand": "npm test",
+    "notes": "Avoid external deps; keep Logger API stable."
+  }
+}

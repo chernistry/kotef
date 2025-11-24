@@ -1,0 +1,9 @@
+{
+  "id": "03-average-harden",
+  "goal": "Harden average(nums): reject empty arrays with a clear error, keep strict input validation, and leave behavior for valid arrays unchanged.",
+  "fixtureDir": "devdata/fixtures/03-average-harden",
+  "expected": {
+    "testsCommand": "npm test",
+    "notes": "Do not swallow invalid input; align with tests by throwing on empty arrays."
+  }
+}
