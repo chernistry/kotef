@@ -3,11 +3,29 @@ import { KotefConfig } from '../../core/config.js';
 import { ChatMessage, callChat } from '../../core/llm.js';
 import { loadRuntimePrompt } from '../../core/prompts.js';
 import { createLogger } from '../../core/logger.js';
+import { jsonrepair } from 'jsonrepair';
 
 export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('planner');
         log.info('Planner node started');
+
+        const tryParseDecision = (raw: string) => {
+            const trimmed = raw.trim();
+            if (!trimmed) {
+                throw new Error('Empty planner response');
+            }
+            try {
+                return JSON.parse(trimmed);
+            } catch (firstErr) {
+                try {
+                    const repaired = jsonrepair(trimmed);
+                    return JSON.parse(repaired);
+                } catch {
+                    throw firstErr;
+                }
+            }
+        };
 
         const promptTemplate = await loadRuntimePrompt('planner');
         const safe = (value: unknown) => {
@@ -48,10 +66,17 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             content: 'Produce the JSON decision now. Do not include markdown or extra text.'
         });
 
+        const hasResearch =
+            !!state.researchResults &&
+            (Array.isArray(state.researchResults)
+                ? state.researchResults.length > 0
+                : Object.keys(state.researchResults).length > 0);
+        const fallbackNext = hasResearch ? 'coder' : 'researcher';
+
         const maxRetries = 2;
         let attempt = 0;
         let assistantMsg: ChatMessage | undefined;
-        let decision: any = { next: 'snitch', reason: 'planner_parse_error', profile: state.runProfile };
+        let decision: any | undefined;
         let workingMessages = [...baseMessages];
 
         while (attempt < maxRetries) {
@@ -68,9 +93,10 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                 log.error('Planner received empty response from LLM', { attempt });
                 if (attempt >= maxRetries) {
                     decision = {
-                        next: 'snitch',
-                        reason: 'planner_empty_response',
-                        profile: state.runProfile
+                        next: fallbackNext,
+                        reason: 'planner_empty_response_fallback',
+                        profile: state.runProfile,
+                        plan: []
                     };
                     break;
                 }
@@ -85,7 +111,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             }
 
             try {
-                decision = JSON.parse(assistantMsg.content);
+                decision = tryParseDecision(assistantMsg.content);
                 log.info('Planner decision', {
                     next: decision.next,
                     reason: decision.reason,
@@ -100,9 +126,10 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                 });
                 if (attempt >= maxRetries) {
                     decision = {
-                        next: 'snitch',
-                        reason: 'planner_parse_error',
+                        next: fallbackNext,
+                        reason: 'planner_parse_error_fallback',
                         profile: state.runProfile,
+                        plan: [],
                         raw: assistantMsg.content.slice(0, 500)
                     };
                     break;
@@ -116,6 +143,15 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                     }
                 ];
             }
+        }
+
+        if (!decision) {
+            decision = {
+                next: fallbackNext,
+                reason: 'planner_unreachable_fallback',
+                profile: state.runProfile,
+                plan: []
+            };
         }
 
         if (!assistantMsg) {

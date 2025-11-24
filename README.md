@@ -1,4 +1,4 @@
-# kotef — spec‑driven coding agent
+# kotef — unapologetically spec‑driven coding agent
 
 > “Give me a repo and a goal. I’ll figure out the rest.”
 
@@ -10,59 +10,51 @@ The idea grew out of two prior experiments:
 
 kotef basically fuses them into a coding agent.
 
-## What it actually does
+## TL;DR workflow
 
-- You run:  
-  `kotef run --root ./my-repo --goal "add pagination to blog posts"`
-- kotef:
-  - scans the repo,
-  - hits the web for best practices,
-  - **bootstraps `.sdd/`** for that project (project.md, architect.md, best_practices.md, tickets),
-  - then follows those specs like a stubborn senior dev:
-    - plans,
-    - edits code via diffs,
-    - runs tests,
-    - logs everything and writes a run report.
+```bash
+node bin/kotef run \
+  --root /path/to/repo \
+  --goal "Create a Python GUI with a Close button" \
+  --yolo   # optional: fast-and-loose mode
+```
 
-Stack: Node.js 20, TypeScript, LangGraph.js, OpenAI‑style tools. Under the hood it reuses battle‑tested bits from personal projects plus the SDDRush prompt flow.
+Under the hood:
 
-## Why this is different
+- **LangGraph flow.** `planner → researcher → coder → verifier → snitch` with run reports, command/time budgets, execution profiles (`strict/fast/smoke/yolo`).
+- **Web search & deep research.** Tavily + scraping + LLM summarizer feed best practices into the spec so the agent isn’t hallucinating 2019 blog posts.
+- **Command policies.** Profiles cap heavy commands/tests so `fast` stays fast and `yolo` finishes after functional success instead of chasing lint forever.
+- **Failure feedback loop.** Runs are bounded: failing tests get summarised, attempts are tracked, and unresolved issues land in `.sdd/issues.md`.
 
-- It doesn’t just “autocomplete code” — it **thinks in specs and tickets**.
-- If your repo has no process, it invents a minimal one for you (SDD bootstrap).
-- If you already have `.sdd/`, it treats it as law, not a suggestion.
-- The long‑term goal is a drop‑in “developer in a box” you can throw at real projects and CI.
+CLI modes:
 
-## We badly need contributors
+- `kotef run …` — one-shot automation, leaves a run report in `.sdd/runs/`.
+- `kotef chat` — Voyant-style interactive loop: generate tickets, pick which ones to execute, watch progress ticket by ticket.
 
-If any of this sounds fun, we need help. Especially if you:
-- hack on **agent frameworks** (LangGraph, LangChain, AutoGen, CrewAI, Swarm, whatever),
-- enjoy **prompt engineering** for serious coding work (not just toy chat prompts),
-- like building **coding copilots / refactoring tools**,
-- care about making agents safe, observable and actually useful.
+## What’s baked in right now
 
-Stuff you could grab:
-- harden runtime prompts using modern prompt‑eng best practices,
-- wire richer graphs (bootstrap → planner → researcher → coder → verifier),
-- adapt more web/search/scraping strategies,
-- build eval scenarios to see if kotef is actually good, not just "vibes".
+- SDD bootstrap when a repo has no `.sdd/`.
+- Respect for existing `.sdd/` (project law).
+- Planner retries + JSON enforcement so runs don’t die on parse errors.
+- Researcher skips web hits if `.sdd/best_practices.md` already exists.
+- Coder tool loop with diff-first edits, profile-aware command/test limits, and fallback run summaries.
+- Verifier adapts to Python/TS stacks, honours profile semantics, and remembers functional probes (e.g. `flet run`, `npm start`).
+- Snitch protocol writes structured issues when specs/goals conflict or attempts are exhausted.
 
-There’s a `.sdd/` with tickets in `./.sdd/backlog/tickets/open/` — pick one, or open an issue if you see a sharper way to do things.
+## We desperately need help
 
-PRs, experiments, and “this design is cursed, here’s better” issues are all welcome.
+I’m building this to feel like “a stubborn senior dev in a CLI”. It’s getting there, but there’s plenty left:
 
-## Prompt evals (quick and dirty)
+- harden runtime prompts using the best playbook you know,
+- refine execution-profile policies (`strict` vs `fast` vs `yolo`),
+- improve deep research / scraping / Tavily/Brave integrations,
+- build eval harnesses and CI scenarios,
+- wire richer graphs (e.g., orchestrator agent, feedback loops between planner/researcher/coder),
+- make the CLI slicker (ticket dashboards, issue summaries, etc.).
 
-- `npm run eval:prompts` runs a 5-task dev set from `devdata/` against the built CLI and drops a JSON report in `devdata/results/`.
-- Set `KOTEF_EVAL_SKIP_AGENT=1` if you just want to smoke-test the harness without calling an LLM.
-- Use the reports to compare prompt/model tweaks and watch for regressions.
+If you’re into LangGraph, AutoGen/CrewAI/Swarm, prompt engineering for real code, or just want coding copilots that don’t lie — I’d love your help. 
+Contributors are begged for, especially anyone who can stress-test the agent on real-world repos.
 
 ## License
 
-The core of **kotef** is open source under the [Apache 2.0 License](./LICENSE).
-
-You are free to use, modify, and distribute it, including in commercial projects, as long as you comply with the license terms (e.g. preserve copyright and notices).
-
-Future hosted/managed offerings (e.g. "kotef Cloud" or enterprise features) may be provided under separate commercial terms.
-
-"kotef" is the name of the open-source project. Using the name for derived commercial products or services should not imply official endorsement by the project maintainers.
+Apache 2.0 — see [LICENSE](./LICENSE). Forks, experiments, and “this design is cursed, here’s better” issues are all welcome. Feel free to build on it commercially; just keep notices intact and don’t imply official endorsement.
