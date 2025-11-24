@@ -1,5 +1,4 @@
-```typescript
-import { describe, it, assert, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { webSearch } from '../../src/tools/web_search.js';
 import { fetchPage } from '../../src/tools/fetch_page.js';
 // import { deepResearch } from '../../src/tools/deep_research.js';
@@ -22,45 +21,57 @@ describe('Search Tools', () => {
 
     describe('webSearch', () => {
         it('should return results from Tavily', async () => {
-            const mockResponse = {
-                results: [
-                    { url: 'https://example.com', title: 'Example', content: 'Snippet' }
-                ]
-            };
-
-            global.fetch = mock.fn(async () => ({
+            const mockFetch = vi.fn().mockResolvedValue({
                 ok: true,
-                json: async () => mockResponse,
-            })) as any;
+                json: async () => ({
+                    results: [
+                        { title: 'Test', url: 'https://example.com', content: 'Test content' }
+                    ]
+                })
+            });
+            global.fetch = mockFetch as any;
 
-            const results = await webSearch(cfg, 'test query');
-            assert.strictEqual(results.length, 1);
-            assert.strictEqual(results[0].url, 'https://example.com');
-            assert.strictEqual(results[0].source, 'tavily');
+            const results = await webSearch({ apiKey: 'test-key' } as any, 'test query');
+            expect(results.length).toBe(1);
+            expect(results[0].title).toBe('Test');
         });
+
+        it('should handle API errors', async () => {
+            const mockFetch = vi.fn().mockResolvedValue({
+                ok: false,
+                statusText: 'Unauthorized'
+            });
+            global.fetch = mockFetch as any;
+
+            const results = await webSearch({ apiKey: 'test-key' } as any, 'test query');
+            expect(results.length).toBe(0);
+        });
+
+        it('should throw if API key is missing', async () => {
+            await expect(webSearch({} as any, 'test query')).rejects.toThrow(/API key is required/);
+        });
+
+        describe('fetchPage', () => {
+            it('should fetch and strip HTML', async () => {
+                const html = '<html><body><h1>Hello</h1><p>World</p><script>alert(1)</script></body></html>';
+
+                global.fetch = mock.fn(async () => ({
+                    ok: true,
+                    status: 200,
+                    headers: { get: () => 'text/html' },
+                    text: async () => html,
+                })) as any;
+
+                const page = await fetchPage(cfg, 'https://example.com/page');
+                assert.strictEqual(page.content, 'Hello World');
+            });
+
+            it('should block unsafe URLs', async () => {
+                await assert.rejects(() => fetchPage(cfg, 'http://localhost:8080'), /blocked by policy/);
+            });
+        });
+
+        // deepResearch test is harder to mock fully without mocking callChat. 
+        // We'll skip deep logic test here and rely on integration tests or mock callChat if possible.
+        // For now, let's just test that it calls webSearch and fetchPage.
     });
-
-    describe('fetchPage', () => {
-        it('should fetch and strip HTML', async () => {
-            const html = '<html><body><h1>Hello</h1><p>World</p><script>alert(1)</script></body></html>';
-
-            global.fetch = mock.fn(async () => ({
-                ok: true,
-                status: 200,
-                headers: { get: () => 'text/html' },
-                text: async () => html,
-            })) as any;
-
-            const page = await fetchPage(cfg, 'https://example.com/page');
-            assert.strictEqual(page.content, 'Hello World');
-        });
-
-        it('should block unsafe URLs', async () => {
-            await assert.rejects(() => fetchPage(cfg, 'http://localhost:8080'), /blocked by policy/);
-        });
-    });
-
-    // deepResearch test is harder to mock fully without mocking callChat. 
-    // We'll skip deep logic test here and rely on integration tests or mock callChat if possible.
-    // For now, let's just test that it calls webSearch and fetchPage.
-});

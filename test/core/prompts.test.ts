@@ -1,5 +1,4 @@
-```typescript
-import { afterEach, describe, it, assert } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import {
     clearPromptCache,
     loadRuntimePrompt,
@@ -20,12 +19,12 @@ describe('Runtime prompts', () => {
     it('loads all runtime prompts with content', async () => {
         for (const name of runtimePrompts) {
             const prompt = await loadRuntimePrompt(name);
-            assert.ok(prompt.length > 20, `Prompt ${ name } should not be empty`);
+            assert.ok(prompt.length > 20, `Prompt ${name} should not be empty`);
         }
     });
 
     it('throws on unknown runtime prompt', async () => {
-        await assert.rejects(() => loadRuntimePrompt('unknown' as RuntimePromptName), /Unknown runtime prompt/);
+        await expect(loadRuntimePrompt('unknown_prompt' as any)).rejects.toThrow(/Unknown runtime prompt/);
     });
 
     it('planner exposes a valid JSON schema block', async () => {

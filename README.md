@@ -45,7 +45,7 @@ Stuff you could grab:
 - harden runtime prompts using modern prompt‑eng best practices,
 - wire richer graphs (bootstrap → planner → researcher → coder → verifier),
 - adapt more web/search/scraping strategies,
-- build eval scenarios to see if kotef is actually good, not just vibes.
+- build eval scenarios to see if kotef is actually good, not just "vibes".
 
 There’s a `.sdd/` with tickets in `./.sdd/backlog/tickets/open/` — pick one, or open an issue if you see a sharper way to do things.
 

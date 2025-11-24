@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach, assert } from 'vitest';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { resolvePath, readFile, listFiles, writePatch, FsContext } from '../../src/tools/fs.js';
@@ -18,17 +18,17 @@ describe('FS Tools', () => {
     describe('resolvePath', () => {
         it('should resolve valid relative paths', () => {
             const p = resolvePath(ctx, 'foo/bar.txt');
-            assert.strictEqual(p, path.join(testRoot, 'foo/bar.txt'));
+            expect(p).toBe(path.join(testRoot, 'foo/bar.txt'));
         });
 
         it('should throw on path traversal', () => {
-            assert.throws(() => resolvePath(ctx, '../outside.txt'), /Path escapes workspace root/);
-            assert.throws(() => resolvePath(ctx, 'foo/../../outside.txt'), /Path escapes workspace root/);
+            expect(() => resolvePath(ctx, '../outside.txt')).toThrow(/Path escapes workspace root/);
+            expect(() => resolvePath(ctx, 'foo/../../outside.txt')).toThrow(/Path escapes workspace root/);
         });
 
         it('should allow root path itself', () => {
             const p = resolvePath(ctx, '.');
-            assert.strictEqual(p, testRoot);
+            expect(p).toBe(testRoot);
         });
     });
 
@@ -36,13 +36,13 @@ describe('FS Tools', () => {
         it('should read file content', async () => {
             await fs.writeFile(path.join(testRoot, 'hello.txt'), 'Hello World');
             const content = await readFile(ctx, 'hello.txt');
-            assert.strictEqual(content, 'Hello World');
+            expect(content).toBe('Hello World');
         });
 
         it('should throw if file is too large', async () => {
             const largeContent = Buffer.alloc(1024 * 1024 + 10, 'a');
             await fs.writeFile(path.join(testRoot, 'large.txt'), largeContent);
-            await assert.rejects(() => readFile(ctx, 'large.txt'), /File too large/);
+            await expect(readFile(ctx, 'large.txt')).rejects.toThrow(/File too large/);
         });
     });
 
@@ -53,8 +53,8 @@ describe('FS Tools', () => {
             await fs.writeFile(path.join(testRoot, 'c.txt'), '');
 
             const files = await listFiles(ctx, '**/*.ts');
-            assert.strictEqual(files.length, 1);
-            assert.ok(files[0].endsWith('a.ts'));
+            expect(files.length).toBe(1);
+            expect(files[0].endsWith('a.ts')).toBeTruthy();
         });
 
         it('should respect gitignore (mocked behavior via fast-glob ignores)', async () => {
@@ -65,8 +65,8 @@ describe('FS Tools', () => {
 
             const files = await listFiles(ctx, '**/*.ts');
 
-            assert.strictEqual(files.length, 1);
-            assert.ok(files[0].endsWith('a.ts'));
+            expect(files.length).toBe(1);
+            expect(files[0].endsWith('a.ts')).toBeTruthy();
         });
     });
 
@@ -87,7 +87,7 @@ describe('FS Tools', () => {
 `;
             await writePatch(ctx, 'file.txt', patch);
             const content = await fs.readFile(filePath, 'utf8');
-            assert.strictEqual(content, 'line1\nline2-modified\nline3\n');
+            expect(content).toBe('line1\nline2-modified\nline3\n');
         });
 
         it('should fail on mismatching patch', async () => {
@@ -104,7 +104,7 @@ describe('FS Tools', () => {
 +line2-modified
  line3
 `;
-            await assert.rejects(() => writePatch(ctx, 'file.txt', patch), /Failed to apply patch/);
+            await expect(writePatch(ctx, 'file.txt', patch)).rejects.toThrow(/Failed to apply patch/);
         });
     });
 });
