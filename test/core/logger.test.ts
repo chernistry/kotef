@@ -1,4 +1,3 @@
-```javascript
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createLogger, Logger } from '../../src/core/logger.js';
 
@@ -26,4 +25,3 @@ describe('Logger', () => {
         expect(logEntry.ts).toBeDefined();
     });
 });
-```

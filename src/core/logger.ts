@@ -7,7 +7,14 @@ export interface LogFields {
     [key: string]: unknown;
 }
 
-export function createLogger(runId: string) {
+export type Logger = {
+    info: (message: string, fields?: LogFields) => void;
+    warn: (message: string, fields?: LogFields) => void;
+    error: (message: string, fields?: LogFields) => void;
+    debug: (message: string, fields?: LogFields) => void;
+};
+
+export function createLogger(runId: string): Logger {
     const log = (level: LogLevel, message: string, fields: LogFields = {}) => {
         const entry = {
             ts: new Date().toISOString(),

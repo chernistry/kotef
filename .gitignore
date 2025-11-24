@@ -76,3 +76,4 @@ node_modules/
 coverage/
 .nyc_output/
 *.tsbuildinfo
+temp-e2e/*

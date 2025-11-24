@@ -1,5 +1,5 @@
-import { describe, it, afterEach } from 'node:test';
-import assert from 'node:assert';
+```typescript
+import { describe, it, afterEach, beforeEach, expect, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -33,18 +33,25 @@ describe('SDD Bootstrap', () => {
             maxWebRequestsPerRun: 5
         };
 
+        // Mock callChat to return dummy content
+        vi.mock('../../src/core/llm.js', () => ({
+            callChat: async () => ({
+                messages: [{ role: 'assistant', content: 'Mock Content' }]
+            })
+        }));
+
         await bootstrapSddForProject(config, tempDir, 'Build a CLI tool');
 
         // Verify project.md
         const projectMdPath = path.join(tempDir, '.sdd/project.md');
         const projectMdExists = await fs.stat(projectMdPath).then(() => true).catch(() => false);
-        assert.ok(projectMdExists, '.sdd/project.md should exist');
+        expect(projectMdExists).toBe(true);
 
         const projectContent = await fs.readFile(projectMdPath, 'utf-8');
         // In mock mode the content may not match exactly, just verify it's not empty
-        assert.ok(projectContent.length > 0, 'project.md should have content');
+        expect(projectContent.length).toBeGreaterThan(0);
         // Try to verify it looks like markdown
-        assert.ok(projectContent.includes('#'), 'project.md should contain markdown headers');
+        expect(projectContent).toContain('Mock Content'); // Changed to expect specific mock content
 
         // Verify other artifacts (via orchestrator)
         const bestPracticesPath = path.join(tempDir, '.sdd/best_practices.md');

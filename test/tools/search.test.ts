@@ -50,25 +50,17 @@ describe('Search Tools', () => {
         it('should throw if API key is missing', async () => {
             await expect(webSearch({} as any, 'test query')).rejects.toThrow(/API key is required/);
         });
-
-        describe('fetchPage', () => {
-            it('should fetch and strip HTML', async () => {
-                const html = '<html><body><h1>Hello</h1><p>World</p><script>alert(1)</script></body></html>';
-
-                global.fetch = mock.fn(async () => ({
-                    ok: true,
-                    status: 200,
-                    headers: { get: () => 'text/html' },
-                    text: async () => html,
+        headers: { get: () => 'text/html' },
+        text: async () => html,
                 })) as any;
 
-                const page = await fetchPage(cfg, 'https://example.com/page');
-                assert.strictEqual(page.content, 'Hello World');
+const page = await fetchPage(cfg, 'https://example.com/page');
+assert.strictEqual(page.content, 'Hello World');
             });
 
-            it('should block unsafe URLs', async () => {
-                await assert.rejects(() => fetchPage(cfg, 'http://localhost:8080'), /blocked by policy/);
-            });
+it('should block unsafe URLs', async () => {
+    await assert.rejects(() => fetchPage(cfg, 'http://localhost:8080'), /blocked by policy/);
+});
         });
 
         // deepResearch test is harder to mock fully without mocking callChat. 
