@@ -15,6 +15,62 @@ export interface SddOrchestratorState {
     ticketsCreated?: string[];
 }
 
+interface ProjectMetadata {
+    techStack: string;
+    domain: string;
+    projectDescription: string;
+}
+
+async function loadProjectMetadata(rootDir: string, goal: string): Promise<ProjectMetadata> {
+    const sddProjectPath = path.join(rootDir, '.sdd', 'project.md');
+
+    let techStack = 'Unknown stack (infer from goal and project.md)';
+    let domain = 'Software Engineering';
+    let projectDescription = `Goal:\n${goal}`;
+
+    try {
+        const content = await fs.readFile(sddProjectPath, 'utf-8');
+        projectDescription = content;
+
+        // Heuristic: extract bullet list under "## Tech Stack"
+        const techHeader = '## Tech Stack';
+        const techIdx = content.indexOf(techHeader);
+        if (techIdx !== -1) {
+            const after = content.slice(techIdx + techHeader.length).split('\n');
+            const items: string[] = [];
+            for (const line of after) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('## ')) break;
+                if (trimmed.startsWith('- ')) {
+                    items.push(trimmed.slice(2).trim());
+                }
+            }
+            if (items.length > 0) {
+                techStack = items.join(', ');
+            }
+        }
+
+        // Optional: extract a "## Domain" section if present
+        const domainHeader = '## Domain';
+        const domainIdx = content.indexOf(domainHeader);
+        if (domainIdx !== -1) {
+            const after = content.slice(domainIdx + domainHeader.length).split('\n');
+            for (const line of after) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('## ')) break;
+                if (trimmed.length > 0) {
+                    domain = trimmed.replace(/^[-*]\s*/, '').trim();
+                    break;
+                }
+            }
+        }
+    } catch {
+        // If project.md is missing or unparsable, fall back to goal-based defaults.
+    }
+
+    return { techStack, domain, projectDescription };
+}
+
 async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
     console.log('Running SDD Research...');
     const { goal, rootDir, config } = state;
@@ -44,11 +100,14 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
 
     console.log('Generating best_practices.md with LLM...');
     
+    const { techStack, domain, projectDescription } = await loadProjectMetadata(rootDir, goal);
+
     // 2. Render prompt with web research injected as additional context
     const prompt = renderBrainTemplate('research', {
         projectName: path.basename(rootDir),
-        domain: 'Software Engineering', // Default, could be inferred
-        techStack: 'TypeScript, Node.js', // Default, could be inferred or passed
+        domain,
+        techStack,
+        projectDescription,
         year: new Date().getFullYear(),
         goal,
         additionalContext: `Web research findings for goal "${goal}":\n\n${findingsContext}`
@@ -75,6 +134,8 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
     console.log('Running SDD Architect...');
     const { goal, rootDir, config, researchContent } = state;
 
+    const { techStack, domain, projectDescription } = await loadProjectMetadata(rootDir, goal);
+
     // 1. Render prompt
     // Architect template refers to .sdd/best_practices.md, so we don't need to inject it if the LLM can read files.
     // But here we are just prompting.
@@ -85,10 +146,11 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
 
     const prompt = renderBrainTemplate('architect', {
         projectName: path.basename(rootDir),
-        domain: 'Software Engineering',
-        techStack: 'TypeScript, Node.js',
+        domain,
+        techStack,
+        projectDescription,
         year: new Date().getFullYear(),
-        goal: goal,
+        goal,
         research: researchContent // Injecting research content if template supports it or we append it
     });
 

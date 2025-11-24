@@ -63,6 +63,25 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             {
                 type: 'function',
                 function: {
+                    name: 'list_files',
+                    description:
+                        'List files in the workspace matching an optional glob pattern (defaults to common source files).',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            pattern: {
+                                type: 'string',
+                                description:
+                                    'Optional glob pattern relative to repo root (e.g. "src/**/*.ts").'
+                            }
+                        },
+                        required: []
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
                     name: 'write_file',
                     description: 'Create or overwrite a file with content',
                     parameters: {
@@ -94,13 +113,33 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                 type: 'function',
                 function: {
                     name: 'run_command',
-                    description: 'Run a shell command in the project directory (e.g., npm install, npm run build)',
+                    description:
+                        'Run a shell command in the project directory (e.g., npm install, npm run build)',
                     parameters: {
                         type: 'object',
                         properties: {
                             command: { type: 'string', description: 'Shell command to execute' }
                         },
                         required: ['command']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'run_tests',
+                    description:
+                        'Run the project test command (or a specific one) in the project directory.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            command: {
+                                type: 'string',
+                                description:
+                                    'Optional explicit test command (e.g., "npm test"). If omitted, use the default from SDD or package.json.'
+                            }
+                        },
+                        required: []
                     }
                 }
             }
@@ -154,6 +193,16 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                     if (toolCall.function.name === 'read_file') {
                         result = await readFile({ rootDir: cfg.rootDir! }, args.path);
                         log.info('File read', { path: args.path, size: result.length });
+                    } else if (toolCall.function.name === 'list_files') {
+                        // Lazy-load to avoid circular imports at top
+                        const { listFiles } = await import('../../tools/fs.js');
+                        const pattern =
+                            typeof args.pattern === 'string' && args.pattern.trim().length > 0
+                                ? args.pattern
+                                : '**/*.{ts,tsx,js,jsx,py,rs,go,php,java,cs,md,mdx,json,yml,yaml,pyw}';
+                        const files = await listFiles({ rootDir: cfg.rootDir! }, pattern);
+                        result = files;
+                        log.info('Files listed', { pattern, count: files.length });
                     } else if (toolCall.function.name === 'write_file') {
                         await writeFile({ rootDir: cfg.rootDir! }, args.path, args.content);
                         result = "File written successfully.";
@@ -174,7 +223,28 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                             stderr: cmdResult.stderr,
                             passed: cmdResult.passed
                         };
-                        log.info('Command executed', { command: args.command, exitCode: cmdResult.exitCode, passed: cmdResult.passed });
+                        log.info('Command executed', {
+                            command: args.command,
+                            exitCode: cmdResult.exitCode,
+                            passed: cmdResult.passed
+                        });
+                    } else if (toolCall.function.name === 'run_tests') {
+                        const command =
+                            typeof args.command === 'string' && args.command.trim().length > 0
+                                ? args.command
+                                : 'npm test';
+                        const cmdResult = await runCommand(cfg, command);
+                        result = {
+                            exitCode: cmdResult.exitCode,
+                            stdout: cmdResult.stdout,
+                            stderr: cmdResult.stderr,
+                            passed: cmdResult.passed
+                        };
+                        log.info('Tests executed', {
+                            command,
+                            exitCode: cmdResult.exitCode,
+                            passed: cmdResult.passed
+                        });
                     } else {
                         result = "Unknown tool";
                         log.warn('Unknown tool called', { tool: toolCall.function.name });
