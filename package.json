@@ -8,7 +8,7 @@
         "kotef": "bin/kotef"
     },
     "scripts": {
-        "build": "tsc && cp -r src/agent/prompts dist/agent/",
+        "build": "rm -rf dist && tsc && mkdir -p dist/src/agent && cp -r src/agent/prompts dist/src/agent/",
         "test": "tsx --test test/**/*.test.ts",
         "test:e2e": "npm run build && tsx --test test/e2e.test.ts",
         "lint": "eslint src test --ext .ts",
@@ -36,7 +36,7 @@
     },
     "devDependencies": {
         "@types/diff": "^7.0.2",
-        "@types/node": "^20.11.24",
+        "@types/node": "^20.19.25",
         "@typescript-eslint/eslint-plugin": "^8.47.0",
         "@typescript-eslint/parser": "^8.47.0",
         "eslint": "^8.57.0",

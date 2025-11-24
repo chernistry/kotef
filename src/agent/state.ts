@@ -13,10 +13,10 @@ export interface SddContext {
 export interface AgentState {
     messages: ChatMessage[];
     sdd: SddContext;
-    plan?: unknown;        // later refined
-    researchResults?: unknown;
-    fileChanges?: unknown;
-    testResults?: unknown;
+    plan?: any;
+    researchResults?: any;
+    fileChanges?: Record<string, string>;
+    testResults?: any;
     done?: boolean;
     /** Internal flag to distinguish between bootstrap vs normal ticket execution. */
     hasSdd?: boolean;

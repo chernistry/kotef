@@ -3,7 +3,7 @@
 Spec version: v1.0  
 Context: `.sdd/project.md` (quality & evaluation goals), `.sdd/best_practices.md` (metrics, budgets),  
 `allthedocs/learning/research/ai_engineering/Prompt_Engineering_Techniques_Comprehensive_Guide.md` (data-driven prompt optimization)  
-Dependencies: 01-scaffold-core, 03-tools-search, 04-agent-graph, 08-runtime-prompts-hardening.
+Dependencies: 01-scaffold-core, web/search tools (from closed 03-tools-search), coding graph (from closed 04-agent-graph), 03-sddrush-template-driver, 04-interactive-sdd-orchestrator-graph, 05-interactive-cli-session, 08-runtime-prompts-hardening.
 
 ## Objective & DoD
 Create a small, **data-driven evaluation harness** for kotef’s runtime prompts and LLM behavior so we can:
@@ -101,4 +101,3 @@ You MAY:
 - Do **not** turn this into a full-blown benchmarking framework; focus on a pragmatic dev tool.
 - Do **not** require special cloud infra; the eval should run on a local dev machine or CI runner.
 - Do **not** entangle eval logic with core agent logic; keep the harness as a thin wrapper around the CLI. 
-

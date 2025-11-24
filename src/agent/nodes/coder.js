@@ -1,19 +1,13 @@
-import { AgentState } from '../state.js';
-import { KotefConfig } from '../../core/config.js';
-
 import { loadPrompt } from '../../core/prompts.js';
-import { callChat, ChatMessage } from '../../core/llm.js';
+import { callChat } from '../../core/llm.js';
 import { readFile, writePatch } from '../../tools/fs.js';
-
-export function coderNode(cfg: KotefConfig, chatFn = callChat) {
-    return async (state: AgentState): Promise<Partial<AgentState>> => {
+export function coderNode(cfg, chatFn = callChat) {
+    return async (state) => {
         const promptTemplate = await loadPrompt('coder');
-
         // Contextualize prompt
         const systemPrompt = promptTemplate
             .replace('{{ticket}}', state.sdd.ticket || 'No ticket provided');
-
-        const messages: ChatMessage[] = [
+        const messages = [
             { role: 'system', content: systemPrompt },
             ...state.messages,
             {
@@ -23,7 +17,6 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         Research: ${JSON.stringify(state.researchResults)}`
             }
         ];
-
         // Define tools for the coder
         const tools = [
             {
@@ -56,7 +49,6 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                 }
             }
         ];
-
         // Call LLM with tools
         // We might need a loop here if the LLM wants to make multiple tool calls.
         // For MVP, let's do one turn: LLM -> Tool -> LLM (confirmation).
@@ -67,47 +59,43 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         // Let's assume we need to handle execution here or `callChat` does it.
         // Re-reading Ticket 01 sketch: "Thin wrapper around OpenAI-compatible SDK".
         // So we likely need to execute tools here.
-
         // Let's do a simple loop for max 5 turns.
         const currentMessages = [...messages];
         let turns = 0;
         const maxTurns = 5;
         let fileChanges = state.fileChanges || {};
-
         while (turns < maxTurns) {
             const response = await chatFn(cfg, currentMessages, {
                 model: cfg.modelStrong, // Coder uses strong model
-                tools: tools as any // Cast to avoid strict type mismatch if any
+                tools: tools // Cast to avoid strict type mismatch if any
             });
-
             const msg = response.messages[response.messages.length - 1];
             currentMessages.push(msg);
-
             if (!msg.tool_calls || msg.tool_calls.length === 0) {
                 // No more tools, we are done
                 break;
             }
-
             // Execute tools
             for (const toolCall of msg.tool_calls) {
                 const args = JSON.parse(toolCall.function.arguments);
-                let result: any;
-
+                let result;
                 try {
                     if (toolCall.function.name === 'read_file') {
-                        result = await readFile({ rootDir: cfg.rootDir! }, args.path);
-                    } else if (toolCall.function.name === 'write_patch') {
-                        await writePatch({ rootDir: cfg.rootDir! }, args.path, args.diff);
+                        result = await readFile({ rootDir: cfg.rootDir }, args.path);
+                    }
+                    else if (toolCall.function.name === 'write_patch') {
+                        await writePatch({ rootDir: cfg.rootDir }, args.path, args.diff);
                         result = "Patch applied successfully.";
                         // Record change
                         fileChanges = { ...(fileChanges || {}), [args.path]: 'patched' };
-                    } else {
+                    }
+                    else {
                         result = "Unknown tool";
                     }
-                } catch (e: any) {
+                }
+                catch (e) {
                     result = `Error: ${e.message}`;
                 }
-
                 currentMessages.push({
                     role: 'tool',
                     tool_call_id: toolCall.id,
@@ -116,7 +104,6 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             }
             turns++;
         }
-
         return {
             fileChanges,
             messages: currentMessages.slice(messages.length) // Append new messages

@@ -8,7 +8,7 @@ Navan/CallQuest prompts:
 - `personal_projects/navan/root/src/prompts/planner.md`
 - `personal_projects/finearts/callquest/root/src/prompts/meta_agent.md`
 
-Dependencies: 01-scaffold-core, 03-tools-search, 04-agent-graph (graph & state), 05-cli-entrypoint.
+Dependencies: 01-scaffold-core, web/search tools (from closed 03-tools-search), coding graph (from closed 04-agent-graph), 03-sddrush-template-driver, 04-interactive-sdd-orchestrator-graph, 05-interactive-cli-session.
 
 ## Objective & DoD
 Design and implement **runtime** prompts (not SDD prompts) for kotef’s coding agent (meta-agent, planner, researcher, coder, verifier) that:
@@ -116,4 +116,3 @@ npm test test/core/prompts.test.ts
 - Do **not** modify SDD prompts in `.sdd/prompts/*.prompt.md` as part of this ticket; they are part of the SDDRush “brain” and are handled separately.
 - Do **not** rely on hidden chain-of-thought in user-facing outputs; separate any internal reasoning requests from visible answer channels per the prompt guide.
 - Do **not** hardcode provider/model names in prompts; refer generically to “the model” and keep provider-specific tuning in config, not in prompt text.
-

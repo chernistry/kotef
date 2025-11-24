@@ -2,7 +2,7 @@
 
 Spec version: v1.0  
 Context: `.sdd/project.md` (Definition of Done: evaluation harness), `.sdd/best_practices.md` Sections on evaluation/metrics, `.sdd/architect.md` Sections 8–10  
-Dependencies: 01–05 (requires runnable CLI + graph).
+Dependencies: 01–05 (core runtime, SDD driver, orchestrator graph, interactive CLI).
 
 ## Objective & DoD
 Set up evaluation scenarios and CI integration to ensure agent quality and prevent regressions as kotef evolves.

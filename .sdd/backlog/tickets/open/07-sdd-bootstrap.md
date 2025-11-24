@@ -1,8 +1,9 @@
 # Ticket: 07 SDD Bootstrap & Auto-Spec Builder
 
 Spec version: v1.0  
-Context: `.sdd/project.md` (Definition of Done: auto-SDD mode), `.sdd/architect.md` (Orchestrator / Agent Sketch – Bootstrap / Spec-Builder node), `.sdd/best_practices.md` (research + SDD governance)  
-Dependencies: 01-scaffold-core, 02-tools-fs, 03-tools-search, 04-agent-graph, 05-cli-entrypoint.
+Context: `.sdd/project.md` (Definition of Done: auto-SDD mode), `.sdd/architect.md` (Orchestrator / Agent Sketch – Bootstrap / Spec-Builder node), `.sdd/best_practices.md` (research + SDD governance),  
+Tickets 03 (template driver), 04 (SDD orchestrator graph), 05 (interactive CLI), 08 (runtime prompts)  
+Dependencies: 01-scaffold-core, 02-tools-fs, 03-sddrush-template-driver, 04-interactive-sdd-orchestrator-graph, 05-interactive-cli-session, web/search tools (from closed 03-tools-search), coding graph (from closed 04-agent-graph).
 
 ## Objective & DoD
 Enable kotef to take a **plain-text user goal + repo path** (with no existing `.sdd/` directory) and:
@@ -53,20 +54,17 @@ export async function bootstrapSddForProject(
 
 High-level bootstrap pipeline:
 1. **Repo scan** – use FS tools to list key files (`package.json`, `tsconfig.json`, major entrypoints) and infer stack.
-2. **Best-practice research** – call `deepResearch` with prompts derived from `.sdd/best_practices.md` and the inferred stack.
-3. **Project spec synthesis** – use `callChat` with a “project spec” prompt (inspired by `brain/.sdd/prompts/01_research.prompt.md` and `02_architect.prompt.md`) to draft:
-   - `.sdd/project.md` tailored to the user’s goal + repo reality,
-   - a minimal `.sdd/architect.md` describing components and constraints.
-4. **Ticket generation** – use another LLM call (prompt inspired by `03_agent.prompt.md`) to create 1–N tickets in `.sdd/backlog/tickets/open/`.
-5. **Write artifacts** – call FS tools to create `.sdd/` and write files:
+2. **SDD orchestration** – reuse the SDD orchestrator graph from Ticket 04 (`runSddOrchestration`) which itself:
+   - uses `renderBrainTemplate` from Ticket 03,
+   - uses web_search/deep_research tools for evidence,
+   - writes `.sdd/best_practices.md`, `.sdd/architect.md`, and initial tickets.
+3. **Project spec synthesis** – ensure that `.sdd/project.md` is created/updated based on the user’s goal + repo scan (may be part of orchestrator flow or a dedicated step here).
+4. **Write artifacts** – call FS tools to create `.sdd/` and write files:
    - ensure directories exist,
    - respect diff-first policy if any SDD files are present.
 
-Bootstrap prompts should:
-- **reuse structure** from the SDDRush `brain/` prompts, and you MAY **directly borrow prompt text** as a starting point,
-- be clearly adapted for “target repo” use (avoid hardcoding paths like `personal_projects/kotef`),
-- be refactored and hardened according to  
-  `allthedocs/learning/research/ai_engineering/Prompt_Engineering_Techniques_Comprehensive_Guide.md` (structured sections, explicit constraints, JSON modes where applicable, refusal policies, grounding instructions).
+Bootstrap must **reuse SDDRush templates via the driver from Ticket 03**, not reinvent them, and follow prompt best practices from  
+`allthedocs/learning/research/ai_engineering/Prompt_Engineering_Techniques_Comprehensive_Guide.md`.
 
 ## Steps
 1. Design types and skeleton for `src/agent/bootstrap.ts` (`BootstrapContext`, `bootstrapSddForProject`).
