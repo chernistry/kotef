@@ -42,6 +42,12 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         };
 
         const executionProfile = inferProfile();
+        const profileTurns: Record<ExecutionProfile, number> = {
+            strict: 20,
+            fast: 12,
+            smoke: 6,
+            yolo: 50
+        };
 
         const replacements: Record<string, string> = {
             '{{TICKET}}': safe(state.sdd.ticket),
@@ -183,7 +189,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         // Let's do a simple loop for max turns.
         const currentMessages = [...messages];
         let turns = 0;
-        const maxTurns = 20; // Increased for large context models
+        const maxTurns = profileTurns[executionProfile] ?? 20;
         let fileChanges = state.fileChanges || {};
 
         log.info('Starting coder tool execution loop', { maxTurns });

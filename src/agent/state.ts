@@ -10,7 +10,7 @@ export interface SddContext {
     issues?: string;       // issues encountered
 }
 
-export type ExecutionProfile = 'strict' | 'fast' | 'smoke';
+export type ExecutionProfile = 'strict' | 'fast' | 'smoke' | 'yolo';
 
 export interface AgentState {
     messages: ChatMessage[];

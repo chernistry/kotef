@@ -1,5 +1,5 @@
 import { StateGraph, END, START } from '@langchain/langgraph';
-import { AgentState } from './state.js';
+import { AgentState, ExecutionProfile } from './state.js';
 import { KotefConfig } from '../core/config.js';
 import { plannerNode } from './nodes/planner.js';
 import { researcherNode } from './nodes/researcher.js';
@@ -50,6 +50,10 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             hasSdd: {
                 reducer: (a, b) => b,
                 default: () => false,
+            },
+            runProfile: {
+                reducer: (a: ExecutionProfile | undefined, b: ExecutionProfile | undefined) => b ?? a,
+                default: () => undefined,
             }
         }
     });
@@ -93,7 +97,19 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
         "planner" as any,
         (state) => {
             const next = (state.plan as any)?.next;
-            if (next === 'researcher') return 'researcher';
+
+            if (next === 'researcher') {
+                const rr: any = state.researchResults;
+                // Avoid infinite planner→researcher loops when research has already been
+                // satisfied from SDD or previously failed.
+                if (rr && !Array.isArray(rr)) {
+                    if (rr.source === 'sdd' || rr.error) {
+                        return 'snitch';
+                    }
+                }
+                return 'researcher';
+            }
+
             if (next === 'coder') return 'coder';
             if (next === 'verifier') return 'verifier';
             if (next === 'done') return 'end';

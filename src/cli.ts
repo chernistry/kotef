@@ -1,15 +1,91 @@
 import { Command } from 'commander';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import readline from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
+import chalk from 'chalk';
+import MarkdownIt from 'markdown-it';
+
 import { loadConfig, KotefConfig } from './core/config.js';
 import { createLogger } from './core/logger.js';
 import { buildKotefGraph } from './agent/graph.js';
 import { bootstrapSddForProject } from './agent/bootstrap.js';
 import { writeRunReport, RunSummary } from './agent/run_report.js';
 import { AgentState } from './agent/state.js';
-import { randomUUID } from 'node:crypto';
 
 const program = new Command();
+
+type Styler = (value: string) => string;
+const identity: Styler = (value: string) => value;
+
+interface BlockParts {
+    top: string;
+    body: string;
+    bottom: string;
+}
+
+const FRAME_BAR = '─'.repeat(44);
+
+const md = new MarkdownIt({
+    breaks: true,
+    linkify: true
+});
+
+function createBlock(title: string, message: string, accent: Styler, body: Styler): BlockParts {
+    const lines = message.split('\n').map(line => (line.length === 0 ? ' ' : line));
+    const topPlain = `┌─ ${title.toUpperCase()} ${FRAME_BAR}`;
+    const bottomPlain = `└${'─'.repeat(Math.max(topPlain.length - 1, 0))}`;
+    const prefixed = lines
+        .map(line => `${accent('│')} ${body(line)}`)
+        .join('\n');
+    return {
+        top: accent(topPlain),
+        body: prefixed,
+        bottom: accent(bottomPlain)
+    };
+}
+
+function renderMarkdownToTerminal(markdown: string): string {
+    const html = md.render(markdown);
+
+    const formatted = html
+        // Headers
+        .replace(/<h1>(.*?)<\/h1>/gi, `${chalk.bold.blue('\n$1\n')}${'='.repeat(50)}`)
+        .replace(/<h2>(.*?)<\/h2>/gi, `${chalk.bold.cyan('\n$1\n')}${'-'.repeat(30)}`)
+        .replace(/<h3>(.*?)<\/h3>/gi, chalk.bold.yellow('\n$1'))
+        .replace(/<h[4-6]>(.*?)<\/h[4-6]>/gi, chalk.bold.magenta('\n$1'))
+        // Bold / italic
+        .replace(/<strong>(.*?)<\/strong>/gi, chalk.bold('$1'))
+        .replace(/<b>(.*?)<\/b>/gi, chalk.bold('$1'))
+        .replace(/<em>(.*?)<\/em>/gi, chalk.italic('$1'))
+        .replace(/<i>(.*?)<\/i>/gi, chalk.italic('$1'))
+        // Code
+        .replace(/<code>(.*?)<\/code>/gi, chalk.bgGray.white(' $1 '))
+        .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/gi, (_m: string, code: string) => {
+            return '\n' + chalk.bgGray.white(' ' + code.trim() + ' ') + '\n';
+        })
+        // Links
+        .replace(/<a href="([^"]+)">(.*?)<\/a>/gi, (_m: string, href: string, text: string) => {
+            return chalk.blue.underline(text) + ' ' + chalk.gray('(' + href + ')');
+        })
+        // Lists
+        .replace(/<ul>/gi, '')
+        .replace(/<\/ul>/gi, '')
+        .replace(/<ol>/gi, '')
+        .replace(/<\/ol>/gi, '')
+        .replace(/<li>(.*?)<\/li>/gi, '  • $1\n')
+        // Paragraphs
+        .replace(/<p>(.*?)<\/p>/gi, '$1\n')
+        // Line breaks
+        .replace(/<br\s*\/?>(?!\n)/gi, '\n')
+        // Strip remaining tags
+        .replace(/<\/?[^>]+(>|$)/g, '')
+        .replace(/\n\s*\n/g, '\n\n')
+        .trim();
+
+    return formatted;
+}
 
 program
     .name('kotef')
@@ -25,6 +101,7 @@ program
     .option('--dry-run', 'Run in dry-run mode (no file writes)', false)
     .option('--max-time <seconds>', 'Maximum run time in seconds')
     .option('--max-tokens <count>', 'Maximum tokens per run')
+    .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .action(async (options) => {
         const runId = randomUUID();
         const rootDir = path.resolve(options.root);
@@ -98,6 +175,8 @@ program
                     ticket: ticketContent
                 },
                 hasSdd: true,
+                // In YOLO mode we bias the planner/coder towards the most aggressive profile.
+                runProfile: options.yolo ? 'yolo' : undefined,
                 fileChanges: {},
                 testResults: {},
                 researchResults: []
@@ -166,61 +245,76 @@ program
         }
     });
 
-import readline from 'node:readline';
 import { runSddOrchestration } from './agent/graphs/sdd_orchestrator.js';
-
-// Helper for interactive prompts
-function promptUser(query: string): Promise<string> {
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-    });
-
-    return new Promise((resolve) => {
-        rl.question(query, (answer) => {
-            rl.close();
-            resolve(answer.trim());
-        });
-    });
-}
 
 program
     .command('chat')
-    .description('Interactive coding session (Voyant-style)')
+    .description('Interactive coding session (Voyant-style, Navan-like CLI)')
     .option('--root <path>', 'Project root directory', process.cwd())
     .option('--goal <text>', 'Initial goal')
+    .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .action(async (options) => {
         const rootDir = path.resolve(options.root);
         const envConfig = loadConfig();
         const cfg: KotefConfig = {
             ...envConfig,
-            rootDir,
+            rootDir
         };
 
-        console.log(`\n🤖 Kotef Interactive Session`);
-        console.log(`   Project: ${rootDir}\n`);
+        const rl = readline.createInterface({ input, output });
 
-        let goal = options.goal;
+        console.log(
+            chalk.cyan(`
+  ██╗  ██╗ ██████╗ ████████╗███████╗███████╗███████╗
+  ██║ ██╔╝██╔═══██╗╚══██╔══╝██╔════╝██╔════╝██╔════╝
+  █████╔╝ ██║   ██║   ██║   █████╗  ███████╗█████╗  
+  ██╔═██╗ ██║   ██║   ██║   ██╔══╝  ╚════██║██╔══╝  
+  ██║  ██╗╚██████╔╝   ██║   ███████╗███████║███████╗
+  ╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚══════╝╚══════╝╚══════╝
+`)
+        );
+        console.log(chalk.yellow.bold('🤖 KOTEF Coding Agent CLI — SDD-driven code edits'));
+        console.log(chalk.gray('─'.repeat(72)));
+        console.log(
+            chalk.white(
+                chalk.green('• Give me a goal, I bootstrap .sdd and tickets\n') +
+                chalk.green('• Then I execute tickets inside your repo (like Codex/Claude Code)\n') +
+                chalk.blue('Commands: ') +
+                chalk.blue('/exit') +
+                chalk.gray(' to quit\n')
+            )
+        );
+        console.log(chalk.gray('─'.repeat(72)));
+        console.log(chalk.gray(`Project root: ${rootDir}\n`));
+
         let keepRunning = true;
 
         while (keepRunning) {
-            // 1. Get Goal
-            if (!goal) {
-                goal = await promptUser('🎯 What would you like to do? ');
-                if (!goal) continue;
-            }
+            const goal =
+                options.goal ||
+                (await rl.question(chalk.blue.bold('You> '))).trim();
 
-            console.log(`\n🚀 Goal: "${goal}"`);
-            const confirm = await promptUser('   Proceed with this goal? [Y/n] ');
-            if (confirm.toLowerCase() === 'n') {
-                goal = undefined;
+            if (!goal) {
                 continue;
             }
+            if (goal.toLowerCase() === '/exit') {
+                break;
+            }
 
-            // 2. Run SDD Orchestration
-            console.log('\n🧠 Orchestrating SDD (Research -> Architect -> Tickets)...');
+            const userBlock = createBlock('You', goal, chalk.blueBright, chalk.white);
+            console.log();
+            console.log(userBlock.top);
+            if (userBlock.body.length > 0) {
+                console.log(userBlock.body);
+            }
+            console.log(userBlock.bottom);
+
+            // Orchestrate SDD (research → architect → tickets)
+            console.log(chalk.gray('\n┌─ ORCHESTRATOR ' + '─'.repeat(40)));
+            console.log(chalk.gray('│ Running SDD bootstrap/orchestration...'));
+            console.log(chalk.gray('└' + '─'.repeat(53)));
+
             try {
-                // Check if .sdd exists
                 const sddDir = path.join(rootDir, '.sdd');
                 let sddExists = false;
                 try {
@@ -231,127 +325,145 @@ program
                 }
 
                 if (!sddExists) {
-                    // Bootstrap
                     await bootstrapSddForProject(cfg, rootDir, goal);
                 } else {
-                    // Just run orchestrator (or maybe we should always run orchestrator? 
-                    // Orchestrator updates best_practices/architect/tickets.
-                    // Bootstrap creates project.md THEN runs orchestrator.
-                    // If project.md exists, we can just run orchestrator.
-                    // But if we want to "re-bootstrap" (update project.md from goal), we might need logic.
-                    // For now, if .sdd exists, assume project.md exists and just run orchestrator.
                     await runSddOrchestration(cfg, rootDir, goal);
                 }
             } catch (e: any) {
-                console.error('❌ SDD Orchestration failed:', e.message);
-                goal = undefined;
+                const msg = e?.message || String(e);
+                console.log(chalk.red(`❌ SDD Orchestration failed: ${msg}`));
+                options.goal = undefined;
                 continue;
             }
 
-            // 3. List Tickets
+            // List tickets
             const ticketsDir = path.join(rootDir, '.sdd/backlog/tickets/open');
             let tickets: string[] = [];
             try {
                 tickets = (await fs.readdir(ticketsDir)).filter(f => f.endsWith('.md')).sort();
             } catch {
-                // No tickets found
+                tickets = [];
             }
 
             if (tickets.length === 0) {
-                console.log('⚠️ No tickets generated. Check .sdd/architect.md for details.');
-            } else {
-                console.log(`\n📋 Generated Tickets:`);
-                tickets.forEach(t => console.log(`   - ${t}`));
+                console.log(chalk.yellow('\n⚠️  No tickets generated. Check .sdd/architect.md for details.\n'));
+                options.goal = undefined;
+                continue;
+            }
 
-                // 4. Execute Tickets
-                const proceed = await promptUser('\n⚡ Execute these tickets now? [Y/n] ');
-                if (proceed.toLowerCase() !== 'n') {
-                    for (const ticket of tickets) {
-                        console.log(`\n🔨 Executing Ticket: ${ticket}`);
+            console.log(chalk.green('\n📋 Generated tickets:'));
+            tickets.forEach(t => console.log(chalk.green(`   • ${t}`)));
 
-                        // Reuse run logic (simplified)
-                        // We need to reload SDD artifacts for each ticket as they might change (though usually they don't during execution, but state does)
-                        // Actually, we should probably call a shared function.
-                        // For now, I'll duplicate the setup logic to avoid massive refactor of `run` command, 
-                        // but I'll strip it down to essentials.
+            const proceed = (
+                await rl.question(chalk.yellow('\nExecute these tickets now? [Y/n] '))
+            ).trim().toLowerCase();
 
-                        const runId = randomUUID();
-                        const log = createLogger(runId); // We might want to silence file logs or keep them? Keep them.
-                        const startTime = Date.now();
+            if (proceed === 'n') {
+                options.goal = undefined;
+                continue;
+            }
 
-                        try {
-                            const sddDir = path.join(rootDir, '.sdd');
-                            const projectMd = await fs.readFile(path.join(sddDir, 'project.md'), 'utf-8').catch(() => '');
-                            const architectMd = await fs.readFile(path.join(sddDir, 'architect.md'), 'utf-8').catch(() => '');
-                            const bestPracticesMd = await fs.readFile(path.join(sddDir, 'best_practices.md'), 'utf-8').catch(() => '');
-                        const ticketContent = await fs.readFile(path.join(ticketsDir, ticket), 'utf-8');
+            // Execute tickets sequentially
+            for (const ticket of tickets) {
+                console.log(chalk.cyan(`\n🔨 Executing ticket: ${ticket}`));
 
-                            const initialState: Partial<AgentState> = {
-                                messages: [{ role: 'user', content: `Execute ticket: ${ticket}` }], // Contextualize?
-                                sdd: {
-                                    project: projectMd,
-                                    architect: architectMd,
-                                    bestPractices: bestPracticesMd,
-                                    ticket: ticketContent
-                                },
-                                hasSdd: true,
-                                fileChanges: {},
-                                testResults: {},
-                                researchResults: []
-                            };
+                const runId = randomUUID();
+                const log = createLogger(runId);
+                const startTime = Date.now();
 
-                        const graph = buildKotefGraph(cfg);
-                        const result = await graph.invoke(initialState);
+                try {
+                    const sddDir = path.join(rootDir, '.sdd');
+                    const projectMd = await fs.readFile(path.join(sddDir, 'project.md'), 'utf-8').catch(() => '');
+                    const architectMd = await fs.readFile(path.join(sddDir, 'architect.md'), 'utf-8').catch(() => '');
+                    const bestPracticesMd = await fs.readFile(path.join(sddDir, 'best_practices.md'), 'utf-8').catch(() => '');
+                    const ticketContent = await fs.readFile(path.join(ticketsDir, ticket), 'utf-8');
 
-                        if (result.done) {
-                            console.log(`✅ Ticket ${ticket} completed.`);
-                            // Move ticket to closed backlog
-                            try {
-                                const closedDir = path.join(sddDir, 'backlog/tickets/closed');
-                                await fs.mkdir(closedDir, { recursive: true });
-                                const src = path.join(ticketsDir, ticket);
-                                const dest = path.join(closedDir, ticket);
-                                await fs.rename(src, dest);
-                                console.log(`📁 Moved ${ticket} → backlog/tickets/closed`);
-                            } catch (moveErr: any) {
-                                console.warn(
-                                    `⚠️ Failed to move ${ticket} to closed backlog: ${moveErr?.message}`
-                                );
-                            }
-                            } else {
-                                console.log(`⚠️ Ticket ${ticket} finished with partial status.`);
-                            }
+                    const initialState: Partial<AgentState> = {
+                        messages: [{ role: 'user', content: `Execute ticket: ${ticket}` }],
+                        sdd: {
+                            project: projectMd,
+                            architect: architectMd,
+                            bestPractices: bestPracticesMd,
+                            ticket: ticketContent
+                        },
+                        hasSdd: true,
+                        runProfile: options.yolo ? 'yolo' : undefined,
+                        fileChanges: {},
+                        testResults: {},
+                        researchResults: []
+                    };
 
-                            // Write report
-                            const endTime = Date.now();
-                            const durationSeconds = (endTime - startTime) / 1000;
+                    const graph = buildKotefGraph(cfg);
+                    const result = await graph.invoke(initialState);
 
-                            const summary: RunSummary = {
-                                status: result.done ? 'success' : 'partial',
-                                plan: result.plan ? JSON.stringify(result.plan, null, 2) : 'No plan',
-                                filesChanged: Object.keys(result.fileChanges || {}),
-                                tests: JSON.stringify(result.testResults || {}, null, 2),
-                                issues: (result.sdd as any)?.issues,
-                                durationSeconds
-                            };
-                            await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
+                    const endTime = Date.now();
+                    const durationSeconds = (endTime - startTime) / 1000;
 
-                        } catch (e: any) {
-                            console.error(`❌ Failed to execute ticket ${ticket}:`, e.message);
-                        }
+                    const summary: RunSummary = {
+                        status: result.done ? 'success' : 'partial',
+                        plan: result.plan ? JSON.stringify(result.plan, null, 2) : 'No plan',
+                        filesChanged: Object.keys(result.fileChanges || {}),
+                        tests: JSON.stringify(result.testResults || {}, null, 2),
+                        issues: (result.sdd as any)?.issues,
+                        durationSeconds
+                    };
+
+                    await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
+
+                    const reportText = `Status: ${summary.status}\n` +
+                        `Files changed: ${summary.filesChanged.join(', ') || 'none'}\n` +
+                        `Duration: ${durationSeconds.toFixed(2)}s`;
+
+                    const assistantBlock = createBlock(
+                        'Kotef',
+                        renderMarkdownToTerminal(reportText),
+                        chalk.greenBright,
+                        identity
+                    );
+                    console.log();
+                    console.log(assistantBlock.top);
+                    if (assistantBlock.body.length > 0) {
+                        console.log(assistantBlock.body);
                     }
+                    console.log(assistantBlock.bottom);
+
+                    if (result.done) {
+                        console.log(chalk.green(`✅ Ticket ${ticket} completed.`));
+                        // Move ticket to closed backlog
+                        try {
+                            const closedDir = path.join(sddDir, 'backlog/tickets/closed');
+                            await fs.mkdir(closedDir, { recursive: true });
+                            const src = path.join(ticketsDir, ticket);
+                            const dest = path.join(closedDir, ticket);
+                            await fs.rename(src, dest);
+                            console.log(chalk.gray(`📁 Moved ${ticket} → backlog/tickets/closed`));
+                        } catch (moveErr: any) {
+                            console.warn(
+                                chalk.yellow(
+                                    `⚠️  Failed to move ${ticket} to closed backlog: ${moveErr?.message}`
+                                )
+                            );
+                        }
+                    } else {
+                        console.log(chalk.yellow(`⚠️  Ticket ${ticket} finished with partial/blocked status.`));
+                    }
+                } catch (e: any) {
+                    log.error('Ticket execution failed', { ticket, error: e?.message });
+                    console.error(chalk.red(`❌ Failed to execute ticket ${ticket}: ${e?.message}`));
                 }
             }
 
-            // 5. Loop
-            goal = undefined; // Reset goal
-            const another = await promptUser('\n🔄 Start another goal? [y/N] ');
-            if (another.toLowerCase() !== 'y') {
+            options.goal = undefined;
+            const another = (await rl.question(chalk.gray('\nStart another goal? [y/N] ')))
+                .trim()
+                .toLowerCase();
+            if (another !== 'y') {
                 keepRunning = false;
             }
         }
 
-        console.log('\n👋 Bye!');
+        rl.close();
+        console.log(chalk.gray('\n👋 Bye!'));
     });
 
 program.parse();

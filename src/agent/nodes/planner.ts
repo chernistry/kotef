@@ -74,7 +74,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         }
 
         const isValidProfile = (p: any): p is ExecutionProfile =>
-            p === 'strict' || p === 'fast' || p === 'smoke';
+            p === 'strict' || p === 'fast' || p === 'smoke' || p === 'yolo';
 
         // Heuristic default profile based on architect SDD
         const architectText = state.sdd.architect || '';
