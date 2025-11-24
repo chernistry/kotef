@@ -48,7 +48,24 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{RESEARCH_RESULTS}}': safe(state.researchResults),
             '{{FILE_CHANGES}}': safe(state.fileChanges),
             '{{TEST_RESULTS}}': safe(state.testResults),
+            '{{FAILURE_HISTORY}}': safe(state.failureHistory),
         };
+
+        // Check for bounded loops (Ticket 11)
+        const MAX_FAILURES = 3;
+        if (state.failureHistory && state.failureHistory.length >= MAX_FAILURES) {
+            const lastFailure = state.failureHistory[state.failureHistory.length - 1];
+            log.warn('Max failures reached, forcing snitch', { failures: state.failureHistory.length });
+            return {
+                plan: {
+                    next: 'snitch',
+                    reason: `Max failures reached (${state.failureHistory.length}). Last error: ${lastFailure.error}`,
+                    profile: state.runProfile,
+                    plan: []
+                },
+                done: true // Snitch will handle logging
+            };
+        }
 
         let systemPrompt = promptTemplate;
         for (const [token, value] of Object.entries(replacements)) {

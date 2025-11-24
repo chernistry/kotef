@@ -104,12 +104,13 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
 
             if (next === 'researcher') {
                 const rr: any = state.researchResults;
-                // Avoid infinite planner→researcher loops when research has already been
-                // satisfied from SDD or previously failed.
+                // Avoid infinite planner→researcher loops when research has already been satisfied.
+                if (Array.isArray(rr) && rr.length > 0) {
+                    return 'coder';
+                }
                 if (rr && !Array.isArray(rr)) {
-                    if (rr.source === 'sdd' || rr.error) {
-                        return 'snitch';
-                    }
+                    if (rr.source === 'sdd') return 'coder';
+                    if (rr.error) return 'snitch';
                 }
                 return 'researcher';
             }
@@ -118,7 +119,10 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             if (next === 'verifier') return 'verifier';
             if (next === 'done') return 'end';
             if (next === 'snitch' || next === 'ask_human') return 'snitch';
-            return 'researcher'; // Default fallback
+            // Fallback: if research already exists, go to coder; else research
+            const rr: any = state.researchResults;
+            if (Array.isArray(rr) && rr.length > 0) return 'coder';
+            return 'researcher';
         },
         {
             researcher: "researcher" as any,

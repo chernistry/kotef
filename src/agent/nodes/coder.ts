@@ -228,7 +228,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             const response = await chatFn(cfg, trimHistory(currentMessages), {
                 model: cfg.modelStrong, // Coder uses strong model
                 tools: tools as any, // Cast to avoid strict type mismatch if any
-                maxTokens: 512,
+                maxTokens: 32000, // Increased to 32k for large file generation
                 temperature: 0
             });
 

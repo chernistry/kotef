@@ -12,6 +12,7 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Research so far: `{{RESEARCH_RESULTS}}`
 - File changes so far: `{{FILE_CHANGES}}`
 - Test results so far: `{{TEST_RESULTS}}`
+- Failure History: `{{FAILURE_HISTORY}}`
 - Execution Profile: `{{EXECUTION_PROFILE}}`
 
 # Policies & Guardrails

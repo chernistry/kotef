@@ -27,10 +27,22 @@ export function snitchNode(cfg: KotefConfig) {
             ticketSnippet ? `**Ticket:** ${ticketSnippet}` : '',
             '',
             `**Reason:** ${reason}`,
-            '',
-            'Source: planner decision with `next="snitch"`.',
             ''
         ].filter(Boolean);
+
+        // Add failure history if present
+        if (state.failureHistory && state.failureHistory.length > 0) {
+            entryLines.push('**Failure History:**');
+            entryLines.push('');
+            state.failureHistory.forEach((failure, idx) => {
+                const timeStr = new Date(failure.timestamp).toISOString();
+                entryLines.push(`${idx + 1}. [${failure.step}] @ ${timeStr}: ${failure.error}`);
+            });
+            entryLines.push('');
+        }
+
+        entryLines.push('Source: planner decision with `next="snitch"`.');
+        entryLines.push('');
 
         const entry = entryLines.join('\n') + '\n';
 

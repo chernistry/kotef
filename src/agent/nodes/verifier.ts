@@ -72,8 +72,21 @@ export function verifierNode(cfg: KotefConfig) {
         const result = await runCommand(cfg, testCommand);
         log.info('Tests completed', { passed: result.passed });
 
+        let failureHistory = state.failureHistory || [];
+        if (!result.passed) {
+            failureHistory = [
+                ...failureHistory,
+                {
+                    step: 'verifier',
+                    error: `Test failed: ${result.failureSummary || result.stderr || 'Unknown error'}`,
+                    timestamp: Date.now()
+                }
+            ];
+        }
+
         return {
             testResults: result,
+            failureHistory,
             done: result.passed
         }
     };
