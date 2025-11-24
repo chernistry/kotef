@@ -1,26 +1,41 @@
 import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 
-import { loadPrompt } from '../../core/prompts.js';
+import { loadRuntimePrompt } from '../../core/prompts.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
 import { readFile, writePatch } from '../../tools/fs.js';
 
 export function coderNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
-        const promptTemplate = await loadPrompt('coder');
+        const promptTemplate = await loadRuntimePrompt('coder');
 
-        // Contextualize prompt
-        const systemPrompt = promptTemplate
-            .replace('{{ticket}}', state.sdd.ticket || 'No ticket provided');
+        const safe = (value: unknown) => {
+            if (value === undefined || value === null) return '';
+            if (typeof value === 'string') return value;
+            return JSON.stringify(value, null, 2);
+        };
+
+        const replacements: Record<string, string> = {
+            '{{TICKET}}': safe(state.sdd.ticket),
+            '{{GOAL}}': safe(state.sdd.goal),
+            '{{SDD_PROJECT}}': safe(state.sdd.project),
+            '{{SDD_ARCHITECT}}': safe(state.sdd.architect),
+            '{{SDD_BEST_PRACTICES}}': safe(state.sdd.bestPractices),
+            '{{RESEARCH_RESULTS}}': safe(state.researchResults),
+            '{{STATE_PLAN}}': safe(state.plan)
+        };
+
+        let systemPrompt = promptTemplate;
+        for (const [token, value] of Object.entries(replacements)) {
+            systemPrompt = systemPrompt.replaceAll(token, value);
+        }
 
         const messages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
             ...state.messages,
             {
                 role: 'user',
-                content: `Implement the changes. You have access to file tools. 
-        Current Plan: ${JSON.stringify(state.plan)}
-        Research: ${JSON.stringify(state.researchResults)}`
+                content: `Implement the ticket with minimal diffs. Plan: ${safe(state.plan)}`
             }
         ];
 

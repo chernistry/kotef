@@ -8,7 +8,6 @@ import { bootstrapSddForProject } from './agent/bootstrap.js';
 import { writeRunReport, RunSummary } from './agent/run_report.js';
 import { AgentState } from './agent/state.js';
 import { randomUUID } from 'node:crypto';
-import { loadPrompt } from './core/prompts.js';
 
 const program = new Command();
 

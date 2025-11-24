@@ -1,0 +1,8 @@
+{
+  "name": "kotef-fixture-01-add-function",
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "test": "node --test"
+  }
+}
