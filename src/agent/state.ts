@@ -7,6 +7,7 @@ export interface SddContext {
     architect: string;     // raw text from .sdd/architect.md
     bestPractices?: string;
     ticket?: string;       // current ticket markdown
+    issues?: string;       // issues encountered
 }
 
 export interface AgentState {

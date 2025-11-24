@@ -11,7 +11,7 @@ describe('Logger', () => {
 
         try {
             const logger = createLogger('test-run-id');
-            logger('info', 'test message', { foo: 'bar' });
+            logger.info('test message', { foo: 'bar' });
 
             assert.strictEqual(logFn.mock.callCount(), 1);
             const callArgs = logFn.mock.calls[0].arguments;

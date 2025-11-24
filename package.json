@@ -3,7 +3,10 @@
     "version": "0.1.0",
     "description": "Autonomous AI coding & research agent",
     "type": "module",
-    "main": "dist/index.js",
+    "main": "dist/src/index.js",
+    "bin": {
+        "kotef": "bin/kotef"
+    },
     "scripts": {
         "build": "tsc",
         "test": "tsx --test test/**/*.test.ts",

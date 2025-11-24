@@ -23,6 +23,8 @@ export const KotefConfigSchema = z.object({
     maxTokensPerRun: z.number().default(10000),
     /** Max number of outbound web requests per run (search + fetch). */
     maxWebRequestsPerRun: z.number().default(30),
+    /** If true, use deterministic mock responses for LLM calls */
+    mockMode: z.boolean().default(false),
     /** Max wall-clock seconds per run before graceful stop. */
     maxRunSeconds: z.number().default(300),
 });
@@ -44,9 +46,10 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         modelStrong: env.KOTEF_MODEL_STRONG || env.OPENAI_MODEL || "gpt-4.1.1",
         searchApiKey: env.SEARCH_API_KEY || env.TAVILY_API_KEY || env.SERPER_API_KEY,
         dryRun,
-        maxTokensPerRun: env.MAX_TOKENS_PER_RUN ? parseInt(env.MAX_TOKENS_PER_RUN, 10) : undefined,
-        maxWebRequestsPerRun: env.MAX_WEB_REQUESTS_PER_RUN ? parseInt(env.MAX_WEB_REQUESTS_PER_RUN, 10) : undefined,
-        maxRunSeconds: env.MAX_RUN_SECONDS ? parseInt(env.MAX_RUN_SECONDS, 10) : undefined,
+        maxRunSeconds: parseInt(env.MAX_RUN_SECONDS || '300', 10),
+        maxTokensPerRun: parseInt(env.MAX_TOKENS_PER_RUN || '100000', 10),
+        maxWebRequestsPerRun: parseInt(env.MAX_WEB_REQUESTS_PER_RUN || '20', 10),
+        mockMode: env.KOTEF_MOCK_MODE === 'true',
     };
 
     return KotefConfigSchema.parse(config);
