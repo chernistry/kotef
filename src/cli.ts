@@ -11,6 +11,7 @@ import { loadConfig, KotefConfig } from './core/config.js';
 import { createLogger } from './core/logger.js';
 import { buildKotefGraph } from './agent/graph.js';
 import { bootstrapSddForProject } from './agent/bootstrap.js';
+import { buildSddSummaries } from './agent/sdd_summary.js';
 import { writeRunReport, RunSummary } from './agent/run_report.js';
 import { AgentState } from './agent/state.js';
 import { estimateTaskScope } from './agent/task_scope.js';
@@ -169,6 +170,11 @@ program
 
             // Initialize State
             const taskScope = estimateTaskScope(options.goal, ticketContent, architectMd);
+
+            // Build SDD summaries for token optimization (cached to disk)
+            log.info('Building SDD summaries...');
+            const sddSummaries = await buildSddSummaries(cfg, rootDir);
+
             const initialState: Partial<AgentState> = {
                 messages: options.goal ? [{ role: 'user', content: options.goal }] : [],
                 sdd: {
@@ -181,6 +187,7 @@ program
                 // In YOLO mode we bias the planner/coder towards the most aggressive profile.
                 runProfile: options.yolo ? 'yolo' : undefined,
                 taskScope,
+                sddSummaries, // Add summaries to state
                 fileChanges: {},
                 testResults: {},
                 researchResults: []

@@ -85,6 +85,13 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             systemPrompt = systemPrompt.replaceAll(token, value);
         }
 
+        // Use summaries if available (significantly reduces token usage)
+        if (state.sddSummaries) {
+            systemPrompt = systemPrompt.replaceAll('{{SDD_PROJECT}}', state.sddSummaries.projectSummary);
+            systemPrompt = systemPrompt.replaceAll('{{SDD_ARCHITECT}}', state.sddSummaries.architectSummary);
+            systemPrompt = systemPrompt.replaceAll('{{SDD_BEST_PRACTICES}}', state.sddSummaries.bestPracticesSummary);
+        }
+
         const messages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
             ...state.messages,

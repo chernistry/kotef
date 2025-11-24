@@ -33,4 +33,10 @@ export interface AgentState {
     runProfile?: ExecutionProfile;
     /** Rough heuristic of task size to guide profiles and command limits. */
     taskScope?: TaskScope;
+    /** Precomputed SDD summaries for token optimization. */
+    sddSummaries?: {
+        projectSummary: string;
+        architectSummary: string;
+        bestPracticesSummary: string;
+    };
 }
