@@ -1,12 +1,16 @@
 import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
+import { createLogger } from '../../core/logger.js';
 
 import { loadRuntimePrompt } from '../../core/prompts.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
-import { readFile, writePatch } from '../../tools/fs.js';
+import { readFile, writeFile, writePatch } from '../../tools/fs.js';
 
 export function coderNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
+        const log = createLogger('coder');
+        log.info('Coder node started');
+        
         const promptTemplate = await loadRuntimePrompt('coder');
 
         const safe = (value: unknown) => {
@@ -58,8 +62,23 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             {
                 type: 'function',
                 function: {
+                    name: 'write_file',
+                    description: 'Create or overwrite a file with content',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Relative path to file' },
+                            content: { type: 'string', description: 'File content' }
+                        },
+                        required: ['path', 'content']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
                     name: 'write_patch',
-                    description: 'Apply a unified diff patch to a file',
+                    description: 'Apply a unified diff patch to an existing file',
                     parameters: {
                         type: 'object',
                         properties: {
@@ -89,7 +108,10 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         const maxTurns = 5;
         let fileChanges = state.fileChanges || {};
 
+        log.info('Starting coder tool execution loop', { maxTurns });
+        
         while (turns < maxTurns) {
+            log.info(`Coder turn ${turns + 1}/${maxTurns}: Calling LLM...`);
             const response = await chatFn(cfg, currentMessages, {
                 model: cfg.modelStrong, // Coder uses strong model
                 tools: tools as any // Cast to avoid strict type mismatch if any
@@ -99,28 +121,43 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             currentMessages.push(msg);
 
             if (!msg.tool_calls || msg.tool_calls.length === 0) {
+                log.info('No more tool calls, coder finished');
                 // No more tools, we are done
                 break;
             }
 
+            log.info(`Executing ${msg.tool_calls.length} tool calls`);
+            
             // Execute tools
             for (const toolCall of msg.tool_calls) {
                 const args = JSON.parse(toolCall.function.arguments);
                 let result: any;
 
+                log.info('Executing tool', { tool: toolCall.function.name, args });
+
                 try {
                     if (toolCall.function.name === 'read_file') {
                         result = await readFile({ rootDir: cfg.rootDir! }, args.path);
+                        log.info('File read', { path: args.path, size: result.length });
+                    } else if (toolCall.function.name === 'write_file') {
+                        await writeFile({ rootDir: cfg.rootDir! }, args.path, args.content);
+                        result = "File written successfully.";
+                        // Record change
+                        fileChanges = { ...(fileChanges || {}), [args.path]: 'created' };
+                        log.info('File written', { path: args.path, size: args.content.length });
                     } else if (toolCall.function.name === 'write_patch') {
                         await writePatch({ rootDir: cfg.rootDir! }, args.path, args.diff);
                         result = "Patch applied successfully.";
                         // Record change
                         fileChanges = { ...(fileChanges || {}), [args.path]: 'patched' };
+                        log.info('Patch applied', { path: args.path });
                     } else {
                         result = "Unknown tool";
+                        log.warn('Unknown tool called', { tool: toolCall.function.name });
                     }
                 } catch (e: any) {
                     result = `Error: ${e.message}`;
+                    log.error('Tool execution failed', { tool: toolCall.function.name, error: e.message });
                 }
 
                 currentMessages.push({
@@ -131,6 +168,8 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             }
             turns++;
         }
+
+        log.info('Coder node completed', { turns, filesChanged: Object.keys(fileChanges).length });
 
         return {
             fileChanges,

@@ -38,6 +38,20 @@ export async function readFile(ctx: FsContext, relativePath: string): Promise<st
 }
 
 /**
+ * Writes content to a file, creating directories as needed.
+ */
+export async function writeFile(ctx: FsContext, relativePath: string, content: string): Promise<void> {
+    const fullPath = resolvePath(ctx, relativePath);
+    const dir = path.dirname(fullPath);
+    
+    // Create directory if it doesn't exist
+    await fs.mkdir(dir, { recursive: true });
+    
+    // Write file
+    await fs.writeFile(fullPath, content, 'utf8');
+}
+
+/**
  * Lists files matching a pattern, respecting .gitignore.
  */
 export async function listFiles(ctx: FsContext, pattern: string | string[]): Promise<string[]> {
