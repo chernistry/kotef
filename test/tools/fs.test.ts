@@ -1,5 +1,4 @@
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert';
+import { describe, it, beforeEach, afterEach, assert } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { resolvePath, readFile, listFiles, writePatch, FsContext } from '../../src/tools/fs.js';

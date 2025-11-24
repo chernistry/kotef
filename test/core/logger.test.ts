@@ -1,10 +1,10 @@
-import { describe, it, mock } from 'node:test';
-import assert from 'node:assert';
+```javascript
+import { describe, it, assert, vi, afterEach } from 'vitest';
 import { createLogger } from '../../src/core/logger.js';
 
 describe('Logger', () => {
     it('should log structured JSON', () => {
-        const logFn = mock.fn();
+        const logFn = vi.fn();
         // Mock console.log
         const originalConsoleLog = console.log;
         console.log = logFn;

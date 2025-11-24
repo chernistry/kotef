@@ -9,8 +9,9 @@
     },
     "scripts": {
         "build": "rm -rf dist && tsc && mkdir -p dist/src/agent && cp -r src/agent/prompts dist/src/agent/ && mkdir -p dist/brain && cp -r brain/templates dist/brain/",
-        "test": "tsx --test test/**/*.test.ts",
-        "test:e2e": "npm run build && tsx --test test/e2e.test.ts",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:e2e": "npm run build && vitest run test/e2e.test.ts",
         "lint": "eslint src test --ext .ts",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
         "eval:prompts": "npm run build && tsx scripts/eval_prompts.ts"
@@ -26,16 +27,16 @@
     "dependencies": {
         "@langchain/core": "^1.0.6",
         "@langchain/langgraph": "^1.0.2",
+        "chalk": "^5.3.0",
         "cheerio": "^1.1.2",
         "commander": "^12.0.0",
         "diff": "^8.0.2",
         "dotenv": "^16.4.5",
         "fast-glob": "^3.3.3",
+        "markdown-it": "^14.1.0",
         "openai": "^4.28.0",
         "robots-parser": "^3.0.1",
-        "zod": "^3.22.4",
-        "chalk": "^5.3.0",
-        "markdown-it": "^14.1.0"
+        "zod": "^3.22.4"
     },
     "devDependencies": {
         "@types/diff": "^7.0.2",
@@ -45,7 +46,8 @@
         "eslint": "^8.57.0",
         "prettier": "^3.2.5",
         "tsx": "^4.7.1",
-        "typescript": "^5.3.3"
+        "typescript": "^5.3.3",
+        "vitest": "^4.0.13"
     },
     "engines": {
         "node": ">=20.0.0"

@@ -3,6 +3,7 @@ import { KotefConfig } from '../../core/config.js';
 import { createLogger } from '../../core/logger.js';
 
 import { runCommand } from '../../tools/test_runner.js';
+import { resolveExecutionProfile, PROFILE_POLICIES } from '../profiles.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -39,37 +40,60 @@ export function verifierNode(cfg: KotefConfig) {
             } catch {
                 // ignore
             }
+            async function detectTestCommand(projectContext: string = '', rootDir: string = '.'): Promise<string> {
+                // Heuristic 1: Check for package.json scripts
+                try {
+                    const pkgJsonPath = path.join(rootDir, 'package.json');
+                    const pkgJson = JSON.parse(await fs.readFile(pkgJsonPath, 'utf-8'));
+                    if (pkgJson.scripts && pkgJson.scripts.test) {
+                        return 'npm test';
+                    }
+                } catch (e) {
+                    // No package.json or error reading it
+                }
 
-            try {
-                const testsDir = path.join(rootDir, 'tests');
-                await fs.access(testsDir);
-                return 'pytest';
-            } catch {
-                // ignore
-            }
+                // Heuristic 2: Check for python tests
+                if (projectContext.includes('Python') || projectContext.includes('pytest')) {
+                    return 'pytest';
+                }
 
-            // Fallback to npm if package.json exists.
-            try {
-                const pkgPath = path.join(rootDir, 'package.json');
-                await fs.access(pkgPath);
+                // Heuristic 3: Check for go tests
+                if (projectContext.includes('Go')) {
+                    return 'go test ./...';
+                }
+
+                // Final fallback: generic command.
                 return 'npm test';
-            } catch {
-                // ignore
+            }
+            const executionProfile = resolveExecutionProfile(state);
+            const policy = PROFILE_POLICIES[executionProfile];
+
+            // In smoke profile, we might skip tests if we just want a quick check,
+            // but usually verifier IS the check.
+            // However, if we have limited test runs, we should respect that.
+            // For now, we will just log the profile.
+            log.info('Verifier starting', { executionProfile, policy });
+
+            // If we have already exceeded maxTestRuns in the coder phase (tracked via state? no, coder tracks its own),
+            // but here we are in verifier. Verifier should always run AT LEAST one test run if possible,
+            // unless we are in a super strict mode or budget is globally exhausted.
+            // For now, let's just run the test.
+
+            // Detect test command
+            const testCommand = await detectTestCommand(state.sdd.project, cfg.rootDir!);
+            log.info('Detected test command', { testCommand });
+
+            if (executionProfile === 'smoke' && !policy.allowAppRun) {
+                // In smoke mode, maybe we only run lint? Or just fast unit tests?
+                // For now, we proceed but maybe we limit the scope if we could.
             }
 
-            // Final fallback: generic command.
-            return 'npm test';
-        }
+            const result = await runCommand(cfg, testCommand);
+            log.info('Tests completed', { passed: result.passed });
 
-        const testCmd = await detectTestCommand();
-
-        log.info('Running tests', { command: testCmd, profile });
-        const result = await runCommand(cfg, testCmd);
-        log.info('Tests completed', { passed: result.passed });
-
-        return {
-            testResults: result,
-            done: result.passed
+            return {
+                testResults: result,
+                done: result.passed
+            };
         };
-    };
-}
+    }

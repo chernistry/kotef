@@ -1,5 +1,5 @@
-import { afterEach, describe, it } from 'node:test';
-import assert from 'node:assert';
+```typescript
+import { afterEach, describe, it, assert } from 'vitest';
 import {
     clearPromptCache,
     loadRuntimePrompt,
@@ -20,7 +20,7 @@ describe('Runtime prompts', () => {
     it('loads all runtime prompts with content', async () => {
         for (const name of runtimePrompts) {
             const prompt = await loadRuntimePrompt(name);
-            assert.ok(prompt.length > 20, `Prompt ${name} should not be empty`);
+            assert.ok(prompt.length > 20, `Prompt ${ name } should not be empty`);
         }
     });
 
@@ -30,7 +30,7 @@ describe('Runtime prompts', () => {
 
     it('planner exposes a valid JSON schema block', async () => {
         const prompt = await loadRuntimePrompt('planner');
-        const match = prompt.match(/```json\n([\s\S]*?)```/);
+        const match = prompt.match(/```json\n([\s\S] *?)```/);
         assert.ok(match, 'Planner prompt must contain a JSON schema block');
         const parsed = JSON.parse(match[1]);
         assert.ok(Array.isArray(parsed.properties.next.enum));

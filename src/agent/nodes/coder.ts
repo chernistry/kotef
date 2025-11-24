@@ -1,4 +1,4 @@
-import { AgentState, ExecutionProfile } from '../state.js';
+import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { createLogger } from '../../core/logger.js';
 
@@ -6,12 +6,13 @@ import { loadRuntimePrompt } from '../../core/prompts.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
 import { readFile, writeFile, writePatch } from '../../tools/fs.js';
 import { runCommand } from '../../tools/test_runner.js';
+import { resolveExecutionProfile, PROFILE_POLICIES, looksLikeInstall, ExecutionProfile } from '../profiles.js';
 
 export function coderNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('coder');
         log.info('Coder node started');
-        
+
         const promptTemplate = await loadRuntimePrompt('coder');
 
         const safe = (value: unknown) => {
@@ -42,6 +43,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         };
 
         const executionProfile = inferProfile();
+        const policy = PROFILE_POLICIES[executionProfile];
         const profileTurns: Record<ExecutionProfile, number> = {
             strict: 20,
             fast: 12,
@@ -182,25 +184,19 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         // But `callChat` in core/llm.ts handles tool execution if we pass a handler?
         // Let's check callChat signature. It returns `toolCalls`. It does NOT execute them automatically unless we implemented that loop in `llm.ts`.
         // The `callChat` in `src/core/llm.ts` (Ticket 01) was a "thin wrapper".
-        // Let's assume we need to handle execution here or `callChat` does it.
-        // Re-reading Ticket 01 sketch: "Thin wrapper around OpenAI-compatible SDK".
         // So we likely need to execute tools here.
 
         // Let's do a simple loop for max turns.
         const currentMessages = [...messages];
         let turns = 0;
         const maxTurns = profileTurns[executionProfile] ?? 20;
-        const profileCommandLimits: Record<ExecutionProfile, number> = {
-            strict: 8,
-            fast: 4,
-            smoke: 1,
-            yolo: 10
-        };
+
         let commandCount = 0;
+        let testCount = 0;
         let fileChanges = state.fileChanges || {};
 
-        log.info('Starting coder tool execution loop', { maxTurns });
-        
+        log.info('Starting coder tool execution loop', { maxTurns, profile: executionProfile });
+
         const trimHistory = (all: ChatMessage[]): ChatMessage[] => {
             if (all.length <= 30) return all;
             const system = all[0];
@@ -228,7 +224,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             }
 
             log.info(`Executing ${msg.tool_calls.length} tool calls`);
-            
+
             // Execute tools
             for (const toolCall of msg.tool_calls) {
                 const args = JSON.parse(toolCall.function.arguments);
@@ -264,9 +260,12 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         log.info('Patch applied', { path: args.path });
                     } else if (toolCall.function.name === 'run_command') {
                         commandCount += 1;
-                        if (commandCount > profileCommandLimits[executionProfile]) {
-                            result = `Skipped command due to per-run command limit for profile "${executionProfile}".`;
+                        if (commandCount > policy.maxCommands) {
+                            result = `Skipped command: budget exceeded for profile "${executionProfile}" (max ${policy.maxCommands}).`;
                             log.info('Command skipped by profile limit', { command: args.command });
+                        } else if (!policy.allowPackageInstalls && looksLikeInstall(args.command)) {
+                            result = `Skipped command: package installs not allowed in profile "${executionProfile}".`;
+                            log.info('Install skipped by profile', { command: args.command });
                         } else {
                             const cmdResult = await runCommand(cfg, args.command);
                             result = {
@@ -282,9 +281,9 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                             });
                         }
                     } else if (toolCall.function.name === 'run_tests') {
-                        commandCount += 1;
-                        if (commandCount > profileCommandLimits[executionProfile]) {
-                            result = `Skipped tests due to per-run command limit for profile "${executionProfile}".`;
+                        testCount += 1;
+                        if (testCount > policy.maxTestRuns) {
+                            result = `Skipped tests: budget exceeded for profile "${executionProfile}" (max ${policy.maxTestRuns}).`;
                             log.info('Tests skipped by profile limit', { requestedCommand: args.command });
                         } else {
                             let command: string;

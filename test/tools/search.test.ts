@@ -1,11 +1,10 @@
-import { describe, it, mock, afterEach } from 'node:test';
-import assert from 'node:assert';
+```typescript
+import { describe, it, assert, vi, afterEach } from 'vitest';
 import { webSearch } from '../../src/tools/web_search.js';
 import { fetchPage } from '../../src/tools/fetch_page.js';
 // import { deepResearch } from '../../src/tools/deep_research.js';
 import { loadConfig } from '../../src/core/config.js';
 
-// Mock fetch globally
 const originalFetch = global.fetch;
 
 describe('Search Tools', () => {

@@ -1,5 +1,4 @@
-import { describe, it, mock, afterEach } from 'node:test';
-import assert from 'node:assert';
+import { describe, it, afterEach, expect } from 'vitest';
 import { buildKotefGraph } from '../../src/agent/graph.js';
 import { loadConfig } from '../../src/core/config.js';
 import { AgentState } from '../../src/agent/state.js';
@@ -39,7 +38,7 @@ describe('Agent Graph', () => {
             }
         });
 
-        assert.ok(result);
+        expect(result).toBeTruthy();
     });
 
 });
