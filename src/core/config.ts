@@ -40,10 +40,10 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
 
     const config = {
         rootDir: path.resolve(rootDir),
-        apiKey: env.KOTEF_API_KEY || env.OPENAI_API_KEY,
-        baseUrl: env.KOTEF_BASE_URL || env.OPENAI_BASE_URL,
-        modelFast: env.KOTEF_MODEL_FAST || env.OPENAI_MODEL || "gpt-4.1.1",
-        modelStrong: env.KOTEF_MODEL_STRONG || env.OPENAI_MODEL || "gpt-4.1.1",
+        apiKey: env.CHAT_LLM_API_KEY || env.KOTEF_API_KEY || env.OPENAI_API_KEY,
+        baseUrl: env.CHAT_LLM_BASE_URL || env.KOTEF_BASE_URL || env.OPENAI_BASE_URL,
+        modelFast: env.CHAT_LLM_MODEL || env.KOTEF_MODEL_FAST || env.OPENAI_MODEL || "gpt-4.1.1",
+        modelStrong: env.CHAT_LLM_MODEL || env.KOTEF_MODEL_STRONG || env.OPENAI_MODEL || "gpt-4.1.1",
         searchApiKey: env.SEARCH_API_KEY || env.TAVILY_API_KEY || env.SERPER_API_KEY,
         dryRun,
         maxRunSeconds: parseInt(env.MAX_RUN_SECONDS || '300', 10),
