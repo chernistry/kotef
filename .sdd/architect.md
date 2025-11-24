@@ -602,3 +602,53 @@ See `.sdd/backlog/tickets/open/` for detailed tickets.
 -   **Automated Tests**: Unit tests for all tools. Integration tests for agent graph (mocked LLM).
 -   **E2E Scenarios**: Run agent on "hello-world" and "fix-bug" dummy projects.
 -   **Manual Review**: User reviews Run Reports and Diffs before application (interactive mode).
+
+## 11. Goal-First DoD & Execution Profiles
+
+### Philosophy
+Kotef's Definition of Done is **profile-sensitive**: we distinguish between **functional success** (the core goal works) and **quality hardening** (all linters, coverage, and secondary checks pass). Different profiles allow different trade-offs between speed and exhaustive quality gates.
+
+### Profile-Specific Quality Gates
+
+| Profile  | Core Tests | Coverage  | Linters/Type-Check  | Behavior                                                                                           |
+|----------|------------|-----------|---------------------|----------------------------------------------------------------------------------------------------|
+| `strict` | **HARD**   | **HARD** ≥90% | **HARD**            | All quality gates must pass. No compromises. Suitable for production code, security-critical work. |
+| `fast`   | **HARD**   | Soft (best-effort) | Soft (best-effort) | Core functional tests must pass. Coverage/linters are attempted but not blocking after N retries.  |
+| `smoke`  | Minimal    | N/A       | N/A                 | Only basic smoke test or manual verification required. No hard gates for automated quality checks. |
+| `yolo`   | Functional-first | N/A | N/A                 | If the app runs and core interactions work, stop after bounded attempts even if some tests fail. Document remaining issues.|
+
+### Functional Success Criteria
+For profiles `fast` and `yolo`, we define "functionally done" as:
+1. **Core goal met**: The primary user-facing functionality works (e.g., app starts, key feature executes without crash).
+2. **No critical failures**: No security vulnerabilities, no data corruption, no crashes in happy path.
+3. **Bounded effort**: After `MAX_GOAL_FIRST_ATTEMPTS` (default: 3) fix cycles, remaining issues are non-critical (lint warnings, coverage gaps, edge-case test failures).
+
+### When to Mark as Done in Non-Strict Profiles
+The `verifierNode` and `plannerNode` use the following logic:
+
+- **strict**: `done = (all tests pass AND coverage ≥ 90% AND no lint errors)`
+- **fast**: `done = (core tests pass) OR (functionalOk AND attempts >= 3 AND remaining failures are non-critical)`
+- **smoke**: `done = (basic smoke test passes OR manual verification confirmed)`
+- **yolo**: `done = (functionalOk AND attempts >= 2) OR (all tests pass)`
+
+Where:
+- `functionalOk`: Derived from successful execution of run commands (e.g., `npm start`, `python app.py`) or explicit functional probes.
+- `non-critical failures`: Lint warnings, coverage gaps, type errors in non-core paths, flaky E2E tests.
+- `critical failures`: Runtime crashes, failing core unit tests, security vulnerabilities.
+
+### Implementation Notes
+- The `verifierNode` tracks attempts via `state.failureHistory.length`.
+- The `plannerNode` decides `next="done"` when functional success criteria are met, even if `testResults.passed` is false.
+- Run reports include:
+  - Profile used (`strict`/`fast`/`smoke`/`yolo`)
+  - Whether run was marked "functionally done with remaining issues"
+  - List of remaining test failures/lint errors (if any)
+- This allows pragmatic, time-boxed completion for rapid prototyping and iterative development, while maintaining strict quality gates for production code.
+
+### Trade-offs & Risks
+- **Risk**: Overly permissive logic may accept runs with serious bugs.
+  - **Mitigation**: Conservative classification of "critical vs non-critical" failures. Security scans and crash tests are always critical.
+- **Risk**: Users may deploy "functionally done" code without addressing remaining issues.
+  - **Mitigation**: Run reports clearly document remaining issues. CI pipelines can enforce `strict` profile for merge/deploy.
+
+---

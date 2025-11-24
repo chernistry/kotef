@@ -84,10 +84,45 @@ export function verifierNode(cfg: KotefConfig) {
             ];
         }
 
+        // Goal-First DoD logic (Ticket 13)
+        const MAX_GOAL_FIRST_ATTEMPTS = 3;
+        const attempts = failureHistory.filter(f => f.step === 'verifier').length;
+
+        let done = result.passed;
+        let completionReason: string | undefined;
+
+        // For fast/yolo profiles, allow "functionally done" even if tests fail
+        if (!result.passed && (executionProfile === 'fast' || executionProfile === 'yolo')) {
+            const maxAttempts = executionProfile === 'yolo' ? 2 : MAX_GOAL_FIRST_ATTEMPTS;
+
+            if (attempts >= maxAttempts) {
+                // Check if failures are non-critical
+                const isNonCritical = result.failureKind !== 'runtime_error' &&
+                    result.failureKind !== 'compilation';
+
+                if (isNonCritical) {
+                    done = true;
+                    completionReason = `Functionally done after ${attempts} attempts. ` +
+                        `Remaining issues: ${result.failureKind} (${result.failureSummary})`;
+                    log.info('Marking as functionally done (goal-first DoD)', {
+                        executionProfile,
+                        attempts,
+                        failureKind: result.failureKind
+                    });
+                }
+            }
+        }
+
         return {
             testResults: result,
             failureHistory,
-            done: result.passed
+            done,
+            ...(completionReason && {
+                plan: {
+                    ...state.plan,
+                    completionReason
+                }
+            })
         }
     };
 }
