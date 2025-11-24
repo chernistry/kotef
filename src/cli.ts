@@ -141,4 +141,155 @@ program
         }
     });
 
+import readline from 'node:readline';
+import { runSddOrchestration } from './agent/graphs/sdd_orchestrator.js';
+
+// Helper for interactive prompts
+function promptUser(query: string): Promise<string> {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+
+    return new Promise((resolve) => {
+        rl.question(query, (answer) => {
+            rl.close();
+            resolve(answer.trim());
+        });
+    });
+}
+
+program
+    .command('chat')
+    .description('Interactive coding session (Voyant-style)')
+    .option('--root <path>', 'Project root directory', process.cwd())
+    .option('--goal <text>', 'Initial goal')
+    .action(async (options) => {
+        const rootDir = path.resolve(options.root);
+        const envConfig = loadConfig();
+        const cfg: KotefConfig = {
+            ...envConfig,
+            rootDir,
+        };
+
+        console.log(`\n🤖 Kotef Interactive Session`);
+        console.log(`   Project: ${rootDir}\n`);
+
+        let goal = options.goal;
+        let keepRunning = true;
+
+        while (keepRunning) {
+            // 1. Get Goal
+            if (!goal) {
+                goal = await promptUser('🎯 What would you like to do? ');
+                if (!goal) continue;
+            }
+
+            console.log(`\n🚀 Goal: "${goal}"`);
+            const confirm = await promptUser('   Proceed with this goal? [Y/n] ');
+            if (confirm.toLowerCase() === 'n') {
+                goal = undefined;
+                continue;
+            }
+
+            // 2. Run SDD Orchestration
+            console.log('\n🧠 Orchestrating SDD (Research -> Architect -> Tickets)...');
+            try {
+                await runSddOrchestration(cfg, rootDir, goal);
+            } catch (e: any) {
+                console.error('❌ SDD Orchestration failed:', e.message);
+                goal = undefined;
+                continue;
+            }
+
+            // 3. List Tickets
+            const ticketsDir = path.join(rootDir, '.sdd/backlog/tickets/open');
+            let tickets: string[] = [];
+            try {
+                tickets = (await fs.readdir(ticketsDir)).filter(f => f.endsWith('.md')).sort();
+            } catch {
+                // No tickets found
+            }
+
+            if (tickets.length === 0) {
+                console.log('⚠️ No tickets generated. Check .sdd/architect.md for details.');
+            } else {
+                console.log(`\n📋 Generated Tickets:`);
+                tickets.forEach(t => console.log(`   - ${t}`));
+
+                // 4. Execute Tickets
+                const proceed = await promptUser('\n⚡ Execute these tickets now? [Y/n] ');
+                if (proceed.toLowerCase() !== 'n') {
+                    for (const ticket of tickets) {
+                        console.log(`\n🔨 Executing Ticket: ${ticket}`);
+
+                        // Reuse run logic (simplified)
+                        // We need to reload SDD artifacts for each ticket as they might change (though usually they don't during execution, but state does)
+                        // Actually, we should probably call a shared function.
+                        // For now, I'll duplicate the setup logic to avoid massive refactor of `run` command, 
+                        // but I'll strip it down to essentials.
+
+                        const runId = randomUUID();
+                        const log = createLogger(runId); // We might want to silence file logs or keep them? Keep them.
+
+                        try {
+                            const sddDir = path.join(rootDir, '.sdd');
+                            const projectMd = await fs.readFile(path.join(sddDir, 'project.md'), 'utf-8').catch(() => '');
+                            const architectMd = await fs.readFile(path.join(sddDir, 'architect.md'), 'utf-8').catch(() => '');
+                            const bestPracticesMd = await fs.readFile(path.join(sddDir, 'best_practices.md'), 'utf-8').catch(() => '');
+                            const ticketContent = await fs.readFile(path.join(ticketsDir, ticket), 'utf-8');
+
+                            const initialState: Partial<AgentState> = {
+                                messages: [{ role: 'user', content: `Execute ticket: ${ticket}` }], // Contextualize?
+                                sdd: {
+                                    project: projectMd,
+                                    architect: architectMd,
+                                    bestPractices: bestPracticesMd,
+                                    ticket: ticketContent
+                                },
+                                hasSdd: true,
+                                fileChanges: {},
+                                testResults: {},
+                                researchResults: []
+                            };
+
+                            const graph = buildKotefGraph(cfg);
+                            const result = await graph.invoke(initialState);
+
+                            if (result.done) {
+                                console.log(`✅ Ticket ${ticket} completed.`);
+                                // Move ticket to closed? (Not implemented yet in graph, maybe manual?)
+                                // For now, just log.
+                            } else {
+                                console.log(`⚠️ Ticket ${ticket} finished with partial status.`);
+                            }
+
+                            // Write report
+                            const summary: RunSummary = {
+                                status: result.done ? 'success' : 'partial',
+                                plan: result.plan ? JSON.stringify(result.plan, null, 2) : 'No plan',
+                                filesChanged: Object.keys(result.fileChanges || {}),
+                                tests: JSON.stringify(result.testResults || {}, null, 2),
+                                issues: (result.sdd as any)?.issues
+                            };
+                            await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
+
+                        } catch (e: any) {
+                            console.error(`❌ Failed to execute ticket ${ticket}:`, e.message);
+                        }
+                    }
+                }
+            }
+
+            // 5. Loop
+            goal = undefined; // Reset goal
+            const another = await promptUser('\n🔄 Start another goal? [y/N] ');
+            if (another.toLowerCase() !== 'y') {
+                keepRunning = false;
+            }
+        }
+
+        console.log('\n👋 Bye!');
+    });
+
 program.parse();
