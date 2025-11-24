@@ -38,39 +38,92 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         }
 
         // Add recent history to context
-        const messages: ChatMessage[] = [
+        const baseMessages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
             ...state.messages
         ];
 
-        messages.push({
+        baseMessages.push({
             role: 'user',
             content: 'Produce the JSON decision now. Do not include markdown or extra text.'
         });
 
-        log.info('Calling LLM for planning decision...');
-        const response = await chatFn(cfg, messages, {
-            model: cfg.modelFast, // Planner uses fast/cheap model
-            // Planner JSON should be compact; keep completion small to reduce latency.
-            maxTokens: 512,
-            response_format: { type: 'json_object' } as any
-        });
+        const maxRetries = 2;
+        let attempt = 0;
+        let assistantMsg: ChatMessage | undefined;
+        let decision: any = { next: 'snitch', reason: 'planner_parse_error', profile: state.runProfile };
+        let workingMessages = [...baseMessages];
 
-        const assistantMsg = response.messages[response.messages.length - 1];
-        if (!assistantMsg.content) {
-            throw new Error("Planner received empty response from LLM");
-        }
-        let decision: any = { next: 'researcher', reason: 'fallback' }; // Default fallback
-
-        try {
-            decision = JSON.parse(assistantMsg.content);
-            log.info('Planner decision', {
-                next: decision.next,
-                reason: decision.reason,
-                profile: decision.profile
+        while (attempt < maxRetries) {
+            attempt += 1;
+            log.info('Calling LLM for planning decision...', { attempt });
+            const response = await chatFn(cfg, workingMessages, {
+                model: cfg.modelFast,
+                maxTokens: 512,
+                response_format: { type: 'json_object' } as any
             });
-        } catch (e) {
-            log.error("Failed to parse planner JSON", { error: e });
+
+            assistantMsg = response.messages[response.messages.length - 1];
+            if (!assistantMsg?.content) {
+                log.error('Planner received empty response from LLM', { attempt });
+                if (attempt >= maxRetries) {
+                    decision = {
+                        next: 'snitch',
+                        reason: 'planner_empty_response',
+                        profile: state.runProfile
+                    };
+                    break;
+                }
+                workingMessages = [
+                    ...workingMessages,
+                    {
+                        role: 'user',
+                        content: 'Previous reply was empty. Respond with a valid JSON object as per schema.'
+                    }
+                ];
+                continue;
+            }
+
+            try {
+                decision = JSON.parse(assistantMsg.content);
+                log.info('Planner decision', {
+                    next: decision.next,
+                    reason: decision.reason,
+                    profile: decision.profile
+                });
+                break;
+            } catch (e) {
+                log.error('Failed to parse planner JSON', {
+                    error: e,
+                    attempt,
+                    contentPreview: assistantMsg.content.slice(0, 200)
+                });
+                if (attempt >= maxRetries) {
+                    decision = {
+                        next: 'snitch',
+                        reason: 'planner_parse_error',
+                        profile: state.runProfile,
+                        raw: assistantMsg.content.slice(0, 500)
+                    };
+                    break;
+                }
+                workingMessages = [
+                    ...workingMessages,
+                    assistantMsg,
+                    {
+                        role: 'user',
+                        content: 'Your previous response was invalid JSON. Reply again with ONLY the JSON object that matches the schema.'
+                    }
+                ];
+            }
+        }
+
+        if (!assistantMsg) {
+            // Should not happen, but guard to avoid undefined messages downstream
+            assistantMsg = {
+                role: 'assistant',
+                content: JSON.stringify(decision)
+            };
         }
 
         const isValidProfile = (p: any): p is ExecutionProfile =>
