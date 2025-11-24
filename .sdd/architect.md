@@ -413,3 +413,181 @@ PE2/Chain‑of‑Verification self-check (≤3 iterations):
 Requirements
 1) No chain‑of‑thought. Provide final decisions with brief, verifiable reasoning.
 2) Be specific to Node.js 20 / TypeScript / LangGraph.js and up‑to‑date for 2025; flag outdated items.
+
+# Architect Specification: Kotef
+
+Spec version: v1.0
+Date: 2025-11-24
+Status: Approved
+
+## 1. Overview
+
+**Kotef** is an autonomous AI coding and research agent designed to act as a "developer in a box". It uses the Spec-Driven Development (SDD) framework as its "brain" to plan, research, and execute coding tasks safely and reliably.
+
+### Core Goals
+1.  **SDD-Native**: Reads and respects `.sdd/project.md`, `.sdd/architect.md`, and tickets as the source of truth.
+2.  **Grounded Intelligence**: Uses two-tier web research (shallow + deep) to ground decisions in up-to-date documentation and best practices.
+3.  **Safe Execution**: Operates within strict safety boundaries (Node.js Permission Model, diff-first editing, path allowlists).
+4.  **Observable**: Provides structured logs, traces, and human-readable run reports for every action.
+
+## 2. Hard Constraints & Preconditions
+
+### Hard Constraints
+-   **Runtime**: Node.js 20 LTS (or higher) with `--experimental-permission` enabled.
+-   **Language**: TypeScript 5.8+ (strict mode).
+-   **Orchestration**: LangGraph.js for agent state machine.
+-   **File Safety**: No direct file overwrites. All edits must be via unified diffs/patches.
+-   **Network Safety**: Host allowlist for web search; no internal network access (SSRF protection).
+-   **Secrets**: No secrets in logs or prompts. Use environment variables only.
+
+### Preconditions
+-   `OPENAI_API_KEY` (or compatible provider key) in environment.
+-   Search API key (e.g., `TAVILY_API_KEY` or `SERPER_API_KEY`) for web research.
+-   Target project must have an initialized `.sdd/` directory (at least `project.md`).
+
+## 3. Metric Profile & Strategic Risk Map
+
+### Metric Profile
+-   **SecRisk (0.25)**: Highest priority. Sandbox escapes or data leaks are unacceptable.
+-   **Maintainability (0.20)**: Clean code, SDD adherence.
+-   **DevTime (0.20)**: Use existing libraries (LangGraph, generic search).
+-   **PerfGain (0.15)**: Fast enough for interactive use.
+-   **Cost (0.10)**: Reasonable token usage.
+-   **DX (0.10)**: Good CLI experience.
+
+### Strategic Risks
+-   **R1: Uncontrolled Edits (High)**: Agent corrupts user code. *Mitigation*: Diff-first editing, dry-run mode, Node permissions.
+-   **R2: Prompt Injection (High)**: Web content tricks agent. *Mitigation*: Host allowlist, content filtering, separate research step.
+-   **R3: Cost Overrun (Medium)**: Agent loops or uses expensive models. *Mitigation*: Token/step limits, budget config.
+
+## 4. Alternatives
+
+### Pattern A: Single-Graph Meta-Agent (Chosen for MVP)
+-   **Description**: One LangGraph graph with a single "Agent" node that has access to all tools, or a simple Planner -> Executor loop.
+-   **Pros**: Simpler to implement, lower latency, easier to debug initially.
+-   **Cons**: Can get confused with complex tasks, harder to scale to specialized roles.
+-   **Decision**: Adopt for MVP to validate core tools and safety.
+
+### Pattern B: Multi-Node Agent Graph (Future)
+-   **Description**: Distinct Planner, Researcher, Coder, Verifier agents passing state.
+-   **Pros**: Better separation of concerns, specialized prompts, easier to upgrade individual components.
+-   **Cons**: Higher complexity, more token usage for coordination.
+-   **Decision**: Planned upgrade path once MVP is stable.
+
+## 5. Architecture Overview
+
+### Diagram
+```mermaid
+graph TD
+    CLI[CLI Entrypoint] -->|Init| State[Agent State]
+    State -->|Load| SDD[SDD Files]
+    State -->|Start| Graph[LangGraph Orchestrator]
+    
+    subgraph "LangGraph Orchestrator"
+        Planner[Planner Node] -->|Plan| Router{Router}
+        Router -->|Need Info| Researcher[Researcher Node]
+        Router -->|Ready to Code| Coder[Coder Node]
+        Router -->|Verify| Verifier[Verifier Node]
+        
+        Researcher -->|Update Context| Planner
+        Coder -->|Apply Patch| Verifier
+        Verifier -->|Success| Done[End]
+        Verifier -->|Fail| Planner
+    end
+    
+    Researcher -->|Call| ToolSearch[Web Search Tools]
+    Coder -->|Call| ToolFS[File System Tools]
+    Verifier -->|Call| ToolTest[Test Runner Tools]
+```
+
+### Data Schema (Agent State)
+-   **`messages`**: Chat history (LangChain format).
+-   **`context`**: Loaded SDD content (project goals, constraints).
+-   **`plan`**: Current plan steps and status.
+-   **`research_results`**: List of findings with citations.
+-   **`file_changes`**: List of proposed/applied patches.
+-   **`test_results`**: Outcome of verification steps.
+
+## 6. Component Specifications
+
+### 6.1. Core & Configuration (`src/core/`)
+-   **`config.ts`**: Loads env vars, parses CLI args, sets up paths. Enforces defaults (e.g., `dryRun: true`).
+-   **`llm.ts`**: Adapter for LLM providers (OpenAI-compatible). Handles retries, timeouts, and structured output parsing.
+-   **`logger.ts`**: Structured JSON logger.
+
+### 6.2. Tools Layer (`src/tools/`)
+-   **`fs.ts`**:
+    -   `readFile(path)`: Reads file content (with size limit).
+    -   `listFiles(pattern)`: Lists files respecting `.gitignore`.
+    -   `writePatch(path, diff)`: Applies a unified diff. **CRITICAL**: Validates path is within workspace.
+-   **`web_search.ts`**:
+    -   `search(query)`: Shallow search (titles + snippets).
+    -   `fetchPage(url)`: Fetches page content (text only, stripped HTML). Respects `robots.txt` and allowlist.
+-   **`deep_research.ts`**:
+    -   Orchestrates multi-step research: Plan Query -> Search -> Fetch -> Summarize -> Repeat if needed.
+-   **`test_runner.ts`**:
+    -   Executes commands from `architect.md` (e.g., `npm test`). Captures stdout/stderr.
+
+### 6.3. Agent Layer (`src/agent/`)
+-   **`state.ts`**: Defines LangGraph state schema.
+-   **`graph.ts`**: Defines the nodes (Planner, Researcher, Coder, Verifier) and edges.
+-   **`prompts/`**:
+    -   `meta_agent.md`: Main system prompt.
+    -   `planner.md`: Planning logic.
+    -   `researcher.md`: Search & summarization logic.
+
+### 6.4. CLI (`src/cli.ts`)
+-   Entry point `bin/kotef`.
+-   Commands:
+    -   `kotef run [ticket-id]`: Execute a task.
+    -   `kotef init`: Scaffold .sdd in a new project.
+
+## 7. Code Standards & Conventions
+
+### Language & Style
+-   **TypeScript**: Strict mode, no `any` (use `unknown` + validation).
+-   **Linting**: ESLint + Prettier.
+-   **Testing**: Node.js built-in runner (`node:test`).
+
+### Security
+-   **Path Validation**: All FS tools must use `resolvePath` which throws if path is outside root.
+-   **Network**: No direct `fetch` in agent logic; must use `web_search` tool which enforces allowlist.
+-   **Secrets**: Never log env vars. Redact likely keys (regex) from logs.
+
+### Observability
+-   **Logs**: JSON format to stdout/file.
+    -   `{"level": "info", "component": "agent", "event": "tool_call", "tool": "read_file", ...}`
+-   **Run Report**: Markdown summary generated at `.sdd/runs/YYYY-MM-DD_HH-MM-SS_run-id.md`.
+
+## 8. Implementation Plan (Tickets)
+
+See `.sdd/backlog/tickets/open/` for detailed tickets.
+
+1.  **01-scaffold-core**: Project setup, config, LLM adapter.
+2.  **02-tools-fs**: Safe file system tools.
+3.  **03-tools-search**: Web search & deep research.
+4.  **04-agent-graph**: LangGraph orchestration.
+5.  **05-cli-entrypoint**: CLI & logging.
+6.  **06-evaluation**: E2E tests & CI.
+
+## 9. Decision Log (ADRs)
+
+### ADR-001: LangGraph.js for Orchestration
+-   **Context**: Need a stateful, graph-based agent framework.
+-   **Decision**: Use LangGraph.js.
+-   **Rationale**: Native TypeScript support, strong state management, fits the "graph of nodes" mental model better than linear chains.
+
+### ADR-002: Node.js Permission Model
+-   **Context**: Need to prevent agent from accessing sensitive system files.
+-   **Decision**: Use `--experimental-permission` flags.
+-   **Rationale**: Provides OS-level enforcement of sandbox, reducing risk of code bugs allowing escapes.
+
+### ADR-003: Diff-First Editing
+-   **Context**: Direct file overwrites are risky and hard to review.
+-   **Decision**: Agent must generate unified diffs.
+-   **Rationale**: Diffs are human-readable, reversible, and standard for code changes.
+
+## 10. Verification Strategy
+-   **Automated Tests**: Unit tests for all tools. Integration tests for agent graph (mocked LLM).
+-   **E2E Scenarios**: Run agent on "hello-world" and "fix-bug" dummy projects.
+-   **Manual Review**: User reviews Run Reports and Diffs before application (interactive mode).

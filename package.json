@@ -1,0 +1,39 @@
+{
+    "name": "kotef",
+    "version": "0.1.0",
+    "description": "Autonomous AI coding & research agent",
+    "type": "module",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc",
+        "test": "tsx --test test/**/*.test.ts",
+        "lint": "eslint src test --ext .ts",
+        "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+    },
+    "keywords": [
+        "ai",
+        "agent",
+        "coding",
+        "llm"
+    ],
+    "author": "Sasha",
+    "license": "ISC",
+    "dependencies": {
+        "commander": "^12.0.0",
+        "dotenv": "^16.4.5",
+        "openai": "^4.28.0",
+        "zod": "^3.22.4"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.24",
+        "@typescript-eslint/eslint-plugin": "^8.47.0",
+        "@typescript-eslint/parser": "^8.47.0",
+        "eslint": "^8.57.0",
+        "prettier": "^3.2.5",
+        "tsx": "^4.7.1",
+        "typescript": "^5.3.3"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    }
+}
