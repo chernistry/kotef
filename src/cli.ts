@@ -13,6 +13,7 @@ import { buildKotefGraph } from './agent/graph.js';
 import { bootstrapSddForProject } from './agent/bootstrap.js';
 import { writeRunReport, RunSummary } from './agent/run_report.js';
 import { AgentState } from './agent/state.js';
+import { estimateTaskScope } from './agent/task_scope.js';
 
 const program = new Command();
 
@@ -102,6 +103,7 @@ program
     .option('--max-time <seconds>', 'Maximum run time in seconds')
     .option('--max-tokens <count>', 'Maximum tokens per run')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
+    .option('--auto-approve', 'Skip interactive approval', false)
     .action(async (options) => {
         const runId = randomUUID();
         const rootDir = path.resolve(options.root);
@@ -121,7 +123,7 @@ program
         const startTime = Date.now();
 
         try {
-                        const sddDir = path.join(rootDir, '.sdd');
+            const sddDir = path.join(rootDir, '.sdd');
             let sddExists = false;
             try {
                 await fs.access(sddDir);
@@ -166,6 +168,7 @@ program
             }
 
             // Initialize State
+            const taskScope = estimateTaskScope(options.goal, ticketContent, architectMd);
             const initialState: Partial<AgentState> = {
                 messages: options.goal ? [{ role: 'user', content: options.goal }] : [],
                 sdd: {
@@ -177,6 +180,7 @@ program
                 hasSdd: true,
                 // In YOLO mode we bias the planner/coder towards the most aggressive profile.
                 runProfile: options.yolo ? 'yolo' : undefined,
+                taskScope,
                 fileChanges: {},
                 testResults: {},
                 researchResults: []
@@ -354,7 +358,7 @@ program
             console.log(chalk.green('\n📋 Generated tickets:'));
             tickets.forEach(t => console.log(chalk.green(`   • ${t}`)));
 
-            const proceed = (
+            const proceed = options.autoApprove ? 'y' : (
                 await rl.question(chalk.yellow('\nExecute these tickets now? [Y/n] '))
             ).trim().toLowerCase();
 
@@ -378,6 +382,7 @@ program
                     const bestPracticesMd = await fs.readFile(path.join(sddDir, 'best_practices.md'), 'utf-8').catch(() => '');
                     const ticketContent = await fs.readFile(path.join(ticketsDir, ticket), 'utf-8');
 
+                    const taskScope = estimateTaskScope(`Execute ticket: ${ticket}`, ticketContent, architectMd);
                     const initialState: Partial<AgentState> = {
                         messages: [{ role: 'user', content: `Execute ticket: ${ticket}` }],
                         sdd: {
@@ -388,6 +393,7 @@ program
                         },
                         hasSdd: true,
                         runProfile: options.yolo ? 'yolo' : undefined,
+                        taskScope,
                         fileChanges: {},
                         testResults: {},
                         researchResults: []

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { webSearch } from '../../src/tools/web_search.js';
 import { fetchPage } from '../../src/tools/fetch_page.js';
 // import { deepResearch } from '../../src/tools/deep_research.js';
@@ -7,16 +7,19 @@ import { loadConfig } from '../../src/core/config.js';
 const originalFetch = global.fetch;
 
 describe('Search Tools', () => {
-    // Mock env vars BEFORE loading config
-    const originalEnv = process.env;
-    process.env = { ...originalEnv, KOTEF_API_KEY: 'dummy-key', SEARCH_API_KEY: 'dummy-key' };
+    // Mock env vars
+    const originalEnv = { ...process.env };
 
-    const cfg = loadConfig();
+    beforeEach(() => {
+        process.env.KOTEF_API_KEY = 'dummy-key';
+        process.env.SEARCH_API_KEY = 'dummy-key';
+        process.env.KOTEF_MOCK_MODE = 'false';
+    });
 
     afterEach(() => {
+        process.env = originalEnv;
+        vi.restoreAllMocks();
         global.fetch = originalFetch;
-        // We don't restore process.env here because we modified it for the whole suite scope variable `cfg`.
-        // But ideally we should. Since `cfg` is loaded once, it's fine.
     });
 
     describe('webSearch', () => {
@@ -31,7 +34,7 @@ describe('Search Tools', () => {
             });
             global.fetch = mockFetch as any;
 
-            const results = await webSearch({ apiKey: 'test-key' } as any, 'test query');
+            const results = await webSearch({ searchApiKey: 'test-key' } as any, 'test query');
             expect(results.length).toBe(1);
             expect(results[0].title).toBe('Test');
         });
@@ -43,14 +46,17 @@ describe('Search Tools', () => {
             });
             global.fetch = mockFetch as any;
 
-            const results = await webSearch({ apiKey: 'test-key' } as any, 'test query');
-            expect(results.length).toBe(0);
+            await expect(webSearch({ searchApiKey: 'test-key' } as any, 'test query')).rejects.toThrow(/Search failed/);
         });
 
         it('should throw if API key is missing', async () => {
-            await expect(webSearch({} as any, 'test query')).rejects.toThrow(/API key is required/);
+            delete process.env.SEARCH_API_KEY;
+            delete process.env.TAVILY_API_KEY;
+            await expect(webSearch({} as any, 'test query')).rejects.toThrow(/Search API key is missing/);
+            process.env.SEARCH_API_KEY = 'dummy-key'; // Restore
         });
         it('should block unsafe URLs', async () => {
+            const cfg = loadConfig();
             await expect(fetchPage(cfg, 'http://localhost:8080')).rejects.toThrow(/blocked by policy/);
         });
     });

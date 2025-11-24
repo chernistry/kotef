@@ -29,7 +29,7 @@ describe('Runtime prompts', () => {
 
     it('planner exposes a valid JSON schema block', async () => {
         const content = await loadRuntimePrompt('planner');
-        expect(content).toContain('Output Format:');
+        expect(content).toContain('# Output format (must strictly match schema)');
         expect(content).toContain('{');
     });
 

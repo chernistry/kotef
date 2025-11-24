@@ -54,6 +54,10 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             runProfile: {
                 reducer: (a: ExecutionProfile | undefined, b: ExecutionProfile | undefined) => b ?? a,
                 default: () => undefined,
+            },
+            taskScope: {
+                reducer: (a, b) => b ?? a,
+                default: () => undefined,
             }
         }
     });

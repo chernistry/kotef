@@ -1,6 +1,13 @@
 
-import { describe, it, afterEach, beforeEach, expect } from 'vitest';
+import { describe, it, afterEach, beforeEach, expect, vi } from 'vitest';
 import { loadConfig } from '../../src/core/config.js';
+
+// Mock dotenv to prevent reloading env vars from .env file
+vi.mock('dotenv', () => ({
+    default: {
+        config: vi.fn(),
+    },
+}));
 
 describe('Config', () => {
     let originalEnv: NodeJS.ProcessEnv;
@@ -20,14 +27,19 @@ describe('Config', () => {
 
         // Save original env
         originalEnv = { ...process.env };
-        // Clear relevant env vars to ensure defaults are tested
+        // Clear all relevant env vars
         delete process.env.KOTEF_API_KEY;
         delete process.env.OPENAI_API_KEY;
         delete process.env.CHAT_LLM_API_KEY;
         delete process.env.CHAT_LLM_BASE_URL;
+        delete process.env.CHAT_LLM_MODEL_FAST;
+        delete process.env.CHAT_LLM_MODEL_STRONG;
         delete process.env.KOTEF_BASE_URL;
         delete process.env.OPENAI_BASE_URL;
-        delete process.env.CHAT_LLM_MODEL;
+        delete process.env.CHAT_LLM_MODEL; // This one is likely superseded by _FAST and _STRONG, but keeping for safety
+        delete process.env.OPENAI_MODEL; // Added this as it's used in tests
+        delete process.env.KOTEF_DRY_RUN; // Added this as it's used in tests
+        delete process.env.MAX_WEB_REQUESTS_PER_RUN; // Added this as it's used in tests
     });
 
     afterEach(() => {
@@ -70,6 +82,6 @@ describe('Config', () => {
             KOTEF_API_KEY: '', // Missing
         };
 
-        expect(() => loadConfig()).toThrow(/API Key is required/);
+        expect(() => loadConfig()).toThrow(/API Key is required/i);
     });
 });

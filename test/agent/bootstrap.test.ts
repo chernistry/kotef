@@ -33,12 +33,7 @@ describe('SDD Bootstrap', () => {
             maxWebRequestsPerRun: 5
         };
 
-        // Mock callChat to return dummy content
-        vi.mock('../../src/core/llm.js', () => ({
-            callChat: async () => ({
-                messages: [{ role: 'assistant', content: 'Mock Content' }]
-            })
-        }));
+
 
         await bootstrapSddForProject(config, tempDir, 'Build a CLI tool');
 
@@ -51,7 +46,7 @@ describe('SDD Bootstrap', () => {
         // In mock mode the content may not match exactly, just verify it's not empty
         expect(projectContent.length).toBeGreaterThan(0);
         // Try to verify it looks like markdown
-        expect(projectContent).toContain('Mock Content'); // Changed to expect specific mock content
+        expect(projectContent).toContain('# Project: Mock Project');
 
         // Verify other artifacts (via orchestrator)
         const bestPracticesPath = path.join(tempDir, '.sdd/best_practices.md');

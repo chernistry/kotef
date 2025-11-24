@@ -11,7 +11,25 @@ import { resolveExecutionProfile, PROFILE_POLICIES, looksLikeInstall, ExecutionP
 export function coderNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('coder');
-        log.info('Coder node started');
+        log.info('Coder node started', { taskScope: state.taskScope });
+
+        const isTinyTask = state.taskScope === 'tiny';
+        const heavyCommandPatterns = [
+            /\bpytest\b/i,
+            /\bnpm\s+test\b/i,
+            /\bpnpm\s+test\b/i,
+            /\byarn\s+test\b/i,
+            /\bmypy\b/i,
+            /\bpylint\b/i,
+            /\bruff\b/i,
+            /\bbandit\b/i,
+            /\bflake8\b/i,
+            /\bblack\b/i,
+            /\bpre-commit\b/i,
+            /\bflet\s+run\b/i,
+            /\bplaywright\b/i
+        ];
+        const looksHeavyCommand = (cmd: string) => heavyCommandPatterns.some((regex) => regex.test(cmd));
 
         const promptTemplate = await loadRuntimePrompt('coder');
 
@@ -259,53 +277,66 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         fileChanges = { ...(fileChanges || {}), [args.path]: 'patched' };
                         log.info('Patch applied', { path: args.path });
                     } else if (toolCall.function.name === 'run_command') {
-                        commandCount += 1;
-                        if (commandCount > policy.maxCommands) {
-                            result = `Skipped command: budget exceeded for profile "${executionProfile}" (max ${policy.maxCommands}).`;
-                            log.info('Command skipped by profile limit', { command: args.command });
-                        } else if (!policy.allowPackageInstalls && looksLikeInstall(args.command)) {
-                            result = `Skipped command: package installs not allowed in profile "${executionProfile}".`;
-                            log.info('Install skipped by profile', { command: args.command });
+                        const commandStr = typeof args.command === 'string' ? args.command : '';
+                        const tinySkip = isTinyTask && executionProfile !== 'strict' && looksHeavyCommand(commandStr);
+                        if (tinySkip) {
+                            result = `Skipped "${commandStr}" because task scope is tiny under profile "${executionProfile}". Provide a short note instead of running heavy commands.`;
+                            log.info('Command skipped by tiny-task policy', { command: commandStr });
                         } else {
-                            const cmdResult = await runCommand(cfg, args.command);
-                            result = {
-                                exitCode: cmdResult.exitCode,
-                                stdout: cmdResult.stdout,
-                                stderr: cmdResult.stderr,
-                                passed: cmdResult.passed
-                            };
-                            log.info('Command executed', {
-                                command: args.command,
-                                exitCode: cmdResult.exitCode,
-                                passed: cmdResult.passed
-                            });
+                            commandCount += 1;
+                            if (commandCount > policy.maxCommands) {
+                                result = `Skipped command: budget exceeded for profile "${executionProfile}" (max ${policy.maxCommands}).`;
+                                log.info('Command skipped by profile limit', { command: commandStr });
+                            } else if (!policy.allowPackageInstalls && looksLikeInstall(commandStr)) {
+                                result = `Skipped command: package installs not allowed in profile "${executionProfile}".`;
+                                log.info('Install skipped by profile', { command: commandStr });
+                            } else {
+                                const cmdResult = await runCommand(cfg, commandStr);
+                                result = {
+                                    exitCode: cmdResult.exitCode,
+                                    stdout: cmdResult.stdout,
+                                    stderr: cmdResult.stderr,
+                                    passed: cmdResult.passed
+                                };
+                                log.info('Command executed', {
+                                    command: commandStr,
+                                    exitCode: cmdResult.exitCode,
+                                    passed: cmdResult.passed
+                                });
+                            }
                         }
                     } else if (toolCall.function.name === 'run_tests') {
-                        testCount += 1;
-                        if (testCount > policy.maxTestRuns) {
-                            result = `Skipped tests: budget exceeded for profile "${executionProfile}" (max ${policy.maxTestRuns}).`;
-                            log.info('Tests skipped by profile limit', { requestedCommand: args.command });
+                        const tinySkip = isTinyTask && executionProfile !== 'strict';
+                        if (tinySkip) {
+                            result = `Skipped automated tests because task scope is tiny under profile "${executionProfile}". Describe manual verification instead.`;
+                            log.info('Tests skipped by tiny-task policy', { requestedCommand: args.command });
                         } else {
-                            let command: string;
-                            if (typeof args.command === 'string' && args.command.trim().length > 0) {
-                                command = args.command;
+                            testCount += 1;
+                            if (testCount > policy.maxTestRuns) {
+                                result = `Skipped tests: budget exceeded for profile "${executionProfile}" (max ${policy.maxTestRuns}).`;
+                                log.info('Tests skipped by profile limit', { requestedCommand: args.command });
                             } else {
-                                // Simple heuristic: prefer pytest if Python structure is detected.
-                                const hasPy = state.sdd.project?.includes('Python') || state.sdd.project?.includes('pyproject.toml');
-                                command = hasPy ? 'pytest' : 'npm test';
+                                let command: string;
+                                if (typeof args.command === 'string' && args.command.trim().length > 0) {
+                                    command = args.command;
+                                } else {
+                                    // Simple heuristic: prefer pytest if Python structure is detected.
+                                    const hasPy = state.sdd.project?.includes('Python') || state.sdd.project?.includes('pyproject.toml');
+                                    command = hasPy ? 'pytest' : 'npm test';
+                                }
+                                const cmdResult = await runCommand(cfg, command);
+                                result = {
+                                    exitCode: cmdResult.exitCode,
+                                    stdout: cmdResult.stdout,
+                                    stderr: cmdResult.stderr,
+                                    passed: cmdResult.passed
+                                };
+                                log.info('Tests executed', {
+                                    command,
+                                    exitCode: cmdResult.exitCode,
+                                    passed: cmdResult.passed
+                                });
                             }
-                            const cmdResult = await runCommand(cfg, command);
-                            result = {
-                                exitCode: cmdResult.exitCode,
-                                stdout: cmdResult.stdout,
-                                stderr: cmdResult.stderr,
-                                passed: cmdResult.passed
-                            };
-                            log.info('Tests executed', {
-                                command,
-                                exitCode: cmdResult.exitCode,
-                                passed: cmdResult.passed
-                            });
                         }
                     } else {
                         result = "Unknown tool";

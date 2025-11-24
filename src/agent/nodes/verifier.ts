@@ -12,24 +12,6 @@ export function verifierNode(cfg: KotefConfig) {
         const log = createLogger('verifier');
         log.info('Verifier node started');
 
-        const profile = state.runProfile || 'fast';
-
-        // Cheap profile: optionally skip heavy tests and just report.
-        if (profile === 'smoke') {
-            log.info('Smoke profile detected; skipping automated tests.');
-            return {
-                testResults: {
-                    command: 'SKIPPED (smoke profile)',
-                    exitCode: 0,
-                    stdout: 'Tests not run in smoke profile; user should run primary test command manually.',
-                    stderr: '',
-                    passed: true
-                },
-                done: true
-            };
-        }
-
-
         async function detectTestCommand(projectContext: string = '', rootDir: string = '.'): Promise<string> {
             // Heuristic 1: Check for package.json scripts
             try {
@@ -57,12 +39,26 @@ export function verifierNode(cfg: KotefConfig) {
         }
         const executionProfile = resolveExecutionProfile(state);
         const policy = PROFILE_POLICIES[executionProfile];
+        const isTinyTask = state.taskScope === 'tiny';
 
-        // In smoke profile, we might skip tests if we just want a quick check,
-        // but usually verifier IS the check.
-        // However, if we have limited test runs, we should respect that.
-        // For now, we will just log the profile.
-        log.info('Verifier starting', { executionProfile, policy });
+        log.info('Verifier starting', { executionProfile, policy, taskScope: state.taskScope });
+
+        if (executionProfile === 'smoke' || (isTinyTask && executionProfile !== 'strict')) {
+            const reason = executionProfile === 'smoke'
+                ? 'SKIPPED (smoke profile)'
+                : 'SKIPPED (tiny task scope)';
+            log.info('Skipping automated tests due to profile/task scope.', { reason });
+            return {
+                testResults: {
+                    command: reason,
+                    exitCode: 0,
+                    stdout: 'Automated tests skipped; run the primary command manually if desired.',
+                    stderr: '',
+                    passed: true
+                },
+                done: true
+            };
+        }
 
         // If we have already exceeded maxTestRuns in the coder phase (tracked via state? no, coder tracks its own),
         // but here we are in verifier. Verifier should always run AT LEAST one test run if possible,
@@ -72,11 +68,6 @@ export function verifierNode(cfg: KotefConfig) {
         // Detect test command
         const testCommand = await detectTestCommand(state.sdd.project, cfg.rootDir!);
         log.info('Detected test command', { testCommand });
-
-        if (executionProfile === 'smoke' && !policy.allowAppRun) {
-            // In smoke mode, maybe we only run lint? Or just fast unit tests?
-            // For now, we proceed but maybe we limit the scope if we could.
-        }
 
         const result = await runCommand(cfg, testCommand);
         log.info('Tests completed', { passed: result.passed });

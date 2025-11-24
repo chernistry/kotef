@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../core/llm.js';
+import type { TaskScope } from './task_scope.js';
 
 export interface SddContext {
     /** Optional natural-language goal that triggered this run. */
@@ -24,4 +25,6 @@ export interface AgentState {
     hasSdd?: boolean;
     /** Execution profile for this run: affects how heavy tests/checks should be. */
     runProfile?: ExecutionProfile;
+    /** Rough heuristic of task size to guide profiles and command limits. */
+    taskScope?: TaskScope;
 }

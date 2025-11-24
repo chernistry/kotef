@@ -27,7 +27,7 @@ describe('SDD Orchestrator Graph', () => {
             maxWebRequestsPerRun: 5
         };
 
-
+        await runSddOrchestration(config, tempDir, 'Build a CLI tool');
         // Verify tickets
         const ticketsDir = path.join(tempDir, '.sdd/backlog/tickets/open');
         const tickets = await fs.readdir(ticketsDir).catch(() => []);
