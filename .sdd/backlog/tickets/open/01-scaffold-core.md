@@ -23,12 +23,22 @@ Initialize the kotef runtime project structure and implement the core configurat
 // src/core/config.ts
 export interface KotefConfig {
   rootDir: string;
-  openaiApiKey: string;
-  openaiBaseUrl: string;
-  openaiModel: string;
+  /** Generic OpenAI-compatible API key (OpenAI, Anthropic via proxy, etc.) */
+  apiKey: string;
+  /** Base URL for the LLM provider (OpenAI, OpenRouter, custom gateway, etc.). */
+  baseUrl: string;
+  /** Default cheaper/faster model for planning, research, and non-critical calls. */
+  modelFast: string;
+  /** Top-tier frontier model (ChatGPT 5.1 / Claude Sonnet 4.5 / Gemini 3 Pro class) for final codegen or critical steps. */
+  modelStrong: string;
   searchApiKey?: string;
   dryRun: boolean;
+  /** Soft budget for a single run; used for guardrails, not hard guarantees. */
   maxTokensPerRun: number;
+  /** Max number of outbound web requests per run (search + fetch). */
+  maxWebRequestsPerRun: number;
+  /** Max wall-clock seconds per run before graceful stop. */
+  maxRunSeconds: number;
 }
 
 export function loadConfig(env = process.env, argv = process.argv): KotefConfig {
@@ -95,7 +105,7 @@ The ticket implementer MUST:
 3. Implement `src/core/logger.ts` following the sketch above, including a simple `createLogger` factory and at least one unit test asserting JSON shape.
 4. Implement `src/core/config.ts`:
    - use `dotenv` to load `.env` once;
-   - define a zod schema for `KotefConfig` with sane defaults (e.g. `dryRun` default `true`);
+   - define a zod schema for `KotefConfig` with sane defaults (e.g. `dryRun` default `true`, `maxRunSeconds` default ≈300, `maxWebRequestsPerRun` default ≈30);
    - derive `rootDir` from `process.cwd()` or a `--root` CLI flag;
    - throw a clear error if required keys (API keys, model) are missing.
 5. Implement `src/core/llm.ts`:

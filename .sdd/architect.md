@@ -439,6 +439,7 @@ Status: Approved
 -   **File Safety**: No direct file overwrites. All edits must be via unified diffs/patches.
 -   **Network Safety**: Host allowlist for web search; no internal network access (SSRF protection).
 -   **Secrets**: No secrets in logs or prompts. Use environment variables only.
+ -   **Performance & Cost Guardrails**: Each `kotef run` must respect configurable budgets from `KotefConfig` (max wall-clock time, max tokens, max web requests). The system should prefer smaller/cheaper models for planning/research and only use top-tier frontier models (ChatGPT 5.1 / Claude Sonnet 4.5 / Gemini 3 Pro class) for final code generation or other critical steps, as defined in `.sdd/best_practices.md`.
 
 ### Preconditions
 -   `OPENAI_API_KEY` (or compatible provider key) in environment.

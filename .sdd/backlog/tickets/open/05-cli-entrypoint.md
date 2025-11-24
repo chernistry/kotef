@@ -9,9 +9,10 @@ Create the CLI entry point to run the agent from the command line, wire it to th
 
 **Definition of Done:**
 - [ ] `bin/kotef` executable created and wired in `package.json` (`"bin"` field).
-- [ ] `src/cli.ts` parses arguments (`run <ticket-id>`, `init`, optional flags like `--root`, `--dry-run`).
-- [ ] CLI initializes `KotefConfig`, loads SDD files for the target repo, and starts the LangGraph runner (`buildKotefGraph`).
+- [ ] `src/cli.ts` parses arguments (`run <ticket-id>`, `init`, optional flags like `--root`, `--dry-run`, `--max-time`, `--max-tokens`).
+- [ ] CLI initializes `KotefConfig`, including performance & cost guardrails (`maxRunSeconds`, `maxTokensPerRun`, `maxWebRequestsPerRun`), loads SDD files for the target repo, and starts the LangGraph runner (`buildKotefGraph`).
 - [ ] Output is streamed to stdout via `logger` and a run report is written to `.sdd/runs/YYYY-MM-DD_HH-MM-SS_<runId>.md`.
+- [ ] If a run hits time/token budgets, the agent stops gracefully and records partial progress and reason in the run report.
 - [ ] Errors exit with non-zero status and a short diagnostic.
 
 ## Implementation Sketch
@@ -47,7 +48,7 @@ export async function writeRunReport(
 1. Add `"bin": { "kotef": "dist/bin/kotef.js" }` (or equivalent) to `package.json`.
 2. Implement `src/cli.ts`:
    - use `commander`/`yargs` or a minimal parser to support:
-     - `kotef run --ticket <id> [--root <path>] [--dry-run]`
+     - `kotef run --ticket <id> [--root <path>] [--dry-run] [--max-time <sec>] [--max-tokens <n>]`
      - `kotef init` (scaffold `.sdd` if not present; can be a stub for now).
    - resolve `rootDir` and SDD paths from args + `KotefConfig`.
    - load `.sdd/project.md`, `.sdd/architect.md`, `.sdd/best_practices.md`, and the chosen ticket Markdown.
