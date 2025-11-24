@@ -1,0 +1,2 @@
+# Best Practices
+- Use TypeScript

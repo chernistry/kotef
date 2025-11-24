@@ -34,20 +34,109 @@ export class KotefLlmError extends Error {
     }
 }
 
+// Assuming ChatCompletionResponse is OpenAI.Chat.Completions.ChatCompletion
+type ChatCompletionResponse = OpenAI.Chat.Completions.ChatCompletion;
+
 export async function callChat(
-    cfg: KotefConfig,
     messages: ChatMessage[],
-    options: ChatCompletionOptions = {},
+    config: KotefConfig,
+    options: ChatCompletionOptions = {}
 ): Promise<{ messages: ChatMessage[]; toolCalls?: ToolCallResult[] }> {
+    if (config.mockMode) {
+        // Simple mock logic for E2E tests
+        const lastMsg = messages[messages.length - 1].content || '';
+        let content: string | null = '';
+        let toolCalls: any[] | undefined = undefined;
+
+        // Planner Mock
+        if (lastMsg.includes('You are the Meta-Agent')) {
+            if (lastMsg.includes('Goal: Add a subtract function')) {
+                content = JSON.stringify({ next: 'coder' });
+            } else {
+                content = JSON.stringify({ next: 'done' });
+            }
+        }
+        // Coder Mock
+        else if (lastMsg.includes('You are the Coder')) {
+            // Check if we already did the edit
+            const hasEdit = messages.some(m => m.role === 'assistant' && m.tool_calls);
+            if (!hasEdit) {
+                content = null;
+                toolCalls = [{
+                    id: 'call_1',
+                    type: 'function',
+                    function: {
+                        name: 'write_patch',
+                        arguments: JSON.stringify({
+                            path: 'src/index.ts',
+                            diff: `--- src/index.ts
++++ src/index.ts
+@@ -1,1 +1,5 @@
+ console.log("Hello World");
++
++export function subtract(a: number, b: number): number {
++    return a - b;
++}`
+                                +                        })
+                            +                    }
+                        +                }];
+            } else {
+                content = "I have applied the changes.";
+            }
+        }
+        // Bootstrap Architect Mock
+        else if (lastMsg.includes('You are the Chief Architect')) {
+            content = JSON.stringify({
+                project: '# Mock Project',
+                architect: '# Mock Architect',
+                bestPractices: '# Mock Best Practices'
+            });
+        }
+        // Bootstrap Tickets Mock
+        else if (lastMsg.includes('You are the Project Manager')) {
+            content = JSON.stringify({
+                tickets: [{
+                    filename: '01-mock-ticket.md',
+                    content: '# Mock Ticket'
+                }]
+            });
+        }
+        else {
+            content = "Mock response";
+        }
+
+        const assistantMessage: ChatMessage = {
+            role: 'assistant',
+            content,
+            tool_calls: toolCalls
+        };
+
+        const resultMessages = [...messages, assistantMessage];
+        const parsedToolCalls: ToolCallResult[] = toolCalls?.map(tc => ({
+            toolName: tc.function.name,
+            args: JSON.parse(tc.function.arguments),
+            result: undefined
+        })) || [];
+
+        return {
+            messages: resultMessages,
+            toolCalls: parsedToolCalls.length > 0 ? parsedToolCalls : undefined
+        };
+    }
+
+    if (!config.apiKey) {
+        throw new KotefLlmError('OpenAI API key is not configured.');
+    }
+
     const openai = new OpenAI({
-        apiKey: cfg.apiKey,
-        baseURL: cfg.baseUrl,
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl,
         timeout: 30000, // 30s timeout
         maxRetries: 3,
     });
 
     try {
-        const model = options.model || (options.useStrongModel ? cfg.modelStrong : cfg.modelFast);
+        const model = options.model || (options.useStrongModel ? config.modelStrong : config.modelFast);
 
         const response = await openai.chat.completions.create({
             model,
@@ -56,6 +145,7 @@ export async function callChat(
             max_tokens: options.maxTokens,
             tools: options.tools,
             tool_choice: options.tool_choice,
+            response_format: options.response_format,
         }, { signal: options.signal });
 
         const choice = response.choices[0];
