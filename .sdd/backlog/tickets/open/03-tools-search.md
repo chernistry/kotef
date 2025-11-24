@@ -1,7 +1,7 @@
 # Ticket: 03 Tools – Web Search & Deep Research
 
 Spec version: v1.0  
-Context: `.sdd/project.md` (Two-tier web research), `.sdd/best_practices.md` Section “Priority 2 — Search & Deep Research Layer”, `.sdd/architect.md` Sections 3, 6.2  
+Context: `.sdd/project.md` (Two-tier web research, grounding requirements), `.sdd/best_practices.md` Section “Priority 2 — Search & Deep Research Layer” and “Performance & Cost Guardrails”, `.sdd/architect.md` Sections 3, 6.2  
 Dependencies: 01-scaffold-core, 02-tools-fs.
 
 ## Objective & DoD
@@ -113,5 +113,10 @@ npm test test/tools/search.test.ts
 
 ## Risks & Edge Cases
 - Prompt injection via untrusted web content (must be mitigated in prompts and best practices; note for Architect/Agent tickets).
-- Over-fetching (too many pages per query) leading to cost overruns.
+- Over-fetching (too many pages per query) leading to cost overruns; ensure `maxWebRequestsPerRun` is honored even when the planner retries.
 - Handling of non-HTML content (PDFs, binaries) – should be explicitly rejected or handled via a later ticket.
+
+## Non‑Goals / Pitfalls to Avoid
+- Do **not** make real network calls in unit tests; inject or mock HTTP/search clients so tests are deterministic and cheap.
+- Do **not** bake provider‑specific quirks into core types; keep `WebSearchResult` and `DeepResearchFinding` generic and map provider responses into them.
+- Do **not** always use `modelStrong` for summarization; follow best_practices and prefer `modelFast` for most research, reserving `modelStrong` for rare, critical summarization steps (if at all in this ticket).*** End Patch ***!

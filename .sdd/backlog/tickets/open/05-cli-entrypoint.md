@@ -74,3 +74,8 @@ export async function writeRunReport(
 ## Risks & Edge Cases
 - Running kotef in a repo without `.sdd/` (should fail with a clear, actionable message or offer `init`).
 - Run report directory not writable or missing (should fail gracefully but not corrupt user repo).
+
+## Non‑Goals / Pitfalls to Avoid
+- Do **not** assume `process.cwd()` is always the project root; respect the `--root` flag and `KotefConfig.rootDir` consistently.
+- Do **not** let CLI flags silently conflict with environment variables; define a clear precedence (e.g. CLI > env > defaults) and document it in help text.
+- Do **not** start background daemons or long-lived processes in this ticket; the focus is a single-run CLI with clear start/finish semantics.*** End Patch ***!

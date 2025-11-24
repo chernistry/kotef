@@ -1,7 +1,7 @@
 # Ticket: 04 Agent Graph & Nodes (LangGraph.js)
 
 Spec version: v1.0  
-Context: `.sdd/project.md` (High-level Architecture Plan), `.sdd/architect.md` Sections 3–6 (Architecture Overview, Component Specifications, Agent Layer)  
+Context: `.sdd/project.md` (High-level Architecture Plan, SDD as brain), `.sdd/best_practices.md` (orchestration, safety, verification), `.sdd/architect.md` Sections 3–6 (Architecture Overview, Component Specifications, Agent Layer)  
 Dependencies: 01-scaffold-core, 02-tools-fs, 03-tools-search.
 
 ## Objective & DoD
@@ -94,6 +94,11 @@ npm test test/agent/graph.test.ts
 ```
 
 ## Risks & Edge Cases
-- Graph design that is too “open”, allowing infinite loops or runaway tool calls (mitigate via step limits in state or config).
+- Graph design that is too “open”, allowing infinite loops or runaway tool calls (mitigate via step limits in state or config and honor `maxRunSeconds` / token budgets).
 - Missing or inconsistent SDD context (agent must fail fast or use Snitch Protocol, not guess).
-- Overly complex prompts that make debugging difficult; keep MVP simple but safe. 
+- Overly complex prompts that make debugging difficult; keep MVP simple but safe.
+
+## Non‑Goals / Pitfalls to Avoid
+- Do **not** hard-code paths to kotef’s own `.sdd/`; the graph should operate on a generic `SddContext` provided by the CLI for the **target** project.
+- Do **not** call filesystem or network APIs directly from nodes; all side effects must go through tools (`fs`, `web_search`, `deep_research`, `test_runner`) to keep behavior auditable and testable.
+- Do **not** embed long prompts inline in TS files; keep them in `src/agent/prompts/*.md` and load them via a prompt loader so they remain editable and versionable.*** End Patch ***!

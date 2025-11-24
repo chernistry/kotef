@@ -60,3 +60,8 @@ npm run test:e2e
 ## Risks & Edge Cases
 - Flaky E2E test due to network or LLM variability (mitigate using a cheap mock model or fixed seed for CI).
 - Overly complex scenario that hides real regressions behind noisy failures – keep the initial scenario simple and deterministic. 
+
+## Non‑Goals / Pitfalls to Avoid
+- Do **not** hit real external LLM/search APIs in CI by default; introduce a mock or “offline” mode (e.g. env flag) so E2E tests remain cheap and stable.
+- Do **not** overfit scenarios to a single project layout; keep the hello‑world repo minimal but representative of common patterns (SDD + small TS app).
+- Do **not** assert on fragile details like exact wording of agent output; focus on structural checks (exit code, files changed, tests run) to avoid brittle tests.*** End Patch ***!

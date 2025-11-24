@@ -75,6 +75,11 @@ npm test test/tools/fs.test.ts
 ```
 
 ## Risks & Edge Cases
-- Symbolic links pointing outside `rootDir` (must not be followed without explicit design).
-- Large or binary files that should not be loaded entirely into memory.
+- Symbolic links pointing outside `rootDir` (must not be followed without explicit design). Prefer treating symlinks as regular files but still applying `resolvePath` to their targets; never allow escaping to parent dirs.
+- Large or binary files that should not be loaded entirely into memory (enforce a max size and reject obviously binary files in MVP).
 - Partial patch application leaving file in corrupt state (mitigated by temp-file + rename).
+
+## Non‑Goals / Pitfalls to Avoid
+- Do **not** shell out to the `patch` CLI; keep patch application in‑process for portability and control.
+- Do **not** implement a full diff engine here; this ticket assumes patches are already generated and focuses on safe application.
+- Do **not** allow absolute paths or `~` expansion as `relativePath` inputs; all paths must be relative to `rootDir` and validated. 
