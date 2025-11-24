@@ -224,8 +224,16 @@ Ensure tickets are granular, have clear dependencies, and cover the entire MVP.
 
     const createdFiles: string[] = [];
     for (const ticket of tickets) {
+        if (!ticket || typeof ticket.filename !== 'string') {
+            console.warn('Skipping malformed ticket entry', ticket);
+            continue;
+        }
         const filePath = path.join(ticketsDir, ticket.filename);
-        await fs.writeFile(filePath, ticket.content);
+        const contentToWrite =
+            typeof ticket.content === 'string'
+                ? ticket.content
+                : `# Ticket: ${ticket.filename}\n\n> WARNING: LLM did not provide explicit content for this ticket. Please regenerate or edit manually.\n`;
+        await fs.writeFile(filePath, contentToWrite);
         createdFiles.push(ticket.filename);
     }
 
