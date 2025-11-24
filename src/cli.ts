@@ -200,7 +200,28 @@ program
             // 2. Run SDD Orchestration
             console.log('\n🧠 Orchestrating SDD (Research -> Architect -> Tickets)...');
             try {
-                await runSddOrchestration(cfg, rootDir, goal);
+                // Check if .sdd exists
+                const sddDir = path.join(rootDir, '.sdd');
+                let sddExists = false;
+                try {
+                    await fs.access(sddDir);
+                    sddExists = true;
+                } catch {
+                    sddExists = false;
+                }
+
+                if (!sddExists) {
+                    // Bootstrap
+                    await bootstrapSddForProject(cfg, rootDir, goal);
+                } else {
+                    // Just run orchestrator (or maybe we should always run orchestrator? 
+                    // Orchestrator updates best_practices/architect/tickets.
+                    // Bootstrap creates project.md THEN runs orchestrator.
+                    // If project.md exists, we can just run orchestrator.
+                    // But if we want to "re-bootstrap" (update project.md from goal), we might need logic.
+                    // For now, if .sdd exists, assume project.md exists and just run orchestrator.
+                    await runSddOrchestration(cfg, rootDir, goal);
+                }
             } catch (e: any) {
                 console.error('❌ SDD Orchestration failed:', e.message);
                 goal = undefined;

@@ -11,7 +11,8 @@ export type BrainTemplateKind =
     | 'architect'
     | 'agent'
     | 'ticket'
-    | 'architect_delta';
+    | 'architect_delta'
+    | 'bootstrap_project';
 
 export interface SddPromptContext {
     projectName: string;
@@ -31,7 +32,8 @@ const TEMPLATE_FILES: Record<BrainTemplateKind, string> = {
     architect: 'architect_template.md',
     agent: 'agent_template.md',
     ticket: 'ticket_template.md',
-    architect_delta: 'architect_delta_template.md'
+    architect_delta: 'architect_delta_template.md',
+    bootstrap_project: 'bootstrap_project.md'
 };
 
 export function loadBrainTemplate(kind: BrainTemplateKind): string {
