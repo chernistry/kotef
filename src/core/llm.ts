@@ -22,6 +22,7 @@ export interface ChatCompletionOptions {
     signal?: AbortSignal;
     tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
     tool_choice?: OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
+    response_format?: { type: 'json_object' | 'text' };
     /** If true, use the strong model (modelStrong) instead of default (modelFast) */
     useStrongModel?: boolean;
 }

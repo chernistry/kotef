@@ -37,7 +37,7 @@ export async function bootstrapSddForProject(
     }
 
     // 2. Research Best Practices
-    const researchPrompt = await loadPrompt('bootstrap_research');
+    // const researchPrompt = await loadPrompt('bootstrap_research');
     // const researchQuery = researchPrompt
     //   .replace('{{stackHints}}', stackHints)
     //   .replace('{{goal}}', goal);
@@ -65,9 +65,11 @@ export async function bootstrapSddForProject(
 
     let artifacts: any = {};
     try {
-        artifacts = JSON.parse(archResponse.messages[archResponse.messages.length - 1].content);
+        const content = archResponse.messages[archResponse.messages.length - 1].content;
+        if (!content) throw new Error("Empty response");
+        artifacts = JSON.parse(content);
     } catch (e) {
-        console.error("Failed to parse bootstrap artifacts", e);
+        console.error("Failed to parse architect response", e);
         return;
     }
 
@@ -84,16 +86,17 @@ export async function bootstrapSddForProject(
 
     let tickets: any[] = [];
     try {
-        const json = JSON.parse(ticketResponse.messages[ticketResponse.messages.length - 1].content);
-        tickets = Array.isArray(json) ? json : (json.tickets || []);
+        const content = ticketResponse.messages[ticketResponse.messages.length - 1].content;
+        if (!content) throw new Error("Empty response");
+        const parsed = JSON.parse(content);
+        tickets = parsed.tickets || [];
     } catch (e) {
-        console.error("Failed to parse bootstrap tickets", e);
+        console.error("Failed to parse ticket response", e);
     }
 
     // 5. Write Files
     // We need to ensure .sdd directories exist.
     // Since we don't have a `mkdir` tool, we rely on `writePatch`? No, `writePatch` assumes file exists usually?
-    // Wait, `writePatch` in `fs.ts` applies diffs. It doesn't create new files easily unless we handle "new file" diffs.
     // But `fs.ts` doesn't expose a simple `writeFile`.
     // We should probably add `writeFile` to `fs.ts` or use `fs` directly here since this is a "system" action, not an agent action?
     // The ticket says "call FS tools to create .sdd/ and files, using diff-based writes if files exist."
@@ -102,6 +105,7 @@ export async function bootstrapSddForProject(
     // But we must respect the sandbox `rootDir`.
 
     const sddDir = path.join(rootDir, '.sdd');
+    // const ticketsDir = path.join(sddDir, 'backlog/tickets/open');
     // const ticketsDir = path.join(sddDir, 'backlog/tickets/open');
 
     // Helper to safe write

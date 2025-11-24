@@ -43,6 +43,9 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         });
 
         const assistantMsg = response.messages[response.messages.length - 1];
+        if (!assistantMsg.content) {
+            throw new Error("Planner received empty response from LLM");
+        }
         let decision: any = { next: 'researcher' }; // Default fallback
 
         try {
