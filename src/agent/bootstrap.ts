@@ -45,9 +45,13 @@ export async function bootstrapSddForProject(
         goal
     });
 
-    const projectResponse = await callChat(cfg, [{ role: 'system', content: projectPrompt }], {
-        model: cfg.modelFast, // Use fast model for project spec
-    });
+    const projectResponse = await callChat(
+        cfg,
+        [{ role: 'system', content: projectPrompt }],
+        {
+            model: cfg.modelFast, // Use fast model for project spec
+        }
+    );
 
     let projectMdContent = projectResponse.messages[projectResponse.messages.length - 1].content;
     // Strip markdown code blocks if present
@@ -73,7 +77,26 @@ export async function bootstrapSddForProject(
         console.log('Created: .sdd/project.md');
     }
 
-    // 3. Run SDD Orchestration
+    // 3. Seed implementing agent spec from SDDRush agent template (agent.md)
+    // This file describes how an implementing agent should behave in this repo
+    // (reading .sdd/*.md, executing tickets in order, quality gates, Snitch Protocol, etc.).
+    try {
+        const agentMdPath = path.join(sddDir, 'agent.md');
+        await fs.access(agentMdPath);
+        console.log('Skipping .sdd/agent.md (already exists)');
+    } catch {
+        console.log('Seeding .sdd/agent.md from brain agent_template.md...');
+        const agentSpec = renderBrainTemplate('agent', {
+            projectName: path.basename(rootDir),
+            domain: 'general',
+            techStack: stackHints,
+            year: new Date().getFullYear()
+        });
+        await safeWrite('.sdd/agent.md', agentSpec);
+        console.log('Created: .sdd/agent.md');
+    }
+
+    // 4. Run SDD Orchestration
     // This will generate best_practices.md, architect.md, and tickets.
     await runSddOrchestration(cfg, rootDir, goal);
 }

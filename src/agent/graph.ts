@@ -5,6 +5,7 @@ import { plannerNode } from './nodes/planner.js';
 import { researcherNode } from './nodes/researcher.js';
 import { coderNode } from './nodes/coder.js';
 import { verifierNode } from './nodes/verifier.js';
+import { snitchNode } from './nodes/snitch.js';
 
 import { callChat } from '../core/llm.js';
 
@@ -82,6 +83,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
     graph.addNode("researcher" as any, researcherNode(cfg));
     graph.addNode("coder" as any, coderNode(cfg, chatFn));
     graph.addNode("verifier" as any, verifierNode(cfg));
+    graph.addNode("snitch" as any, snitchNode(cfg));
 
     // Add edges
     graph.addEdge(START, "planner" as any);
@@ -95,12 +97,14 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             if (next === 'coder') return 'coder';
             if (next === 'verifier') return 'verifier';
             if (next === 'done') return 'end';
-            return 'researcher'; // Default
+            if (next === 'snitch' || next === 'ask_human') return 'snitch';
+            return 'researcher'; // Default fallback
         },
         {
             researcher: "researcher" as any,
             coder: "coder" as any,
             verifier: "verifier" as any,
+            snitch: "snitch" as any,
             end: END
         }
     );
@@ -120,6 +124,9 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             planner: "planner" as any
         }
     );
+
+    // Snitch terminates the run after logging an issue
+    graph.addEdge("snitch" as any, END);
 
     return graph.compile();
 }
