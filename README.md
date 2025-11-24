@@ -29,7 +29,7 @@ Under the hood:
 CLI modes:
 
 - `kotef run …` — one-shot automation, leaves a run report in `.sdd/runs/`.
-- `kotef chat` — Voyant-style interactive loop: generate tickets, pick which ones to execute, watch progress ticket by ticket.
+- `kotef chat` —  interactive loop: generate tickets, pick which ones to execute, watch progress ticket by ticket.
 
 ## What’s baked in right now
 
