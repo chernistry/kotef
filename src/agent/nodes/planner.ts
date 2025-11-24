@@ -23,9 +23,9 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         const replacements: Record<string, string> = {
             '{{GOAL}}': safe(state.sdd.goal),
             '{{TICKET}}': safe(state.sdd.ticket),
-            '{{SDD_PROJECT}}': summarize(state.sdd.project, 4000),
-            '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 4000),
-            '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 4000),
+            '{{SDD_PROJECT}}': summarize(state.sdd.project, 2500),
+            '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),
+            '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),
             '{{STATE_PLAN}}': safe(state.plan),
             '{{RESEARCH_RESULTS}}': safe(state.researchResults),
             '{{FILE_CHANGES}}': safe(state.fileChanges),
@@ -52,7 +52,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         const response = await chatFn(cfg, messages, {
             model: cfg.modelFast, // Planner uses fast/cheap model
             // Planner JSON should be compact; keep completion small to reduce latency.
-            maxTokens: 800,
+            maxTokens: 512,
             response_format: { type: 'json_object' } as any
         });
 
@@ -90,9 +90,10 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         const hasStrictSignal = strictSignals.some(sig => architectText.includes(sig));
         const defaultProfile: ExecutionProfile = hasStrictSignal ? 'strict' : 'fast';
 
+        // CLI/profile overrides from state take precedence over model guesses.
         const resolvedProfile: ExecutionProfile =
+            (state.runProfile && isValidProfile(state.runProfile) ? state.runProfile : undefined) ||
             (isValidProfile(decision.profile) ? decision.profile : undefined) ||
-            state.runProfile ||
             defaultProfile;
 
         // Update state with the new plan/decision

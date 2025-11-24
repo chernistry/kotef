@@ -52,9 +52,9 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         const replacements: Record<string, string> = {
             '{{TICKET}}': safe(state.sdd.ticket),
             '{{GOAL}}': safe(state.sdd.goal),
-            '{{SDD_PROJECT}}': summarize(state.sdd.project, 4000),
-            '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 4000),
-            '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 4000),
+            '{{SDD_PROJECT}}': summarize(state.sdd.project, 2500),
+            '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),
+            '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),
             '{{RESEARCH_RESULTS}}': safe(state.researchResults),
             '{{STATE_PLAN}}': safe(state.plan),
             '{{EXECUTION_PROFILE}}': executionProfile
@@ -190,15 +190,32 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         const currentMessages = [...messages];
         let turns = 0;
         const maxTurns = profileTurns[executionProfile] ?? 20;
+        const profileCommandLimits: Record<ExecutionProfile, number> = {
+            strict: 8,
+            fast: 4,
+            smoke: 1,
+            yolo: 10
+        };
+        let commandCount = 0;
         let fileChanges = state.fileChanges || {};
 
         log.info('Starting coder tool execution loop', { maxTurns });
         
+        const trimHistory = (all: ChatMessage[]): ChatMessage[] => {
+            if (all.length <= 30) return all;
+            const system = all[0];
+            const rest = all.slice(1);
+            const tail = rest.slice(-20);
+            return [system, ...tail];
+        };
+
         while (turns < maxTurns) {
             log.info(`Coder turn ${turns + 1}/${maxTurns}: Calling LLM...`);
-            const response = await chatFn(cfg, currentMessages, {
+            const response = await chatFn(cfg, trimHistory(currentMessages), {
                 model: cfg.modelStrong, // Coder uses strong model
-                tools: tools as any // Cast to avoid strict type mismatch if any
+                tools: tools as any, // Cast to avoid strict type mismatch if any
+                maxTokens: 512,
+                temperature: 0
             });
 
             const msg = response.messages[response.messages.length - 1];
@@ -246,35 +263,51 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         fileChanges = { ...(fileChanges || {}), [args.path]: 'patched' };
                         log.info('Patch applied', { path: args.path });
                     } else if (toolCall.function.name === 'run_command') {
-                        const cmdResult = await runCommand(cfg, args.command);
-                        result = {
-                            exitCode: cmdResult.exitCode,
-                            stdout: cmdResult.stdout,
-                            stderr: cmdResult.stderr,
-                            passed: cmdResult.passed
-                        };
-                        log.info('Command executed', {
-                            command: args.command,
-                            exitCode: cmdResult.exitCode,
-                            passed: cmdResult.passed
-                        });
+                        commandCount += 1;
+                        if (commandCount > profileCommandLimits[executionProfile]) {
+                            result = `Skipped command due to per-run command limit for profile "${executionProfile}".`;
+                            log.info('Command skipped by profile limit', { command: args.command });
+                        } else {
+                            const cmdResult = await runCommand(cfg, args.command);
+                            result = {
+                                exitCode: cmdResult.exitCode,
+                                stdout: cmdResult.stdout,
+                                stderr: cmdResult.stderr,
+                                passed: cmdResult.passed
+                            };
+                            log.info('Command executed', {
+                                command: args.command,
+                                exitCode: cmdResult.exitCode,
+                                passed: cmdResult.passed
+                            });
+                        }
                     } else if (toolCall.function.name === 'run_tests') {
-                        const command =
-                            typeof args.command === 'string' && args.command.trim().length > 0
-                                ? args.command
-                                : 'npm test';
-                        const cmdResult = await runCommand(cfg, command);
-                        result = {
-                            exitCode: cmdResult.exitCode,
-                            stdout: cmdResult.stdout,
-                            stderr: cmdResult.stderr,
-                            passed: cmdResult.passed
-                        };
-                        log.info('Tests executed', {
-                            command,
-                            exitCode: cmdResult.exitCode,
-                            passed: cmdResult.passed
-                        });
+                        commandCount += 1;
+                        if (commandCount > profileCommandLimits[executionProfile]) {
+                            result = `Skipped tests due to per-run command limit for profile "${executionProfile}".`;
+                            log.info('Tests skipped by profile limit', { requestedCommand: args.command });
+                        } else {
+                            let command: string;
+                            if (typeof args.command === 'string' && args.command.trim().length > 0) {
+                                command = args.command;
+                            } else {
+                                // Simple heuristic: prefer pytest if Python structure is detected.
+                                const hasPy = state.sdd.project?.includes('Python') || state.sdd.project?.includes('pyproject.toml');
+                                command = hasPy ? 'pytest' : 'npm test';
+                            }
+                            const cmdResult = await runCommand(cfg, command);
+                            result = {
+                                exitCode: cmdResult.exitCode,
+                                stdout: cmdResult.stdout,
+                                stderr: cmdResult.stderr,
+                                passed: cmdResult.passed
+                            };
+                            log.info('Tests executed', {
+                                command,
+                                exitCode: cmdResult.exitCode,
+                                passed: cmdResult.passed
+                            });
+                        }
                     } else {
                         result = "Unknown tool";
                         log.warn('Unknown tool called', { tool: toolCall.function.name });
