@@ -1,4 +1,4 @@
-import { AgentState } from '../state.js';
+import { AgentState, ExecutionProfile } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { ChatMessage, callChat } from '../../core/llm.js';
 import { loadRuntimePrompt } from '../../core/prompts.js';
@@ -15,12 +15,17 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             if (typeof value === 'string') return value;
             return JSON.stringify(value, null, 2);
         };
+        const summarize = (value: unknown, maxChars: number) => {
+            const text = safe(value);
+            if (text.length <= maxChars) return text;
+            return text.slice(0, maxChars) + '\n\n...[truncated for planner; see SDD files for full spec]';
+        };
         const replacements: Record<string, string> = {
             '{{GOAL}}': safe(state.sdd.goal),
             '{{TICKET}}': safe(state.sdd.ticket),
-            '{{SDD_PROJECT}}': safe(state.sdd.project),
-            '{{SDD_ARCHITECT}}': safe(state.sdd.architect),
-            '{{SDD_BEST_PRACTICES}}': safe(state.sdd.bestPractices),
+            '{{SDD_PROJECT}}': summarize(state.sdd.project, 4000),
+            '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 4000),
+            '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 4000),
             '{{STATE_PLAN}}': safe(state.plan),
             '{{RESEARCH_RESULTS}}': safe(state.researchResults),
             '{{FILE_CHANGES}}': safe(state.fileChanges),
@@ -59,15 +64,42 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
 
         try {
             decision = JSON.parse(assistantMsg.content);
-            log.info('Planner decision', { next: decision.next, reason: decision.reason });
+            log.info('Planner decision', {
+                next: decision.next,
+                reason: decision.reason,
+                profile: decision.profile
+            });
         } catch (e) {
             log.error("Failed to parse planner JSON", { error: e });
         }
 
+        const isValidProfile = (p: any): p is ExecutionProfile =>
+            p === 'strict' || p === 'fast' || p === 'smoke';
+
+        // Heuristic default profile based on architect SDD
+        const architectText = state.sdd.architect || '';
+        const strictSignals = [
+            '--cov',
+            'coverage',
+            'mypy',
+            'pylint',
+            'black',
+            'lint',
+            'pre-commit'
+        ];
+        const hasStrictSignal = strictSignals.some(sig => architectText.includes(sig));
+        const defaultProfile: ExecutionProfile = hasStrictSignal ? 'strict' : 'fast';
+
+        const resolvedProfile: ExecutionProfile =
+            (isValidProfile(decision.profile) ? decision.profile : undefined) ||
+            state.runProfile ||
+            defaultProfile;
+
         // Update state with the new plan/decision
         return {
             plan: decision,
-            messages: [assistantMsg] // Append assistant's thought process
+            messages: [assistantMsg], // Append assistant's thought process
+            runProfile: resolvedProfile
         };
     };
 }

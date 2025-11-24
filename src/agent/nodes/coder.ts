@@ -1,4 +1,4 @@
-import { AgentState } from '../state.js';
+import { AgentState, ExecutionProfile } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { createLogger } from '../../core/logger.js';
 
@@ -19,15 +19,39 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             if (typeof value === 'string') return value;
             return JSON.stringify(value, null, 2);
         };
+        const summarize = (value: unknown, maxChars: number) => {
+            const text = safe(value);
+            if (text.length <= maxChars) return text;
+            return text.slice(0, maxChars) + '\n\n...[truncated; use read_file(\".sdd/*\") for full spec]';
+        };
+
+        const inferProfile = (): ExecutionProfile => {
+            if (state.runProfile) return state.runProfile;
+            const architectText = state.sdd.architect || '';
+            const strictSignals = [
+                '--cov',
+                'coverage',
+                'mypy',
+                'pylint',
+                'black',
+                'lint',
+                'pre-commit'
+            ];
+            const hasStrictSignal = strictSignals.some(sig => architectText.includes(sig));
+            return hasStrictSignal ? 'strict' : 'fast';
+        };
+
+        const executionProfile = inferProfile();
 
         const replacements: Record<string, string> = {
             '{{TICKET}}': safe(state.sdd.ticket),
             '{{GOAL}}': safe(state.sdd.goal),
-            '{{SDD_PROJECT}}': safe(state.sdd.project),
-            '{{SDD_ARCHITECT}}': safe(state.sdd.architect),
-            '{{SDD_BEST_PRACTICES}}': safe(state.sdd.bestPractices),
+            '{{SDD_PROJECT}}': summarize(state.sdd.project, 4000),
+            '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 4000),
+            '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 4000),
             '{{RESEARCH_RESULTS}}': safe(state.researchResults),
-            '{{STATE_PLAN}}': safe(state.plan)
+            '{{STATE_PLAN}}': safe(state.plan),
+            '{{EXECUTION_PROFILE}}': executionProfile
         };
 
         let systemPrompt = promptTemplate;

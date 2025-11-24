@@ -10,6 +10,8 @@ export interface SddContext {
     issues?: string;       // issues encountered
 }
 
+export type ExecutionProfile = 'strict' | 'fast' | 'smoke';
+
 export interface AgentState {
     messages: ChatMessage[];
     sdd: SddContext;
@@ -20,4 +22,6 @@ export interface AgentState {
     done?: boolean;
     /** Internal flag to distinguish between bootstrap vs normal ticket execution. */
     hasSdd?: boolean;
+    /** Execution profile for this run: affects how heavy tests/checks should be. */
+    runProfile?: ExecutionProfile;
 }
