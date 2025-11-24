@@ -2,8 +2,8 @@ You are an expert technical project manager and architect.
 Your task is to create a `project.md` file for a software project based on the user's goal and the inferred tech stack.
 
 ## Context
-Goal: {{goal}}
-Tech Stack Hints: {{stackHints}}
+Goal: {{GOAL}}
+Tech Stack Hints: {{TECH_STACK}}
 
 ## Instructions
 1. Analyze the goal and stack hints.

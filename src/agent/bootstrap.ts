@@ -38,8 +38,11 @@ export async function bootstrapSddForProject(
     // 2. Synthesize Project Spec (project.md)
     console.log('Synthesizing project.md...');
     const projectPrompt = await renderBrainTemplate('bootstrap_project', {
-        goal,
-        stackHints
+        projectName: path.basename(rootDir),
+        domain: 'general',
+        techStack: stackHints,
+        year: new Date().getFullYear(),
+        goal
     });
 
     const projectResponse = await callChat(cfg, [{ role: 'system', content: projectPrompt }], {

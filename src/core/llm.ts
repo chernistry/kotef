@@ -103,6 +103,23 @@ export async function callChat(
                 }]
             });
         }
+        // Bootstrap Project MD Mock
+        else if (systemMsg.includes('create a `project.md`') || systemMsg.includes('technical project manager')) {
+            content = `# Project: Mock Project
+
+## Goal
+Build awesome software
+
+## Tech Stack
+TypeScript, Node.js
+
+## Scope
+MVP implementation
+
+## Definition of Done
+- [ ] Code works
+- [ ] Tests pass`;
+        }
         // Deep Research Mock
         else if (systemMsg.includes('research assistant') || lastMsg.includes('research assistant') || systemMsg.includes('software researcher')) {
             content = JSON.stringify([{
