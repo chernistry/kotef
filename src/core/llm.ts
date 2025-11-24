@@ -22,6 +22,8 @@ export interface ChatCompletionOptions {
     signal?: AbortSignal;
     tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
     tool_choice?: OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
+    /** If true, use the strong model (modelStrong) instead of default (modelFast) */
+    useStrongModel?: boolean;
 }
 
 export class KotefLlmError extends Error {
@@ -37,15 +39,17 @@ export async function callChat(
     options: ChatCompletionOptions = {},
 ): Promise<{ messages: ChatMessage[]; toolCalls?: ToolCallResult[] }> {
     const openai = new OpenAI({
-        apiKey: cfg.openaiApiKey,
-        baseURL: cfg.openaiBaseUrl,
+        apiKey: cfg.apiKey,
+        baseURL: cfg.baseUrl,
         timeout: 30000, // 30s timeout
         maxRetries: 3,
     });
 
     try {
+        const model = options.model || (options.useStrongModel ? cfg.modelStrong : cfg.modelFast);
+
         const response = await openai.chat.completions.create({
-            model: options.model || cfg.openaiModel,
+            model,
             messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
             temperature: options.temperature ?? 0,
             max_tokens: options.maxTokens,

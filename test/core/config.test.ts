@@ -13,14 +13,16 @@ describe('Config', () => {
         process.env = {
             ...originalEnv,
             OPENAI_API_KEY: 'test-key',
-            OPENAI_MODEL: 'gpt-4-test',
+            OPENAI_MODEL: 'gpt-4.1-test',
             KOTEF_DRY_RUN: 'false',
+            MAX_WEB_REQUESTS_PER_RUN: '50',
         };
 
         const config = loadConfig();
-        assert.strictEqual(config.openaiApiKey, 'test-key');
-        assert.strictEqual(config.openaiModel, 'gpt-4-test');
+        assert.strictEqual(config.apiKey, 'test-key');
+        assert.strictEqual(config.modelFast, 'gpt-4.1-test');
         assert.strictEqual(config.dryRun, false);
+        assert.strictEqual(config.maxWebRequestsPerRun, 50);
     });
 
     it('should use defaults when env vars are missing', () => {
@@ -30,16 +32,18 @@ describe('Config', () => {
         };
 
         const config = loadConfig();
-        assert.strictEqual(config.openaiBaseUrl, 'https://api.openai.com/v1');
+        assert.strictEqual(config.baseUrl, 'https://api.openai.com/v1');
         assert.strictEqual(config.dryRun, true);
+        assert.strictEqual(config.maxRunSeconds, 300);
     });
 
     it('should throw if required keys are missing', () => {
         process.env = {
             ...originalEnv,
             OPENAI_API_KEY: '', // Missing
+            KOTEF_API_KEY: '', // Missing
         };
 
-        assert.throws(() => loadConfig(), /OPENAI_API_KEY is required/);
+        assert.throws(() => loadConfig(), /API Key is required/);
     });
 });

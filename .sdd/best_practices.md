@@ -25,7 +25,7 @@
 - **R1: Uncontrolled code edits or file system damage** – *High*. If the agent misapplies a patch or writes outside the workspace, it could corrupt the project or delete data. Mitigated by diff-first approach, path allowlists, and dry-run mode.
 - **R2: Prompt injection or data exfiltration via web content** – *High*. Malicious pages could trick the LLM into revealing secrets or doing destructive actions. Mitigate by strict host allowlist, content sanitization, and never fully trusting external text in prompts[\[7\]](https://hiflylabs.com/blog/2025/8/28/ai-agent-governance#:~:text=incorrect%20actions%2C%20or%20even%20produce,prompt%20injection).
 - **R3: Upstream API or model changes** – *Medium*. Search engines, LLM APIs, etc., may change formats or performance over time, breaking tools. Mitigate via modular provider code and feature flags (e.g. easy to switch search API) plus monitoring of provider announcements.
-- **R4: Runaway costs or latency** – *Medium*. Without guardrails, the agent could loop or use an expensive model excessively (e.g. call GPT-4 repeatedly), leading to high costs or long waits. Mitigate with budgets, timeouts, and an emergency stop if a run exceeds limits.
+- **R4: Runaway costs or latency** – *Medium*. Without guardrails, the agent could loop or use an expensive model excessively (e.g. call gpt-4.1 repeatedly), leading to high costs or long waits. Mitigate with budgets, timeouts, and an emergency stop if a run exceeds limits.
 - **R5: Stale best practices or security posture** – *Low–Medium*. As 2025 tech evolves, parts of this guide may become outdated (e.g. new Node features, new OWASP Top 10). Mitigate by scheduling periodic reviews of the SDD best_practices and adjusting the agent’s behavior accordingly.
 
 ------------------------------------------------------------------------
@@ -611,9 +611,9 @@ We address performance and cost together, as they often trade off (faster usuall
 **Optimization Techniques:**
 
 - **Model Selection:** Use cheaper LLMs where suitable. For instance:
-- Use GPT-3.5 for research summarization or for simpler coding tasks; reserve GPT-4 for when high reasoning is needed (maybe an option `--quality high` triggers GPT-4).
+- Use GPT-3.5 for research summarization or for simpler coding tasks; reserve gpt-4.1 for when high reasoning is needed (maybe an option `--quality high` triggers gpt-4.1).
 - We could allow local models (like running a smaller model via `llmjs` or `ggml`). That could cut cost but might impact quality. However, giving that option is good for offline or cost-sensitive users.
-- Also multi-step approaches: sometimes using a series of smaller model calls can be cheaper than one big GPT-4 call. We should experiment but not overcomplicate initially.
+- Also multi-step approaches: sometimes using a series of smaller model calls can be cheaper than one big gpt-4.1 call. We should experiment but not overcomplicate initially.
 - **Parallelism:** Within the confines of Node’s single-thread, we can do some things in parallel:
 - Fetch multiple web pages concurrently (with a limit). Node can handle parallel HTTP well.
 - Possibly run tests and analysis in parallel (though tests themselves might be single-threaded by Node test runner unless we spawn separate processes per test file; Node’s runner does run files in parallel by default).
@@ -635,7 +635,7 @@ We address performance and cost together, as they often trade off (faster usuall
 
 **Resource Limits in Testing/CI:** - Ensure our CI doesn’t inadvertently run a massive search. In CI config, maybe disable actual web access or have a very low time limit on runs (since CI should not hang because an API is slow or down). - Possibly have a special mode for CI where agent uses canned answers (to eliminate flakiness and external dependency). For example, set an env like `KOTEF_MODE=offline` which makes all search return pre-recorded known answers. This ensures reproducibility and speed in CI. It’s a bit like having unit tests for the agent’s logic with stubbed external world.
 
-**Performance Example:** If a typical run uses: - 3 OpenAI calls (planner, coder, maybe a follow-up fix) at ~2k tokens each = 6k tokens -\> with GPT-4 (\$0.06/1k output) it’s ~\$0.36, GPT-3.5 (\$0.002/1k) negligible. - 5 web fetches, that’s just bandwidth (few MB at most). - Running tests on a medium project (if tests take 10s). So maybe each run \< \$0.50 and 2-5 minutes. That’s acceptable for a dev’s usage or even CI on critical changes. But if agent is run often, encourage using cheaper models or raising awareness of cost.
+**Performance Example:** If a typical run uses: - 3 OpenAI calls (planner, coder, maybe a follow-up fix) at ~2k tokens each = 6k tokens -\> with gpt-4.1 (\$0.06/1k output) it’s ~\$0.36, GPT-3.5 (\$0.002/1k) negligible. - 5 web fetches, that’s just bandwidth (few MB at most). - Running tests on a medium project (if tests take 10s). So maybe each run \< \$0.50 and 2-5 minutes. That’s acceptable for a dev’s usage or even CI on critical changes. But if agent is run often, encourage using cheaper models or raising awareness of cost.
 
 **Scaling Up:** - If we wanted to use kotef on a very large codebase or many tasks concurrently, we might consider: - Sharding tasks (though we currently do one at a time). - Running in a distributed manner (not immediate focus, but something like handling multiple tickets in parallel if we had multi agents). - But more practically: ensure memory usage scales roughly linearly with what it needs (not e.g. loading entire repo in memory if not needed). - Use streams for reading large files instead of loading whole file if we only need small part (for now, reading file fully is fine for code files).
 
