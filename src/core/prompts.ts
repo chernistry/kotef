@@ -53,12 +53,12 @@ export async function loadPrompt(promptName: string): Promise<string> {
     return content;
 }
 
-export async function loadRuntimePrompt(name: RuntimePromptName): Promise<string> {
+export const loadRuntimePrompt = async (name: RuntimePromptName): Promise<string> => {
     if (!RUNTIME_PROMPTS.has(name)) {
         throw new Error(`Unknown runtime prompt: ${name}`);
     }
     return loadPrompt(name);
-}
+};
 
 export function clearPromptCache() {
     promptCache.clear();

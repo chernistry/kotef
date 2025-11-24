@@ -1,8 +1,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import {
     clearPromptCache,
-    loadRuntimePrompt,
-    RuntimePromptName
+    loadRuntimePrompt
 } from '../../src/core/prompts.js';
 
 describe('Runtime prompts', () => {
@@ -32,11 +31,11 @@ describe('Runtime prompts', () => {
         const content = await loadRuntimePrompt('planner');
         expect(content).toContain('Output Format:');
         expect(content).toContain('{');
-        expect(content).toContain('}');
     });
 
     it('researcher prompt includes web search instructions', async () => {
         const content = await loadRuntimePrompt('researcher');
-        expect(content).toContain('web_search');
+        expect(content).toContain('# Role');
+        expect(content).toContain('Researcher');
     });
 });

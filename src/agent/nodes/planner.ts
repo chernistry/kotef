@@ -8,7 +8,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('planner');
         log.info('Planner node started');
-        
+
         const promptTemplate = await loadRuntimePrompt('planner');
         const safe = (value: unknown) => {
             if (value === undefined || value === null) return '';

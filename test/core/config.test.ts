@@ -1,8 +1,9 @@
+
 import { describe, it, afterEach, beforeEach, expect } from 'vitest';
 import { loadConfig } from '../../src/core/config.js';
 
 describe('Config', () => {
-    const originalEnv = process.env;
+    let originalEnv: NodeJS.ProcessEnv;
 
     beforeEach(() => {
         // Assuming 'vi' is a placeholder for a test runner's module reset function,
@@ -13,18 +14,19 @@ describe('Config', () => {
         // If using node:test, you might need to import 'mock' from 'node:test' and use `mock.reset()`
         // or similar if module caching is an issue.
         // For this change, I'll assume 'vi' is intended to be available or a typo.
-        // If 'vi' is not available, the line `vi.resetModules();` should be removed.
+        // If 'vi' is not available, the line `vi.resetModules(); ` should be removed.
         // As per the instruction, I'm adding it.
         // vi.resetModules(); // This line would require 'vi' to be imported or globally available (e.g., Vitest)
 
-        // Create a fresh copy of the original environment for each test
-        process.env = { ...originalEnv };
-
-        // Clear specific environment variables that might interfere with tests
+        // Save original env
+        originalEnv = { ...process.env };
+        // Clear relevant env vars to ensure defaults are tested
         delete process.env.KOTEF_API_KEY;
         delete process.env.OPENAI_API_KEY;
         delete process.env.CHAT_LLM_API_KEY;
         delete process.env.CHAT_LLM_BASE_URL;
+        delete process.env.KOTEF_BASE_URL;
+        delete process.env.OPENAI_BASE_URL;
         delete process.env.CHAT_LLM_MODEL;
     });
 

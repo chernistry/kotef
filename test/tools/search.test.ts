@@ -50,20 +50,12 @@ describe('Search Tools', () => {
         it('should throw if API key is missing', async () => {
             await expect(webSearch({} as any, 'test query')).rejects.toThrow(/API key is required/);
         });
-        headers: { get: () => 'text/html' },
-        text: async () => html,
-                })) as any;
-
-const page = await fetchPage(cfg, 'https://example.com/page');
-assert.strictEqual(page.content, 'Hello World');
-            });
-
-it('should block unsafe URLs', async () => {
-    await assert.rejects(() => fetchPage(cfg, 'http://localhost:8080'), /blocked by policy/);
-});
+        it('should block unsafe URLs', async () => {
+            await expect(fetchPage(cfg, 'http://localhost:8080')).rejects.toThrow(/blocked by policy/);
         });
-
-        // deepResearch test is harder to mock fully without mocking callChat. 
-        // We'll skip deep logic test here and rely on integration tests or mock callChat if possible.
-        // For now, let's just test that it calls webSearch and fetchPage.
     });
+
+    // deepResearch test is harder to mock fully without mocking callChat. 
+    // We'll skip deep logic test here and rely on integration tests or mock callChat if possible.
+    // For now, let's just test that it calls webSearch and fetchPage.
+});

@@ -1,4 +1,4 @@
-```typescript
+
 import { describe, it, afterEach, beforeEach, expect, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -56,10 +56,10 @@ describe('SDD Bootstrap', () => {
         // Verify other artifacts (via orchestrator)
         const bestPracticesPath = path.join(tempDir, '.sdd/best_practices.md');
         const bestPracticesExists = await fs.stat(bestPracticesPath).then(() => true).catch(() => false);
-        assert.ok(bestPracticesExists, '.sdd/best_practices.md should exist');
+        expect(bestPracticesExists).toBe(true);
 
         const architectPath = path.join(tempDir, '.sdd/architect.md');
         const architectExists = await fs.stat(architectPath).then(() => true).catch(() => false);
-        assert.ok(architectExists, '.sdd/architect.md should exist');
+        expect(architectExists).toBe(true);
     });
 });
