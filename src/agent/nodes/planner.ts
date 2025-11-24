@@ -46,6 +46,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         log.info('Calling LLM for planning decision...');
         const response = await chatFn(cfg, messages, {
             model: cfg.modelFast, // Planner uses fast/cheap model
+            // Planner JSON should be compact; keep completion small to reduce latency.
+            maxTokens: 800,
             response_format: { type: 'json_object' } as any
         });
 

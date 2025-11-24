@@ -119,7 +119,12 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
         { role: 'user', content: prompt }
     ];
 
-    const response = await callChat(config, messages);
+    const response = await callChat(config, messages, {
+        model: config.modelFast,
+        temperature: 0,
+        // Best practices doc: target ~15–20k chars (~3.5k tokens).
+        maxTokens: 3500
+    });
     const content = response.messages[response.messages.length - 1].content || '';
 
     // 4. Write file
@@ -163,7 +168,12 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
         { role: 'user', content: fullPrompt }
     ];
 
-    const response = await callChat(config, messages);
+    const response = await callChat(config, messages, {
+        model: config.modelFast,
+        temperature: 0,
+        // Architecture spec: also ~15–20k chars, allow a bit more.
+        maxTokens: 4000
+    });
     const content = response.messages[response.messages.length - 1].content || '';
 
     // 3. Write file
@@ -206,7 +216,12 @@ Ensure tickets are granular, have clear dependencies, and cover the entire MVP.
         { role: 'user', content: prompt }
     ];
 
-    const response = await callChat(config, messages, { response_format: { type: 'json_object' } });
+    const response = await callChat(config, messages, {
+        model: config.modelFast,
+        temperature: 0,
+        maxTokens: 2000,
+        response_format: { type: 'json_object' }
+    });
     const content = response.messages[response.messages.length - 1].content || '{}';
 
     let tickets: { filename: string; content: string }[] = [];
