@@ -50,3 +50,7 @@ Stuff you could grab:
 There’s a `.sdd/` with tickets in `./.sdd/backlog/tickets/open/` — pick one, or open an issue if you see a sharper way to do things.
 
 PRs, experiments, and “this design is cursed, here’s better” issues are all welcome.
+
+## License
+
+Apache License 2.0 – see [LICENSE](./LICENSE) for details.
