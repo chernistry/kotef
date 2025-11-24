@@ -53,4 +53,10 @@ PRs, experiments, and “this design is cursed, here’s better” issues are al
 
 ## License
 
-Apache License 2.0 – see [LICENSE](./LICENSE) for details.
+The core of **kotef** is open source under the [Apache 2.0 License](./LICENSE).
+
+You are free to use, modify, and distribute it, including in commercial projects, as long as you comply with the license terms (e.g. preserve copyright and notices).
+
+Future hosted/managed offerings (e.g. "kotef Cloud" or enterprise features) may be provided under separate commercial terms.
+
+"kotef" is the name of the open-source project. Using the name for derived commercial products or services should not imply official endorsement by the project maintainers.

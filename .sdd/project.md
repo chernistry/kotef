@@ -17,6 +17,7 @@ The goal is to build a production‑grade AI coding/search agent (similar to Cla
   - `/Users/sasha/IdeaProjects/personal_projects/tavily`
   and follow guidelines from:
   - `/Users/sasha/IdeaProjects/allthedocs/learning/research/ai_engineering/agentic_systems_building_best_practices.md`
+- Licensing model: All code in this repository is open source under Apache License 2.0. Future commercial offerings (e.g. "kotef Cloud", managed services, enterprise features) will be provided under separate commercial terms and maintained in separate private repositories. The open-source core remains free for commercial use with proper attribution.
 
 ## Definition of Done
 List 5–10 concrete conditions that must be true when the project is “Done” (functional and non‑functional).
