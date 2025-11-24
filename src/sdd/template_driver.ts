@@ -22,6 +22,8 @@ export interface SddPromptContext {
     year: number;
     // Additional fields for specific templates
     goal?: string;
+    /** Optional long-form context (e.g., web research findings) injected into templates that support {{ADDITIONAL_CONTEXT}}. */
+    additionalContext?: string;
     research?: string;
     architect?: string;
     ticket?: string;
@@ -75,6 +77,12 @@ export function renderBrainTemplate(
     // Context-specific placeholders
     if (ctx.goal) {
         rendered = rendered.replace(/{{GOAL}}/g, ctx.goal);
+    }
+    if (ctx.additionalContext) {
+        rendered = rendered.replace(/{{ADDITIONAL_CONTEXT}}/g, ctx.additionalContext);
+    } else if (ctx.goal) {
+        // Backwards-compatible fallback: when no explicit additionalContext is provided,
+        // keep using the goal as additional context.
         rendered = rendered.replace(/{{ADDITIONAL_CONTEXT}}/g, ctx.goal);
     }
     if (ctx.research) rendered = rendered.replace(/{{RESEARCH}}/g, ctx.research);

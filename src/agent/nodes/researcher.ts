@@ -13,9 +13,12 @@ export function researcherNode(cfg: KotefConfig) {
 
         const query = state.sdd.goal || "Analyze project structure";
 
-        // Only research if not already done (basic check)
-        if (state.researchResults) {
-            log.info('Research already done, skipping');
+        // Only research if not already done (check if results exist and are non-empty)
+        const hasResults = state.researchResults && 
+            (Array.isArray(state.researchResults) ? state.researchResults.length > 0 : Object.keys(state.researchResults).length > 0);
+        
+        if (hasResults) {
+            log.info('Research already done, skipping', { resultsCount: Array.isArray(state.researchResults) ? state.researchResults.length : Object.keys(state.researchResults).length });
             return {};
         }
 
@@ -23,7 +26,7 @@ export function researcherNode(cfg: KotefConfig) {
         
         try {
             const findings = await deepResearch(cfg, query);
-            log.info('Research completed', { findingsCount: findings ? Object.keys(findings).length : 0 });
+            log.info('Research completed', { findingsCount: findings ? findings.length : 0 });
             return {
                 researchResults: findings
             };

@@ -1,10 +1,10 @@
 import { StateGraph, START, END } from '@langchain/langgraph';
 import { KotefConfig } from '../../core/config.js';
-import { callChat } from '../../core/llm.js';
+import { callChat, ChatMessage } from '../../core/llm.js';
 import { renderBrainTemplate, loadBrainTemplate } from '../../sdd/template_driver.js';
+import { deepResearch, DeepResearchFinding } from '../../tools/deep_research.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { ChatMessage } from '../../core/llm.js';
 
 export interface SddOrchestratorState {
     goal: string;
@@ -19,16 +19,42 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
     console.log('Running SDD Research...');
     const { goal, rootDir, config } = state;
 
-    // 1. Render prompt
+    // 1. Run web-backed deep research (Tavily + fetchPage + LLM summarization)
+    console.log(`Starting deep research for goal: "${goal}"`);
+    let findings: DeepResearchFinding[] = [];
+    try {
+        findings = await deepResearch(config, goal);
+        console.log(`Deep research completed. Found ${findings.length} findings.`);
+    } catch (e) {
+        console.warn('Deep research failed, falling back to model-only research:', e);
+        findings = [];
+    }
+
+    const findingsContext =
+        findings.length === 0
+            ? 'No external web findings were available. Base recommendations on up-to-date, conservative defaults for this stack, and clearly mark low-confidence areas.'
+            : findings
+                  .map((f, idx) => {
+                      const sources = f.citations
+                          .map(c => `- ${c.url}${c.title ? ` — ${c.title}` : ''}`)
+                          .join('\n');
+                      return `(${idx + 1}) ${f.statement}\nSources:\n${sources}`;
+                  })
+                  .join('\n\n');
+
+    console.log('Generating best_practices.md with LLM...');
+    
+    // 2. Render prompt with web research injected as additional context
     const prompt = renderBrainTemplate('research', {
         projectName: path.basename(rootDir),
         domain: 'Software Engineering', // Default, could be inferred
         techStack: 'TypeScript, Node.js', // Default, could be inferred or passed
         year: new Date().getFullYear(),
-        goal: goal
+        goal,
+        additionalContext: `Web research findings for goal "${goal}":\n\n${findingsContext}`
     });
 
-    // 2. Call LLM
+    // 3. Call LLM to synthesize best_practices.md from template + findings
     const messages: ChatMessage[] = [
         { role: 'system', content: 'You are an expert software researcher.' },
         { role: 'user', content: prompt }
@@ -37,7 +63,7 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
     const response = await callChat(config, messages);
     const content = response.messages[response.messages.length - 1].content || '';
 
-    // 3. Write file
+    // 4. Write file
     const sddDir = path.join(rootDir, '.sdd');
     await fs.mkdir(sddDir, { recursive: true });
     await fs.writeFile(path.join(sddDir, 'best_practices.md'), content);

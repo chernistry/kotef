@@ -5,6 +5,7 @@ import { createLogger } from '../../core/logger.js';
 import { loadRuntimePrompt } from '../../core/prompts.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
 import { readFile, writeFile, writePatch } from '../../tools/fs.js';
+import { runCommand } from '../../tools/test_runner.js';
 
 export function coderNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
@@ -88,6 +89,20 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         required: ['path', 'diff']
                     }
                 }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'run_command',
+                    description: 'Run a shell command in the project directory (e.g., npm install, npm run build)',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            command: { type: 'string', description: 'Shell command to execute' }
+                        },
+                        required: ['command']
+                    }
+                }
             }
         ];
 
@@ -102,10 +117,10 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         // Re-reading Ticket 01 sketch: "Thin wrapper around OpenAI-compatible SDK".
         // So we likely need to execute tools here.
 
-        // Let's do a simple loop for max 5 turns.
+        // Let's do a simple loop for max turns.
         const currentMessages = [...messages];
         let turns = 0;
-        const maxTurns = 5;
+        const maxTurns = 20; // Increased for large context models
         let fileChanges = state.fileChanges || {};
 
         log.info('Starting coder tool execution loop', { maxTurns });
@@ -151,6 +166,15 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         // Record change
                         fileChanges = { ...(fileChanges || {}), [args.path]: 'patched' };
                         log.info('Patch applied', { path: args.path });
+                    } else if (toolCall.function.name === 'run_command') {
+                        const cmdResult = await runCommand(cfg, args.command);
+                        result = {
+                            exitCode: cmdResult.exitCode,
+                            stdout: cmdResult.stdout,
+                            stderr: cmdResult.stderr,
+                            passed: cmdResult.passed
+                        };
+                        log.info('Command executed', { command: args.command, exitCode: cmdResult.exitCode, passed: cmdResult.passed });
                     } else {
                         result = "Unknown tool";
                         log.warn('Unknown tool called', { tool: toolCall.function.name });
