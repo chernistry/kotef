@@ -9,6 +9,8 @@ export interface RunSummary {
     issues?: string;
     status: 'success' | 'failed' | 'partial';
     error?: string;
+    durationSeconds?: number;
+    tokenUsage?: number;
 }
 
 export async function writeRunReport(
@@ -33,6 +35,12 @@ export async function writeRunReport(
     let report = `# Run Report: ${runId}\n\n`;
     report += `**Date:** ${new Date().toISOString()}\n`;
     report += `**Status:** ${summary.status}\n`;
+    if (summary.durationSeconds) {
+        report += `**Duration:** ${summary.durationSeconds.toFixed(2)}s\n`;
+    }
+    if (summary.tokenUsage) {
+        report += `**Token Usage:** ${summary.tokenUsage}\n`;
+    }
     if (summary.error) {
         report += `**Error:** ${summary.error}\n`;
     }

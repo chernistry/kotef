@@ -42,6 +42,7 @@ program
 
         const log = createLogger(runId);
         log.info('Starting kotef run', { runId, rootDir, goal: options.goal, ticket: options.ticket });
+        const startTime = Date.now();
 
         try {
             const sddDir = path.join(rootDir, '.sdd');
@@ -109,12 +110,16 @@ program
             log.info('Run completed.', { done: result.done });
 
             // Generate Report
+            const endTime = Date.now();
+            const durationSeconds = (endTime - startTime) / 1000;
+
             const summary: RunSummary = {
                 status: result.done ? 'success' : 'partial',
                 plan: result.plan ? JSON.stringify(result.plan, null, 2) : 'No plan',
                 filesChanged: Object.keys(result.fileChanges || {}),
                 tests: JSON.stringify(result.testResults || {}, null, 2),
-                issues: (result.sdd as any)?.issues
+                issues: (result.sdd as any)?.issues,
+                durationSeconds
             };
 
             await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
@@ -231,6 +236,7 @@ program
 
                         const runId = randomUUID();
                         const log = createLogger(runId); // We might want to silence file logs or keep them? Keep them.
+                        const startTime = Date.now();
 
                         try {
                             const sddDir = path.join(rootDir, '.sdd');
@@ -265,12 +271,16 @@ program
                             }
 
                             // Write report
+                            const endTime = Date.now();
+                            const durationSeconds = (endTime - startTime) / 1000;
+
                             const summary: RunSummary = {
                                 status: result.done ? 'success' : 'partial',
                                 plan: result.plan ? JSON.stringify(result.plan, null, 2) : 'No plan',
                                 filesChanged: Object.keys(result.fileChanges || {}),
                                 tests: JSON.stringify(result.testResults || {}, null, 2),
-                                issues: (result.sdd as any)?.issues
+                                issues: (result.sdd as any)?.issues,
+                                durationSeconds
                             };
                             await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
 
