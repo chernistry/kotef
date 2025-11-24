@@ -257,6 +257,7 @@ program
     .option('--root <path>', 'Project root directory', process.cwd())
     .option('--goal <text>', 'Initial goal')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
+    .option('--auto-approve', 'Skip interactive approval', false)
     .action(async (options) => {
         const rootDir = path.resolve(options.root);
         const envConfig = loadConfig();

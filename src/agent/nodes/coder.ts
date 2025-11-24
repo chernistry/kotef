@@ -265,11 +265,16 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         result = files;
                         log.info('Files listed', { pattern, count: files.length });
                     } else if (toolCall.function.name === 'write_file') {
-                        await writeFile({ rootDir: cfg.rootDir! }, args.path, args.content);
-                        result = "File written successfully.";
-                        // Record change
-                        fileChanges = { ...(fileChanges || {}), [args.path]: 'created' };
-                        log.info('File written', { path: args.path, size: args.content.length });
+                        if (!args.content) {
+                            result = "Error: write_file requires 'content' parameter. Please provide the full file content.";
+                            log.error('write_file called without content', { path: args.path });
+                        } else {
+                            await writeFile({ rootDir: cfg.rootDir! }, args.path, args.content);
+                            result = "File written successfully.";
+                            // Record change
+                            fileChanges = { ...(fileChanges || {}), [args.path]: 'created' };
+                            log.info('File written', { path: args.path, size: args.content.length });
+                        }
                     } else if (toolCall.function.name === 'write_patch') {
                         await writePatch({ rootDir: cfg.rootDir! }, args.path, args.diff);
                         result = "Patch applied successfully.";

@@ -2,6 +2,7 @@ import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { deepResearch } from '../../tools/deep_research.js';
 import { createLogger } from '../../core/logger.js';
+import { buildResearchQuery, loadProjectMetadata } from '../graphs/sdd_orchestrator.js';
 
 export function researcherNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
@@ -37,13 +38,24 @@ export function researcherNode(cfg: KotefConfig) {
             return {};
         }
 
-        // Build a goal-aware query if possible
+        // Build a goal-aware, LLM-optimized query if possible
         const goalFromSdd = state.sdd.goal;
         const goalFromMessages =
             state.messages.find(m => m.role === 'user' && typeof m.content === 'string')?.content || '';
-        const query = goalFromSdd || goalFromMessages || 'Analyze project structure';
+        const baseGoal = goalFromSdd || goalFromMessages || 'Analyze project structure';
 
-        log.info('Starting deep research', { query });
+        let query = baseGoal;
+        try {
+            const metadata = await loadProjectMetadata(cfg.rootDir, baseGoal);
+            query = await buildResearchQuery(cfg, baseGoal, metadata);
+            log.info('Starting deep research', { query, originalGoal: baseGoal });
+        } catch (error) {
+            log.warn('Failed to build optimized research query; falling back to raw goal', {
+                error: String(error),
+            });
+            log.info('Starting deep research', { query: baseGoal });
+            query = baseGoal;
+        }
 
         try {
             const findings = await deepResearch(cfg, query);

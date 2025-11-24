@@ -16,6 +16,10 @@ export interface WebSearchResult {
 // Simple in-memory cache: Map<query, WebSearchResult[]>
 const searchCache = new Map<string, WebSearchResult[]>();
 
+export function clearSearchCache() {
+    searchCache.clear();
+}
+
 export async function webSearch(
     cfg: KotefConfig,
     query: string,
@@ -65,7 +69,7 @@ export async function webSearch(
 
 async function searchTavily(cfg: KotefConfig, query: string, maxResults = 5): Promise<WebSearchResult[]> {
     const log = createLogger('tavily');
-    
+
     if (!cfg.searchApiKey) {
         log.error('Tavily API key missing');
         throw new Error('Search API key is missing (TAVILY_API_KEY)');

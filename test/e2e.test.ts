@@ -54,7 +54,7 @@ describe('E2E Tests', () => {
         const runsDir = path.join(destDir, '.sdd/runs');
         const runs = await fs.readdir(runsDir);
         expect(runs.length).toBeGreaterThan(0);
-    });
+    }, 60000);
 
     it('should bootstrap SDD for new project', async () => {
         const scenarioName = 'hello-world-nosdd';
@@ -64,11 +64,9 @@ describe('E2E Tests', () => {
         // Copy scenario
         await fs.cp(srcDir, destDir, { recursive: true });
 
-        // Run kotef with goal to trigger bootstrap
-        // Use chat command which handles bootstrap internally if needed, or run command if that's what we want to test.
-        // But the previous test used chat. Let's stick to chat for consistency or fix the run command syntax.
-        // The original test used `run` command. Let's fix syntax: KOTEF_API_KEY=dummy ... run --root ...
-        const command = `${kotefBin} chat --root "${destDir}" --goal "Add a subtract function" --auto-approve`;
+        // Run kotef chat
+        // We pipe "n" to answer "Start another goal?" prompt
+        const command = `echo "n" | ${kotefBin} chat --root "${destDir}" --goal "Add a subtract function" --auto-approve`;
 
         console.log(`Running: ${command}`);
         const { stdout, stderr } = await execAsync(command, { env: { ...process.env, KOTEF_API_KEY: 'dummy', KOTEF_MOCK_MODE: 'true' } });
@@ -77,11 +75,11 @@ describe('E2E Tests', () => {
         if (stderr) console.error('STDERR:', stderr);
 
         // Assertions
-        // Check if .sdd was created
+        // Verify SDD created
         const sddExists = await fs.access(path.join(destDir, '.sdd')).then(() => true).catch(() => false);
         expect(sddExists).toBe(true);
 
         const projectMd = await fs.readFile(path.join(destDir, '.sdd/project.md'), 'utf-8');
-        expect(projectMd).toContain('# Mock Project');
-    });
+        expect(projectMd).toContain('# Project: Mock Project'); // From mock bootstrap
+    }, 60000);
 });

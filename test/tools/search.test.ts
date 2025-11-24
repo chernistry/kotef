@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { webSearch } from '../../src/tools/web_search.js';
+import { webSearch, clearSearchCache } from '../../src/tools/web_search.js';
 import { fetchPage } from '../../src/tools/fetch_page.js';
 // import { deepResearch } from '../../src/tools/deep_research.js';
 import { loadConfig } from '../../src/core/config.js';
@@ -14,6 +14,7 @@ describe('Search Tools', () => {
         process.env.KOTEF_API_KEY = 'dummy-key';
         process.env.SEARCH_API_KEY = 'dummy-key';
         process.env.KOTEF_MOCK_MODE = 'false';
+        clearSearchCache();
     });
 
     afterEach(() => {

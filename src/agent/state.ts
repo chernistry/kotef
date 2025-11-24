@@ -20,6 +20,12 @@ export interface AgentState {
     researchResults?: any;
     fileChanges?: Record<string, string>;
     testResults?: any;
+    /** History of failures encountered during this run, for loop detection. */
+    failureHistory?: Array<{
+        step: string;
+        error: string;
+        timestamp: number;
+    }>;
     done?: boolean;
     /** Internal flag to distinguish between bootstrap vs normal ticket execution. */
     hasSdd?: boolean;

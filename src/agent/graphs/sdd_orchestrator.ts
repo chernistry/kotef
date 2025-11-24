@@ -3,6 +3,7 @@ import { KotefConfig } from '../../core/config.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
 import { renderBrainTemplate, loadBrainTemplate } from '../../sdd/template_driver.js';
 import { deepResearch, DeepResearchFinding } from '../../tools/deep_research.js';
+import { loadPrompt } from '../../core/prompts.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
@@ -15,13 +16,13 @@ export interface SddOrchestratorState {
     ticketsCreated?: string[];
 }
 
-interface ProjectMetadata {
+export interface ProjectMetadata {
     techStack: string;
     domain: string;
     projectDescription: string;
 }
 
-async function loadProjectMetadata(rootDir: string, goal: string): Promise<ProjectMetadata> {
+export async function loadProjectMetadata(rootDir: string, goal: string): Promise<ProjectMetadata> {
     const sddProjectPath = path.join(rootDir, '.sdd', 'project.md');
 
     let techStack = 'Unknown stack (infer from goal and project.md)';
@@ -71,15 +72,56 @@ async function loadProjectMetadata(rootDir: string, goal: string): Promise<Proje
     return { techStack, domain, projectDescription };
 }
 
+export async function buildResearchQuery(
+    cfg: KotefConfig,
+    goal: string,
+    metadata: ProjectMetadata,
+): Promise<string> {
+    try {
+        const promptTemplate = await loadPrompt('search_query_optimizer');
+        const truncatedDescription = (metadata.projectDescription || '').slice(0, 1500);
+        const filled = promptTemplate
+            .replace('{goal}', goal)
+            .replace('{techStack}', metadata.techStack || 'unknown')
+            .replace('{domain}', metadata.domain || 'software engineering')
+            .replace('{projectDescription}', truncatedDescription);
+
+        const messages: ChatMessage[] = [
+            {
+                role: 'system',
+                content: 'You optimize web search queries for software engineering best-practices research.',
+            },
+            { role: 'user', content: filled },
+        ];
+
+        const response = await callChat(cfg, messages, {
+            model: cfg.modelFast,
+            temperature: 0,
+            maxTokens: 64,
+        });
+        const raw = (response.messages[response.messages.length - 1]?.content || '').trim();
+        const line = raw.split('\n')[0] || '';
+        const cleaned = line.replace(/^("|')|("|')$/g, '').trim();
+
+        return cleaned || goal;
+    } catch (err) {
+        console.warn('search_query_optimizer failed, falling back to raw goal', { error: String(err) });
+        return goal;
+    }
+}
+
 async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
     console.log('Running SDD Research...');
     const { goal, rootDir, config } = state;
+    const metadata = await loadProjectMetadata(rootDir, goal);
+    const researchQuery = await buildResearchQuery(config, goal, metadata);
 
     // 1. Run web-backed deep research (Tavily + fetchPage + LLM summarization)
     console.log(`Starting deep research for goal: "${goal}"`);
+    console.log(`Web research query: "${researchQuery}"`);
     let findings: DeepResearchFinding[] = [];
     try {
-        findings = await deepResearch(config, goal);
+        findings = await deepResearch(config, researchQuery);
         console.log(`Deep research completed. Found ${findings.length} findings.`);
     } catch (e) {
         console.warn('Deep research failed, falling back to model-only research:', e);
@@ -100,7 +142,7 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
 
     console.log('Generating best_practices.md with LLM...');
     
-    const { techStack, domain, projectDescription } = await loadProjectMetadata(rootDir, goal);
+    const { techStack, domain, projectDescription } = metadata;
 
     // 2. Render prompt with web research injected as additional context
     const prompt = renderBrainTemplate('research', {
