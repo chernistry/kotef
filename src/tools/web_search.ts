@@ -23,6 +23,15 @@ export async function webSearch(
     const provider = options.provider || 'tavily';
     const cacheKey = `${provider}:${query}`;
 
+    if (cfg.mockMode) {
+        return [{
+            url: 'https://example.com/mock',
+            title: 'Mock Search Result',
+            snippet: 'This is a mock search result for query: ' + query,
+            source: 'mock'
+        }];
+    }
+
     if (searchCache.has(cacheKey)) {
         return searchCache.get(cacheKey)!;
     }

@@ -38,26 +38,28 @@ export class KotefLlmError extends Error {
 type ChatCompletionResponse = OpenAI.Chat.Completions.ChatCompletion;
 
 export async function callChat(
-    messages: ChatMessage[],
     config: KotefConfig,
+    messages: ChatMessage[],
     options: ChatCompletionOptions = {}
 ): Promise<{ messages: ChatMessage[]; toolCalls?: ToolCallResult[] }> {
     if (config.mockMode) {
-        // Simple mock logic for E2E tests
+        // Simple mock logic based on system prompt or last message
+        const systemMsg = messages.find(m => m.role === 'system')?.content || '';
         const lastMsg = messages[messages.length - 1].content || '';
-        let content: string | null = '';
-        let toolCalls: any[] | undefined = undefined;
+
+        let content: string | null = null;
+        let toolCalls: any[] = [];
 
         // Planner Mock
-        if (lastMsg.includes('You are the Meta-Agent')) {
-            if (lastMsg.includes('Goal: Add a subtract function')) {
+        if (systemMsg.includes('You are Kotef') || lastMsg.includes('You are Kotef')) {
+            if (messages.some(m => m.content && m.content.includes('Add a subtract function'))) {
                 content = JSON.stringify({ next: 'coder' });
             } else {
                 content = JSON.stringify({ next: 'done' });
             }
         }
         // Coder Mock
-        else if (lastMsg.includes('You are the Coder')) {
+        else if (systemMsg.includes('You are the Coder') || lastMsg.includes('You are the Coder')) {
             // Check if we already did the edit
             const hasEdit = messages.some(m => m.role === 'assistant' && m.tool_calls);
             if (!hasEdit) {
@@ -77,23 +79,23 @@ export async function callChat(
 +export function subtract(a: number, b: number): number {
 +    return a - b;
 +}`
-                                +                        })
-                            +                    }
-                        +                }];
+                        })
+                    }
+                }];
             } else {
                 content = "I have applied the changes.";
             }
         }
         // Bootstrap Architect Mock
-        else if (lastMsg.includes('You are the Chief Architect')) {
+        else if (systemMsg.includes('You are the Chief Architect') || lastMsg.includes('You are the Chief Architect')) {
             content = JSON.stringify({
-                project: '# Mock Project',
-                architect: '# Mock Architect',
-                bestPractices: '# Mock Best Practices'
+                project_md: '# Mock Project',
+                architect_md: '# Mock Architect',
+                best_practices_md: '# Mock Best Practices'
             });
         }
         // Bootstrap Tickets Mock
-        else if (lastMsg.includes('You are the Project Manager')) {
+        else if (systemMsg.includes('You are the Project Manager') || lastMsg.includes('You are the Project Manager')) {
             content = JSON.stringify({
                 tickets: [{
                     filename: '01-mock-ticket.md',
@@ -101,8 +103,19 @@ export async function callChat(
                 }]
             });
         }
+        // Deep Research Mock
+        else if (systemMsg.includes('You are a research assistant') || lastMsg.includes('You are a research assistant')) {
+            content = JSON.stringify([{
+                statement: 'Mock finding',
+                citations: [{ url: 'https://example.com/mock', title: 'Mock Source' }]
+            }]);
+        }
         else {
-            content = "Mock response";
+            if (options.response_format?.type === 'json_object') {
+                content = "{}";
+            } else {
+                content = "Mock response";
+            }
         }
 
         const assistantMessage: ChatMessage = {

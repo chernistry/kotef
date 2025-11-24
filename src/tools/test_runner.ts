@@ -26,6 +26,16 @@ export async function runCommand(
     // Ideally, we'd use spawn with arguments array, but test commands are often complex strings.
     // We rely on the agent being trusted and the sandbox being the container.
 
+    if (cfg.mockMode) {
+        return {
+            command,
+            exitCode: 0,
+            stdout: 'Mock test passed',
+            stderr: '',
+            passed: true
+        };
+    }
+
     try {
         const { stdout, stderr } = await execAsync(command, {
             cwd: cfg.rootDir,

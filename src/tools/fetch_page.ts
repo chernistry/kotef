@@ -44,6 +44,15 @@ export async function fetchPage(
         return pageCache.get(url)!;
     }
 
+    if (cfg.mockMode) {
+        return {
+            url,
+            status: 200,
+            content: 'Mock page content for ' + url,
+            contentType: 'text/html'
+        };
+    }
+
     if (!isUrlAllowed(url)) {
         throw new Error(`URL blocked by policy: ${url}`);
     }

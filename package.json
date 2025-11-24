@@ -8,8 +8,9 @@
         "kotef": "bin/kotef"
     },
     "scripts": {
-        "build": "tsc",
+        "build": "tsc && cp -r src/agent/prompts dist/agent/",
         "test": "tsx --test test/**/*.test.ts",
+        "test:e2e": "npm run build && tsx --test test/e2e.test.ts",
         "lint": "eslint src test --ext .ts",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
     },

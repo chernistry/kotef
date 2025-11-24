@@ -84,6 +84,9 @@ export async function writePatch(ctx: FsContext, relativePath: string, diffConte
     const patchedContent = Diff.applyPatch(originalContent, diffContent);
 
     if (patchedContent === false) {
+        console.error(`[FS] Patch failed for ${relativePath}`);
+        console.error(`[FS] Original:\n${originalContent}`);
+        console.error(`[FS] Diff:\n${diffContent}`);
         throw new Error(`Failed to apply patch to ${relativePath}. Hunk mismatch or invalid diff.`);
     }
 

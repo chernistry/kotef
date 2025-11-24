@@ -84,9 +84,12 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             currentMessages.push(msg);
 
             if (!msg.tool_calls || msg.tool_calls.length === 0) {
+                console.log('[Coder] No tool calls in response');
                 // No more tools, we are done
                 break;
             }
+
+            console.log(`[Coder] executing ${msg.tool_calls.length} tool calls`);
 
             // Execute tools
             for (const toolCall of msg.tool_calls) {

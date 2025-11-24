@@ -10,9 +10,7 @@ export function verifierNode(cfg: KotefConfig) {
         const testCmd = "npm test"; // Simplify for now
 
         const result = await runCommand(cfg, testCmd);
-
-        // If passed, we are done.
-        // If failed, we update state so Planner can see it.
+        console.log(`[Verifier] Command: ${testCmd}, Passed: ${result.passed}, MockMode: ${cfg.mockMode}`);
 
         return {
             testResults: result,
