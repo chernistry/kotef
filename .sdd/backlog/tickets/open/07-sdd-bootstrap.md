@@ -62,7 +62,11 @@ High-level bootstrap pipeline:
    - ensure directories exist,
    - respect diff-first policy if any SDD files are present.
 
-Bootstrap prompts should **reuse structure** from the SDDRush `brain/` prompts but be clearly adapted for “target repo” use (avoid hardcoding paths like `personal_projects/kotef`).
+Bootstrap prompts should:
+- **reuse structure** from the SDDRush `brain/` prompts, and you MAY **directly borrow prompt text** as a starting point,
+- be clearly adapted for “target repo” use (avoid hardcoding paths like `personal_projects/kotef`),
+- be refactored and hardened according to  
+  `allthedocs/learning/research/ai_engineering/Prompt_Engineering_Techniques_Comprehensive_Guide.md` (structured sections, explicit constraints, JSON modes where applicable, refusal policies, grounding instructions).
 
 ## Steps
 1. Design types and skeleton for `src/agent/bootstrap.ts` (`BootstrapContext`, `bootstrapSddForProject`).
@@ -102,4 +106,3 @@ npm test test/agent/bootstrap.test.ts
 - Do **not** try to fully reverse-engineer a large legacy codebase in this ticket; aim for a **useful starting SDD**, not perfection.
 - Do **not** hardcode any specific cloud provider or model; use `KotefConfig` model settings and follow best_practices for modelFast/modelStrong.
 - Do **not** bypass existing tools (fs, web_search, deep_research); bootstrap must go through the same tool stack the rest of the agent uses. 
-

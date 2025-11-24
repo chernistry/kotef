@@ -97,6 +97,10 @@ export async function callChat(
 
 The ticket implementer MUST:
 - inspect `navan/root/src/core/llm.ts` and `finearts/callquest/root/src/core/llm.ts` and explicitly note which resilience/metrics patterns are reused vs intentionally omitted;
+- you MAY **directly borrow code** from these reference files as a starting point, but you MUST:
+  - remove or neutralize all Navan/CallQuest domain-specific logic (intents/slots/travel/callquest notions),
+  - rename types and functions to be generic (coding agent–oriented),
+  - keep only the resilience/observability patterns and provider abstractions;
 - avoid embedding any Navan/CallQuest domain-specific logic (intents/slots/travel/callquest notions).
 
 ## Steps

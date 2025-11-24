@@ -1,38 +1,60 @@
 import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
-import { ChatMessage } from '../../core/llm.js';
+import { ChatMessage, callChat } from '../../core/llm.js';
 import { loadPrompt } from '../../core/prompts.js';
 
-export function plannerNode(_cfg: KotefConfig) {
+export function plannerNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const promptTemplate = await loadPrompt('meta_agent');
 
-        // Simple template substitution
         const systemPrompt = promptTemplate
             .replace('{{project}}', state.sdd.project)
             .replace('{{architect}}', state.sdd.architect)
             .replace('{{bestPractices}}', state.sdd.bestPractices || 'None')
             .replace('{{ticket}}', state.sdd.ticket || 'None');
 
-        const _messages: ChatMessage[] = [
+        // Add recent history to context
+        const messages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
             ...state.messages
         ];
 
-        // For MVP, the planner just decides the next step by outputting a thought.
-        // In a real implementation, it would output a structured plan.
-        // Here we just let the LLM generate a response which might include tool calls (if we attached tools to planner).
-        // But per design, Planner -> Router -> Specific Node.
-        // Let's assume the Planner outputs a JSON decision or just text that the Router parses.
-        // For this MVP step, let's keep it simple: Planner is the entry point that might just pass through or add context.
+        // Call LLM
+        // We expect the planner to output a JSON plan or a decision.
+        // For this MVP, let's ask for a JSON response with "next" field.
+        // We can append a user message forcing this format if not in system prompt.
+        messages.push({
+            role: 'user',
+            content: `Analyze the current state. 
+      If research is needed, reply with {"next": "researcher", "reason": "..."}.
+      If ready to code, reply with {"next": "coder", "reason": "..."}.
+      If ready to verify, reply with {"next": "verifier", "reason": "..."}.
+      If done, reply with {"next": "done", "reason": "..."}.
+      
+      Current Plan: ${JSON.stringify(state.plan || {})}
+      Research Results: ${JSON.stringify(state.researchResults || {})}
+      File Changes: ${JSON.stringify(state.fileChanges || {})}
+      Test Results: ${JSON.stringify(state.testResults || {})}`
+        });
 
-        // Actually, looking at the graph design: Planner -> Router.
-        // The Planner should probably analyze the state and decide what to do.
+        const response = await callChat(cfg, messages, {
+            model: cfg.modelFast, // Planner uses fast model
+            response_format: { type: 'json_object' }
+        });
 
-        // Let's make the Planner output a "Plan" object into the state.
+        const assistantMsg = response.messages[response.messages.length - 1];
+        let decision: any = { next: 'researcher' }; // Default fallback
 
+        try {
+            decision = JSON.parse(assistantMsg.content);
+        } catch (e) {
+            console.error("Failed to parse planner JSON:", e);
+        }
+
+        // Update state with the new plan/decision
         return {
-            plan: { next: 'researcher' } // Stub: always go to researcher first for now, or logic to decide.
+            plan: decision,
+            messages: [assistantMsg] // Append assistant's thought process
         };
     };
 }

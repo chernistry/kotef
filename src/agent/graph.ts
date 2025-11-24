@@ -77,11 +77,33 @@ export function buildKotefGraph(cfg: KotefConfig) {
 
     // Add edges
     graph.addEdge(START, "planner" as any);
-    graph.addEdge("planner" as any, "researcher" as any);
-    graph.addEdge("researcher" as any, "coder" as any);
+
+    // Planner decides where to go
+    graph.addConditionalEdges(
+        "planner" as any,
+        (state) => {
+            const next = (state.plan as any)?.next;
+            if (next === 'researcher') return 'researcher';
+            if (next === 'coder') return 'coder';
+            if (next === 'verifier') return 'verifier';
+            if (next === 'done') return 'end';
+            return 'researcher'; // Default
+        },
+        {
+            researcher: "researcher" as any,
+            coder: "coder" as any,
+            verifier: "verifier" as any,
+            end: END
+        }
+    );
+
+    // Researcher goes back to Planner (to decide next step, e.g. code or more research)
+    graph.addEdge("researcher" as any, "planner" as any);
+
+    // Coder goes to Verifier
     graph.addEdge("coder" as any, "verifier" as any);
 
-    // Conditional edge from verifier
+    // Verifier goes to Planner (if failed) or End (if passed)
     graph.addConditionalEdges(
         "verifier" as any,
         (state) => state.done ? "end" : "planner",

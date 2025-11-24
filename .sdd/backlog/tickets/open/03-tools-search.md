@@ -76,7 +76,11 @@ export async function deepResearch(
 The implementer MUST:
 - study `finearts/callquest/root/src/tools/search.ts` and `navan/root/src/tools/{search,tavily_search,brave_search}.ts` for patterns (timeouts, resilience, result shaping);
 - study `navan/root/src/core/deep_research.ts` for multi-step orchestration and adapt the algorithm, not the domain-specific outputs;
-- align with scraping/allowlist practices from `personal_projects/tavily`.
+- align with scraping/allowlist practices from `personal_projects/tavily`;
+- you MAY **directly borrow code** from these reference modules as an initial implementation, provided that you:
+  - strip or generalize any travel/callquest-specific types and naming,
+  - keep provider / resilience / metrics patterns,
+  - bring the code in line with kotef’s config and type shapes.
 
 ## Steps
 1. Define core types/interfaces (`WebSearchOptions`, `WebSearchResult`, `FetchedPage`, `DeepResearchFinding`) and ensure they are domain-agnostic.

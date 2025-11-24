@@ -67,6 +67,12 @@ Node implementations should be strongly inspired by:
 
 but without importing any domain-specific schemas. Only architectural patterns (tool routing, planner JSON, verification loop) should be reused.
 
+You MAY **directly borrow prompt text and code structure** from these references as a baseline for kotef’s runtime prompts and node wiring, as long as you:
+- rewrite any domain-specific references (travel, callquest, booking flows) into neutral coding-agent concepts,
+- align tool lists and intents with kotef’s tools and goals,
+- refactor prompts to follow the prompt-engineering best practices in  
+  `allthedocs/learning/research/ai_engineering/Prompt_Engineering_Techniques_Comprehensive_Guide.md` (see also Ticket 08).
+
 ## Steps
 1. Define `AgentState` and `SddContext` in `src/agent/state.ts` according to `.sdd/architect.md`’s “Data Schema (Agent State)” section.
 2. Design initial runtime prompts in `src/agent/prompts/`:

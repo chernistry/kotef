@@ -1,14 +1,22 @@
 import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 
-export function verifierNode(_cfg: KotefConfig) {
+import { runCommand } from '../../tools/test_runner.js';
+
+export function verifierNode(cfg: KotefConfig) {
     return async (_state: AgentState): Promise<Partial<AgentState>> => {
-        // Stub implementation
-        // In real life: run tests
+        // Determine test command from architect.md or default
+        // For MVP, let's look for "npm test" or similar in architect.md, or default to "npm test"
+        const testCmd = "npm test"; // Simplify for now
+
+        const result = await runCommand(cfg, testCmd);
+
+        // If passed, we are done.
+        // If failed, we update state so Planner can see it.
 
         return {
-            testResults: { passed: true },
-            done: true
+            testResults: result,
+            done: result.passed
         };
     };
 }
