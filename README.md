@@ -5,7 +5,7 @@
 kotef is an autonomous coding agent that **writes its own spec and tickets, then ships the code**. You point it at a project, tell it what you want, and it does the boring parts: research, architecture, tickets, patches, tests.
 
 The idea grew out of two prior experiments:
-- [synapse](https://github.com/chernistry/synapse) — adaptive governance, metric‑driven agents.
+- [synapse](https://chernistry.github.io/synapse/) — adaptive governance, metric‑driven agents.
 - [sddrush](https://github.com/chernistry/sddrush) — tiny SDD toolkit and prompt templates.
 
 kotef basically fuses them into a coding agent.
