@@ -7,23 +7,44 @@ export function researcherNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('researcher');
         log.info('Researcher node started');
-        
-        // In a real implementation, we'd parse the plan or messages to get the query.
-        // For MVP stub, let's assume we research the goal if present.
 
-        const query = state.sdd.goal || "Analyze project structure";
+        // If SDD already provides best practices, treat them as primary research source
+        // and avoid hitting the web again unless we explicitly carry over prior findings.
+        const sddBest = state.sdd.bestPractices || '';
+        if (sddBest.trim().length > 0) {
+            log.info('Existing SDD best_practices.md detected; skipping external deep research.');
+            return {
+                researchResults: {
+                    source: 'sdd',
+                    note: 'Using .sdd/best_practices.md as primary best-practices reference; no fresh web research performed in this run.'
+                }
+            };
+        }
 
         // Only research if not already done (check if results exist and are non-empty)
-        const hasResults = state.researchResults && 
-            (Array.isArray(state.researchResults) ? state.researchResults.length > 0 : Object.keys(state.researchResults).length > 0);
-        
+        const hasResults =
+            state.researchResults &&
+            (Array.isArray(state.researchResults)
+                ? state.researchResults.length > 0
+                : Object.keys(state.researchResults).length > 0);
+
         if (hasResults) {
-            log.info('Research already done, skipping', { resultsCount: Array.isArray(state.researchResults) ? state.researchResults.length : Object.keys(state.researchResults).length });
+            log.info('Research already done, skipping', {
+                resultsCount: Array.isArray(state.researchResults)
+                    ? state.researchResults.length
+                    : Object.keys(state.researchResults).length
+            });
             return {};
         }
 
+        // Build a goal-aware query if possible
+        const goalFromSdd = state.sdd.goal;
+        const goalFromMessages =
+            state.messages.find(m => m.role === 'user' && typeof m.content === 'string')?.content || '';
+        const query = goalFromSdd || goalFromMessages || 'Analyze project structure';
+
         log.info('Starting deep research', { query });
-        
+
         try {
             const findings = await deepResearch(cfg, query);
             log.info('Research completed', { findingsCount: findings ? findings.length : 0 });
@@ -31,7 +52,7 @@ export function researcherNode(cfg: KotefConfig) {
                 researchResults: findings
             };
         } catch (error) {
-            log.error("Research failed", { error });
+            log.error('Research failed', { error });
             return {
                 researchResults: { error: String(error) }
             };
