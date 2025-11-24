@@ -24,7 +24,7 @@ kotef basically fuses them into a coding agent.
     - runs tests,
     - logs everything and writes a run report.
 
-Stack: Node.js 20, TypeScript, LangGraph.js, OpenAI‑style tools. Under the hood it reuses battle‑tested bits from Navan/CallQuest/Tavily plus the SDDRush prompt flow.
+Stack: Node.js 20, TypeScript, LangGraph.js, OpenAI‑style tools. Under the hood it reuses battle‑tested bits from personal projects plus the SDDRush prompt flow.
 
 ## Why this is different
 
