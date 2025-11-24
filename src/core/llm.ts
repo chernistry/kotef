@@ -104,7 +104,7 @@ export async function callChat(
             });
         }
         // Deep Research Mock
-        else if (systemMsg.includes('research assistant') || lastMsg.includes('research assistant')) {
+        else if (systemMsg.includes('research assistant') || lastMsg.includes('research assistant') || systemMsg.includes('software researcher')) {
             content = JSON.stringify([{
                 statement: 'Mock finding',
                 citations: [{ url: 'https://example.com/mock', title: 'Mock Source' }]

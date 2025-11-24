@@ -1,5 +1,5 @@
-import { StateGraph, END } from '@langchain/langgraph';
-import { KotefConfig } from '../../config.js';
+import { StateGraph, START, END } from '@langchain/langgraph';
+import { KotefConfig } from '../../core/config.js';
 import { callChat } from '../../core/llm.js';
 import { renderBrainTemplate, loadBrainTemplate } from '../../sdd/template_driver.js';
 import path from 'node:path';
@@ -158,10 +158,10 @@ const workflow = new StateGraph<SddOrchestratorState>({
     .addNode('sdd_research', sddResearch)
     .addNode('sdd_architect', sddArchitect)
     .addNode('sdd_tickets', sddTickets)
-    .addEdge('START', 'sdd_research')
+    .addEdge(START, 'sdd_research')
     .addEdge('sdd_research', 'sdd_architect')
     .addEdge('sdd_architect', 'sdd_tickets')
-    .addEdge('sdd_tickets', 'END');
+    .addEdge('sdd_tickets', END);
 
 const app = workflow.compile();
 
