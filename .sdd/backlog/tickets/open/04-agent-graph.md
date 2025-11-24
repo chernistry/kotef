@@ -2,10 +2,10 @@
 
 Spec version: v1.0  
 Context: `.sdd/project.md` (High-level Architecture Plan, SDD as brain), `.sdd/best_practices.md` (orchestration, safety, verification), `.sdd/architect.md` Sections 3–6 (Architecture Overview, Component Specifications, Agent Layer)  
-Dependencies: 01-scaffold-core, 02-tools-fs, 03-tools-search.
+Dependencies: 01-scaffold-core, 02-tools-fs, 03-tools-search (and will later be extended by 07-sdd-bootstrap).
 
 ## Objective & DoD
-Implement the initial LangGraph agent orchestration with Planner, Researcher, Coder, and Verifier nodes, using SDD as the “brain” and tools as the “body”.
+Implement the initial LangGraph agent orchestration with Bootstrap (future), Planner, Researcher, Coder, and Verifier nodes, using SDD as the “brain” and tools as the “body”.
 
 **Definition of Done:**
 - [ ] `src/agent/state.ts` defines a typed `AgentState` interface consistent with `.sdd/architect.md`’s state schema.
@@ -25,6 +25,8 @@ Implement the initial LangGraph agent orchestration with Planner, Researcher, Co
 import type { ChatMessage } from '../core/llm';
 
 export interface SddContext {
+  /** Optional natural-language goal that triggered this run. */
+  goal?: string;
   project: string;       // raw text from .sdd/project.md
   architect: string;     // raw text from .sdd/architect.md
   bestPractices?: string;
@@ -39,6 +41,8 @@ export interface AgentState {
   fileChanges?: unknown;
   testResults?: unknown;
   done?: boolean;
+  /** Internal flag to distinguish between bootstrap vs normal ticket execution. */
+  hasSdd?: boolean;
 }
 ```
 
@@ -76,7 +80,7 @@ but without importing any domain-specific schemas. Only architectural patterns (
    - `coderNode`: calls FS tools (`readFile`, `writePatch`) and records proposed changes in `fileChanges`.
    - `verifierNode`: calls `test_runner` (even if stubbed) and updates `testResults` + `done`.
 4. Wire up the graph in `src/agent/graph.ts` using LangGraph.js APIs:
-   - define entry point (e.g. `planner`);
+   - define entry point (for now, e.g. `planner`; later, a `bootstrap` node will be added per Ticket 07);
    - define edges planner → researcher/coder/verifier → planner/done.
 5. Add unit tests in `test/agent/graph.test.ts` using mocked `callChat` and tools:
    - compile the graph and run a minimal scenario (e.g. planner → coder → verifier → done).
@@ -101,4 +105,4 @@ npm test test/agent/graph.test.ts
 ## Non‑Goals / Pitfalls to Avoid
 - Do **not** hard-code paths to kotef’s own `.sdd/`; the graph should operate on a generic `SddContext` provided by the CLI for the **target** project.
 - Do **not** call filesystem or network APIs directly from nodes; all side effects must go through tools (`fs`, `web_search`, `deep_research`, `test_runner`) to keep behavior auditable and testable.
-- Do **not** embed long prompts inline in TS files; keep them in `src/agent/prompts/*.md` and load them via a prompt loader so they remain editable and versionable.*** End Patch ***!
+- Do **not** embed long prompts inline in TS files; keep them in `src/agent/prompts/*.md` and load them via a prompt loader so they remain editable and versionable.

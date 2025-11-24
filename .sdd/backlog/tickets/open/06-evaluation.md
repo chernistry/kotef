@@ -9,8 +9,9 @@ Set up evaluation scenarios and CI integration to ensure agent quality and preve
 
 **Definition of Done:**
 - [ ] `test/scenarios/hello-world/` created (sample repo with `.sdd/` and simple coding task).
-- [ ] E2E test script implemented: runs kotef on the sample project and asserts:
-  - [ ] agent reads `.sdd` correctly,
+- [ ] At least one additional scenario created for a repo **without** `.sdd/` where kotef must bootstrap SDD from a natural-language goal.
+- [ ] E2E test script implemented: runs kotef on both scenarios and asserts:
+  - [ ] agent reads or bootstraps `.sdd` correctly,
   - [ ] agent proposes at least one diff,
   - [ ] agent runs tests (even if they are trivial) and reports status.
 - [ ] GitHub Actions workflow (`.github/workflows/ci.yml`) configured to run lint, unit tests, and E2E tests on push/PR.
@@ -40,8 +41,11 @@ Scenario repo should be minimal (e.g. `hello-world` TS project with `.sdd/` and 
    - copy the dummy project to a temporary directory;
    - run `kotef run --ticket <id>` via `child_process.spawn`;
    - verify exit code and that at least one source file and/or test file was modified as expected.
-3. Add a `npm run test:e2e` script to `package.json` that runs this E2E test file.
-4. Create `.github/workflows/ci.yml`:
+3. Add a second scenario (e.g. `test/scenarios/hello-world-nosdd/`) with a similar tiny TS project **without any `.sdd/` directory** and a simple natural-language goal stored in a fixture. Extend the E2E test to:
+   - run `kotef run --root <nosdd-path> --goal "<goal>"`,
+   - assert that `.sdd/` is created and that the agent proposes at least one diff.
+4. Add a `npm run test:e2e` script to `package.json` that runs this E2E test file.
+5. Create `.github/workflows/ci.yml`:
    - install dependencies;
    - run `npm run lint`, `npm test`, and `npm run test:e2e`.
 5. Optionally (stretch): capture simple metrics (duration, exit code, whether tests passed) and log them in a machine-readable format (JSON) for future dashboards.
@@ -64,4 +68,4 @@ npm run test:e2e
 ## Non‑Goals / Pitfalls to Avoid
 - Do **not** hit real external LLM/search APIs in CI by default; introduce a mock or “offline” mode (e.g. env flag) so E2E tests remain cheap and stable.
 - Do **not** overfit scenarios to a single project layout; keep the hello‑world repo minimal but representative of common patterns (SDD + small TS app).
-- Do **not** assert on fragile details like exact wording of agent output; focus on structural checks (exit code, files changed, tests run) to avoid brittle tests.*** End Patch ***!
+- Do **not** assert on fragile details like exact wording of agent output; focus on structural checks (exit code, files changed, tests run) to avoid brittle tests.

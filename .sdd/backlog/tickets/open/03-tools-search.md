@@ -119,4 +119,4 @@ npm test test/tools/search.test.ts
 ## Non‑Goals / Pitfalls to Avoid
 - Do **not** make real network calls in unit tests; inject or mock HTTP/search clients so tests are deterministic and cheap.
 - Do **not** bake provider‑specific quirks into core types; keep `WebSearchResult` and `DeepResearchFinding` generic and map provider responses into them.
-- Do **not** always use `modelStrong` for summarization; follow best_practices and prefer `modelFast` for most research, reserving `modelStrong` for rare, critical summarization steps (if at all in this ticket).*** End Patch ***!
+- Do **not** always use `modelStrong` for summarization; follow best_practices and prefer `modelFast` for most research, reserving `modelStrong` for rare, critical summarization steps (if at all in this ticket).

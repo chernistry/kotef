@@ -22,11 +22,13 @@ The goal is to build a production‑grade AI coding/search agent (similar to Cla
 List 5–10 concrete conditions that must be true when the project is “Done” (functional and non‑functional).
 - Functional outcomes (what users can do):
   - Run kotef against a local project and have it:
-    - read SDD specs (`.sdd/*`),
+    - accept a natural‑language goal (e.g. “add pagination to blog posts”),
+    - if needed, perform best‑practice research and **bootstrap SDD** for that repo (create or update `.sdd/project.md`, `.sdd/best_practices.md`, `.sdd/architect.md`, and initial tickets),
+    - read and respect SDD specs (`.sdd/*`),
     - perform deep web research for missing knowledge,
     - propose and implement code changes via tools/CLI.
   - Support web search and focused content fetching using adapted Navan/Tavily components.
-  - Expose a simple CLI / API to trigger research → architecture → coding loops.
+  - Expose a simple CLI / API to trigger research → architecture → coding loops (including an “auto‑SDD” mode for repos without `.sdd/`).
 - Quality attributes (performance, reliability, security, UX):
   - Respect timeouts, rate limits, and host allowlists for all web calls.
   - Never write outside the allowed project workspace; provide diffs/patches instead of blind overwrites.

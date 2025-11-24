@@ -93,15 +93,21 @@ List 5–10 concrete conditions that must be true when the project is “Done”
     - Guardrails for secrets, PII, and host allowlists (align with Navan/Tavily patterns and the best‑practices doc).
 
 ## Orchestrator / Agent Sketch (kotef runtime)
-- Main role: glue SDD brain + tools into a single experience similar to Claude Code / Q Chat / ChatGPT Code.
-- Rough structure (for future `architect.md` and implementation):
+- Main role: glue SDD brain + tools into a single experience similar to Claude Code / Q Chat / ChatGPT Code, **while being able to synthesize that SDD brain on the fly** from a natural-language request.
+- Rough structure:
   - Entry points:
-    - CLI command (e.g. `kotef run <project-root>`) that:
-      - loads `.sdd/*` for the target project;
+    - CLI command (e.g. `kotef run --root <project-root> --goal "<task>"`) that:
+      - checks whether `.sdd/` exists in the target project;
+      - if `.sdd/` is missing, runs an **SDD bootstrap flow** (Research → Architect → Tickets) to create minimal SDD artifacts for the project based on the user’s goal and a light repo scan;
+      - if `.sdd/` exists, loads `.sdd/*` for the target project;
       - constructs the LangGraph.js graph with configured tools (search, deep research, file I/O, test runner);
-      - triggers a single “task run” (e.g. implement next ticket, fix failing tests, perform research).
+      - triggers a single “task run” (e.g. implement next ticket, fix failing tests, perform research) against the now-available SDD.
     - Optional API/daemon mode for multi‑turn sessions.
   - Agents / nodes (can initially be a single meta‑agent, but architect.md should allow splitting):
+    - Bootstrap / Spec‑Builder node:
+      - Given a user goal and repo snapshot, orchestrates best‑practice research and SDD synthesis.
+      - Uses LLM + tools (web_search, deep_research, fs) to draft `.sdd/project.md`, `.sdd/best_practices.md`, `.sdd/architect.md`, and initial `.sdd/backlog/tickets/open/*`.
+      - May reuse SDDRush prompts from `brain/` (01_research / 02_architect / 03_agent) as templates.
     - Planner node:
       - Reads `.sdd/project.md`, `.sdd/architect.md`, open tickets.
       - Decides whether to call deep research tools (Navan/Tavily) for this task.
@@ -117,12 +123,14 @@ List 5–10 concrete conditions that must be true when the project is “Done”
       - Decides whether Definition of Done is satisfied for the current ticket.
   - State & feedback:
     - Shared state includes:
+      - initial user goal / intent (plain text);
+      - whether SDD already existed or was bootstrapped in this run;
       - current ticket and status (planned / in‑progress / blocked / done);
       - research artifacts (citations, summaries, URLs);
       - code diff summaries and test results.
     - On failures:
       - Verifier or Coding node records issues in `.sdd/issues.md`.
-      - Planner can request spec updates (new tickets / ADR changes) before retrying.
+      - Planner or Bootstrap node can request spec updates (new tickets / ADR changes) before retrying.
 - Architect for kotef должен опираться на
   `/Users/sasha/IdeaProjects/allthedocs/learning/research/ai_engineering/agentic_systems_building_best_practices.md`
   при выборе паттерна (single vs multi‑agent, memory, evaluation) и явно описать этот выбор в `architect.md` (через ADR + MCDM).
@@ -425,7 +433,7 @@ Status: Approved
 **Kotef** is an autonomous AI coding and research agent designed to act as a "developer in a box". It uses the Spec-Driven Development (SDD) framework as its "brain" to plan, research, and execute coding tasks safely and reliably.
 
 ### Core Goals
-1.  **SDD-Native**: Reads and respects `.sdd/project.md`, `.sdd/architect.md`, and tickets as the source of truth.
+1.  **SDD-Native**: Reads and respects `.sdd/project.md`, `.sdd/architect.md`, and tickets as the source of truth – and can **create or update** these SDD artifacts itself when they do not yet exist for a target project.
 2.  **Grounded Intelligence**: Uses two-tier web research (shallow + deep) to ground decisions in up-to-date documentation and best practices.
 3.  **Safe Execution**: Operates within strict safety boundaries (Node.js Permission Model, diff-first editing, path allowlists).
 4.  **Observable**: Provides structured logs, traces, and human-readable run reports for every action.
@@ -444,7 +452,9 @@ Status: Approved
 ### Preconditions
 -   `OPENAI_API_KEY` (or compatible provider key) in environment.
 -   Search API key (e.g., `TAVILY_API_KEY` or `SERPER_API_KEY`) for web research.
--   Target project must have an initialized `.sdd/` directory (at least `project.md`).
+-   Target project path is provided. A `.sdd/` directory is **optional**:
+    - if present, kotef loads and respects existing SDD artifacts;
+    - if missing, kotef runs an internal **SDD bootstrap flow** to create minimal `.sdd/project.md`, `.sdd/best_practices.md`, `.sdd/architect.md`, and initial tickets based on the user’s natural-language request and a light repo scan.
 
 ## 3. Metric Profile & Strategic Risk Map
 

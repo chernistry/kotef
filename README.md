@@ -15,7 +15,9 @@ It aims for “Claude Code / Q / ChatGPT Code”‑class behavior, but with a ha
 
 - **Agentic body**  
   Implemented in **Node.js 20 + TypeScript + LangGraph.js**, kotef runs as a CLI that:
-  - reads `.sdd/*` for the target project,
+  - accepts a natural-language goal from the user,
+  - if needed, **bootstraps SDD** for the target repo (creating `.sdd/project.md`, `.sdd/architect.md`, `.sdd/best_practices.md`, and initial tickets),
+  - reads `.sdd/*` for the target project once available,
   - uses tools for web search, deep research, repo inspection, patch generation, and test running,
   - applies code changes via diffs only, within a sandboxed workspace,
   - produces structured logs and run reports under `.sdd/runs/`.
@@ -37,13 +39,16 @@ If you want to help shape a next‑generation coding agent from the ground up, t
 
 ## How it works (short version)
 
-1. You describe your project using SDD (`.sdd/project.md`, `.sdd/architect.md`, tickets).  
-2. kotef loads that “brain”, reads the open ticket, and plans a run.  
-3. It calls tools for search, research, file I/O, and tests, generating diffs instead of blind writes.  
+1. You point kotef at a repo and tell it, in plain language, what you want (for example: “add pagination to blog posts” or “refactor auth routes into modules”).  
+2. If the repo has no `.sdd/`, kotef:
+   - researches best practices for the detected stack,
+   - synthesizes `.sdd/project.md`, `.sdd/best_practices.md`, `.sdd/architect.md`, and initial tickets,
+   - effectively **writes the spec and tickets for you**.
+3. kotef then loads that SDD “brain”, picks the right ticket and plan, and calls tools for search, research, file I/O, and tests, generating diffs instead of blind writes.  
 4. It stops when the ticket’s Definition of Done is met or when guardrails (time, tokens, web calls) say “enough”.  
 5. It emits a run report summarizing what changed and why.
 
-The same pattern is used here: kotef uses SDD to build kotef.
+Power users can still hand-craft or edit `.sdd/*` and tickets; kotef will respect and update them instead of starting from scratch.
 
 ## Contributing (we need you)
 
