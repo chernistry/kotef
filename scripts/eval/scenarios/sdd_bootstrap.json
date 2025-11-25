@@ -1,0 +1,17 @@
+{
+    "id": "sdd_bootstrap",
+    "description": "Bootstrap SDD from scratch for a new project",
+    "goal": "Initialize an SDD structure for a TypeScript library project called 'string-utils' that will provide common string manipulation functions. Create project.md, architect.md, and best_practices.md.",
+    "profile": "fast",
+    "scope": "tiny",
+    "expectedStatus": [
+        "done_success",
+        "done_partial"
+    ],
+    "thresholds": {
+        "maxCommands": 10,
+        "maxTestRuns": 1,
+        "maxWebRequests": 5,
+        "maxSteps": 15
+    }
+}

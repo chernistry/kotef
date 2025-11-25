@@ -1,0 +1,17 @@
+{
+    "id": "node_simple_function",
+    "description": "Create a Node.js utility function with tests",
+    "goal": "Create a src/utils.js file with a function isPalindrome(str) that checks if a string is a palindrome (case-insensitive). Add a test file using Node's built-in test runner.",
+    "profile": "fast",
+    "scope": "tiny",
+    "expectedStatus": [
+        "done_success",
+        "done_partial"
+    ],
+    "thresholds": {
+        "maxCommands": 15,
+        "maxTestRuns": 4,
+        "maxWebRequests": 8,
+        "maxSteps": 20
+    }
+}

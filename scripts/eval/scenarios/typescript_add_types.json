@@ -1,0 +1,18 @@
+{
+    "id": "typescript_add_types",
+    "description": "Add TypeScript types to untyped code",
+    "goal": "The file src/calculator.ts has functions without type annotations. Add proper TypeScript types to all function parameters and return types.",
+    "profile": "fast",
+    "scope": "tiny",
+    "fixtureDir": "typescript-untyped",
+    "expectedStatus": [
+        "done_success",
+        "done_partial"
+    ],
+    "thresholds": {
+        "maxCommands": 12,
+        "maxTestRuns": 2,
+        "maxWebRequests": 6,
+        "maxSteps": 18
+    }
+}

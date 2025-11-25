@@ -1,0 +1,17 @@
+{
+    "id": "html_israeli_flag",
+    "description": "Create HTML/CSS/JS page with animated Israeli flag",
+    "goal": "Create a single HTML file with embedded CSS and JavaScript that draws the Israeli flag (blue stripes and Star of David on white background). The star should rotate slowly. No external dependencies.",
+    "profile": "fast",
+    "scope": "tiny",
+    "expectedStatus": [
+        "done_success",
+        "done_partial"
+    ],
+    "thresholds": {
+        "maxCommands": 15,
+        "maxTestRuns": 2,
+        "maxWebRequests": 8,
+        "maxSteps": 20
+    }
+}

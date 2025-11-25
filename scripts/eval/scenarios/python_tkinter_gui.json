@@ -1,0 +1,17 @@
+{
+    "id": "python_tkinter_gui",
+    "description": "Create a Python GUI with Tkinter window and close button",
+    "goal": "Create a Python GUI application using tkinter with a window titled 'Hello Kotef' and a Close button that exits when clicked. The window should be 400x300 pixels.",
+    "profile": "fast",
+    "scope": "tiny",
+    "expectedStatus": [
+        "done_success",
+        "done_partial"
+    ],
+    "thresholds": {
+        "maxCommands": 20,
+        "maxTestRuns": 3,
+        "maxWebRequests": 10,
+        "maxSteps": 25
+    }
+}
