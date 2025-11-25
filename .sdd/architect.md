@@ -774,4 +774,97 @@ Where:
 - **Risk**: Users may deploy "functionally done" code without addressing remaining issues.
   - **Mitigation**: Run reports clearly document remaining issues. CI pipelines can enforce `strict` profile for merge/deploy.
 
+## 12. Progress & Stop Rules
+
+### Philosophy
+Kotef implements a **supervisor-level progress controller** that tracks global progress across the entire run and detects stuck states. This prevents infinite loops and provides clear feedback when the agent cannot make further progress.
+
+### Global Thresholds
+
+| Threshold | Value | Scope | Enforcement |
+|-----------|-------|-------|-------------|
+| `MAX_STEPS` | 50 | Total steps per run | `plannerNode` aborts with `aborted_stuck` when exceeded |
+| `MAX_PLANNER_TO_RESEARCHER` | 5 | Planner→Researcher hops | Aborts when loop counter exceeds limit without progress |
+| `MAX_PLANNER_TO_VERIFIER` | 5 | Planner→Verifier hops | Aborts when loop counter exceeds limit without progress |
+| `MAX_PLANNER_TO_CODER` | 5 | Planner→Coder hops | Aborts when loop counter exceeds limit without progress |
+| `MAX_REPEATED_SNAPSHOTS` | 3 | Progress snapshots | `assessProgress` marks as `stuck_candidate` when snapshots are identical |
+
+### Progress Assessment Criteria
+
+The system tracks progress via lightweight **snapshots** (implemented in `src/agent/utils/progress_controller.ts`):
+
+```typescript
+interface ProgressSnapshot {
+    node: string;                    // Current node (planner, coder, verifier, etc.)
+    fileChangeCount: number;         // Number of files changed so far
+    sameErrorCount: number;          // Number of identical consecutive errors
+    lastTestSignature?: string;      // Hash of last test output
+    functionalChecksCount: number;   // Number of functional probes run
+    timestamp: number;               // When this snapshot was taken
+}
+```
+
+**Progress is detected when**:
+- File change count increases
+- Error count decreases or signature changes
+- Functional checks run successfully
+- Node transitions indicate forward movement
+
+**Stuck state is detected when**:
+- Same snapshot repeats for `MAX_REPEATED_SNAPSHOTS` consecutive steps
+- Loop counters exceed thresholds without progress
+- Total steps exceed `MAX_STEPS`
+
+### Integration Points
+
+1. **Planner Node** (`src/agent/nodes/planner.ts`):
+   - Creates progress snapshot at start of each planning cycle
+   - Calls `assessProgress(progressHistory)` to check for stuck states
+   - Routes to `snitch` with `terminalStatus: 'aborted_stuck'` when stuck
+   - Increments loop counters for each edge (planner→researcher, etc.)
+   - Resets loop counters when clear progress is detected
+
+2. **Coder Node** (`src/agent/nodes/coder.ts`):
+   - Tracks `consecutiveNoOps` for repeated no-change cycles
+   - Updates `fileChanges` to signal progress
+
+3. **Verifier Node** (`src/agent/nodes/verifier.ts`):
+   - Updates `sameErrorCount` when identical test failures repeat
+   - Sets `lastTestSignature` for error deduplication
+
+4. **Snitch Node** (`src/agent/nodes/snitch.ts`):
+   - Writes stuck state reports to `.sdd/issues.md`
+   - Includes failure history, metrics, and terminal status
+
+### Profile-Specific Attempt Limits
+
+Different execution profiles allow varying numbers of fix attempts before accepting partial success:
+
+| Profile | Max Fix Attempts | Behavior When Limit Reached |
+|---------|------------------|-----------------------------|
+| `strict` | N/A (must pass) | No partial success; failures are always blocking |
+| `fast` | 3 | Accept `done_partial` if functional goal met |
+| `smoke` | 1 | Accept `done_partial` after minimal verification |
+| `yolo` | 2 | Accept `done_partial` aggressively if app runs |
+
+### Terminal Statuses
+
+When the agent reaches a terminal state, one of these statuses is set:
+
+- `done_success`: All quality gates passed, ticket fully complete
+- `done_partial`: Functional goal met, but some non-critical issues remain (allowed in non-strict profiles)
+- `aborted_stuck`: Agent is looping without progress (stuck detection triggered)
+- `aborted_constraint`: External constraint violated (timeout, budget exceeded, missing dependency)
+
+### Run Report Integration
+
+Run reports (`.sdd/runs/*.md`) include:
+- `terminalStatus` field indicating how the run ended
+- `stopReason` explaining why (for aborted runs)
+- Progress metrics (total steps, loop counters, file changes)
+- Failure history with timestamps
+
+This ensures full traceability for debugging stuck states and understanding agent behavior.
+
 ---
+

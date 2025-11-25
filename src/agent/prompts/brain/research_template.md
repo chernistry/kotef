@@ -19,7 +19,11 @@ Create a comprehensive best‑practices guide for {{PROJECT_NAME}} that is:
 4) Complete — cover architecture, quality, ops, security, and technical debt.
 5) Risk‑aware — define a simple metric profile (PerfGain, SecRisk, DevTime, Maintainability, Cost, DX) with indicative weights for this project, plus 3–5 key risks with High/Medium/Low labels.
 6) Conflict‑aware — explicitly call out conflicting or mutually exclusive practices and alternative patterns.
-7) Verification‑ready — for each major recommendation, note how to validate it (tests, metrics, experiments) so the architect/agent can reuse these checks.
+7) **Bad‑practice‑aware** — explicitly search for **common bad practices, anti‑patterns, and red flags** for this stack/domain, and describe:
+   - how they typically show up in real code/built systems,
+   - why they are harmful now ({{YEAR}}),
+   - what to do instead or how to migrate away from them.
+8) Verification‑ready — for each major recommendation (and “don’t do this”), note how to validate it (tests, metrics, experiments) so the architect/agent can reuse these checks.
 
 ## Output Structure (Markdown)
 ### 1. TL;DR (≤10 bullets)
@@ -33,6 +37,9 @@ For {{TECH_STACK}}:
 - Tooling maturity: testing, observability, security
 - Cloud/vendor updates
 - Alternative approaches and when to choose them
+- **Red flags & traps**:
+  - widespread but now‑discouraged practices (e.g., patterns that conflict with current security/scale/maintainability expectations),
+  - legacy patterns people still copy from old blog posts that should be avoided in new code.
 
 ### 3. Architecture Patterns (2–4 for {{DOMAIN}} with {{TECH_STACK}})
 Pattern A — [NAME] (MVP)
@@ -87,16 +94,29 @@ Repeat the structure from 4.
 - [ADR‑001] [Choice] over [alternatives] because [reason]
 
 ### 15. Anti‑Patterns to Avoid
-- For {{TECH_STACK}}/{{DOMAIN}} with “what, why bad, what instead”
+- For {{TECH_STACK}}/{{DOMAIN}} list specific anti‑patterns with:
+  - **What** (concrete code/config/systems examples),
+  - **Why bad now** (broken assumptions, perf/regulatory/security risks, maintenance pain),
+  - **What instead** (actionable alternatives or migration paths).
 
-### 16. Evidence & Citations
+### 16. Red Flags & Smells in Existing Projects
+- How to recognize that {{PROJECT_NAME}} (or a similar project) is in trouble:
+  - architectural smells (e.g., unbounded growth of “god files”, tight coupling around certain modules),
+  - operational smells (no timeouts, no retries, no metrics/logs),
+  - process smells (no tests around critical paths, no CI, dangerous deploy patterns).
+- For each red flag, include:
+  - how to detect it (queries, metrics, code searches),
+  - what minimal remediation looks like,
+  - how an agent like kotef should treat it (e.g., when to create a separate “janitor” ticket).
+
+### 17. Evidence & Citations
 - List sources inline near claims; add links; include “Last updated” dates when possible.
 
-### 17. Verification
+### 18. Verification
 - Self‑check: how to validate key recommendations (scripts, smoke tests, benchmarks)
 - Confidence: [High/Medium/Low] per section
 
-### 18. Technical Debt & Migration Guidance
+### 19. Technical Debt & Migration Guidance
 - Typical sources of technical debt for {{TECH_STACK}}/{{DOMAIN}}.
 - Recommended strategies to keep debt under control over time (continuous refactoring, migration paths, feature flags).
 - When to introduce dedicated “janitor” tasks and what they should look like.

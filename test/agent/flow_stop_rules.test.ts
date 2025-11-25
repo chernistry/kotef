@@ -58,9 +58,9 @@ describe('Agent Flow & Stop Rules', () => {
     });
 
     it('should abort if planner->researcher loop limit is exceeded', async () => {
-        state.loopCounters.planner_to_researcher = 6; // Threshold is 5
+        state.loopCounters.planner_to_researcher = 5; // At threshold (will be 6 > 5 after increment)
 
-        // Mock LLM to propose 'researcher' again
+        // Mock LLM to propose 'researcher' again (this will increment to 6 > 5)
         mockChatFn.mockResolvedValue({
             messages: [{
                 role: 'assistant',
@@ -78,13 +78,13 @@ describe('Agent Flow & Stop Rules', () => {
 
         expect(result.terminalStatus).toBe('aborted_stuck');
         expect(result.plan?.next).toBe('snitch');
-        expect(result.plan?.reason).toContain('Planner->Researcher loop limit exceeded');
+        expect(result.plan?.reason).toContain('planner→researcher');
     });
 
     it('should abort if planner->verifier loop limit is exceeded', async () => {
-        state.loopCounters.planner_to_verifier = 6; // Threshold is 5
+        state.loopCounters.planner_to_verifier = 5; // At threshold
 
-        // Mock LLM to propose 'verifier' again
+        // Mock LLM to propose 'verifier' again (this will increment to 6 > 5)
         mockChatFn.mockResolvedValue({
             messages: [{
                 role: 'assistant',
@@ -102,11 +102,11 @@ describe('Agent Flow & Stop Rules', () => {
 
         expect(result.terminalStatus).toBe('aborted_stuck');
         expect(result.plan?.next).toBe('snitch');
-        expect(result.plan?.reason).toContain('Planner->Verifier loop limit exceeded');
+        expect(result.plan?.reason).toContain('planner→verifier without progress');
     });
 
     it('should allow normal flow if limits are not exceeded', async () => {
-        state.loopCounters.planner_to_researcher = 2;
+        state.loopCounters.planner_to_researcher = 0;
 
         mockChatFn.mockResolvedValue({
             messages: [{
@@ -125,6 +125,41 @@ describe('Agent Flow & Stop Rules', () => {
 
         expect(result.terminalStatus).toBeUndefined();
         expect(result.plan?.next).toBe('researcher');
-        expect(result.loopCounters?.planner_to_researcher).toBe(3);
+        expect(result.loopCounters?.planner_to_researcher).toBe(1);
+    });
+
+    it('should accept done_partial when functional goal is met in non-strict profile', async () => {
+        state.runProfile = 'fast';
+        // Only 2 failures to avoid MAX_FAILURES (3) check
+        state.failureHistory = [
+            { step: 'verifier', error: 'lint warning: unused variable', timestamp: Date.now() - 1000 },
+            { step: 'verifier', error: 'lint warning: unused variable', timestamp: Date.now() }
+        ];
+        state.functionalChecks = [
+            { command: 'npm run dev', exitCode: 0, timestamp: Date.now(), node: 'coder' }
+        ];
+        state.testResults = { passed: false, message: 'Some lint warnings remain' };
+
+        // Mock LLM to propose done_partial
+        mockChatFn.mockResolvedValue({
+            messages: [{
+                role: 'assistant',
+                content: JSON.stringify({
+                    next: 'done',
+                    terminalStatus: 'done_partial',
+                    reason: 'Functional goal met (app runs), but minor lint warnings remain',
+                    profile: 'fast',
+                    plan: []
+                })
+            }]
+        });
+
+        const node = plannerNode(mockConfig, mockChatFn);
+        const result = await node(state);
+
+        expect(result.terminalStatus).toBe('done_partial');
+        // Planner doesn't set done:true - that's handled by the graph router
+        expect(result.plan?.next).toBe('done');
     });
 });
+

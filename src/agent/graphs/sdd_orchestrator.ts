@@ -4,6 +4,7 @@ import { callChat, ChatMessage } from '../../core/llm.js';
 import { renderBrainTemplate, loadBrainTemplate } from '../../sdd/template_driver.js';
 import { deepResearch, DeepResearchFinding } from '../../tools/deep_research.js';
 import { loadPrompt } from '../../core/prompts.js';
+import { jsonrepair } from 'jsonrepair';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
@@ -201,7 +202,9 @@ Based on the Architecture Plan below, break down the implementation into sequent
 ${architectContent}
 
 ## Output Format
-Return a JSON object with a 'tickets' array. Each item must have:
+You MUST respond with a single JSON object only. Do NOT include markdown fences, comments, or prose outside the JSON.
+
+The JSON object must have a 'tickets' array. Each item must have:
 - filename: string (e.g., "01-setup-core.md")
 - content: string (the full markdown content of the ticket)
 
@@ -225,15 +228,44 @@ Ensure tickets are granular, have clear dependencies, and cover the entire MVP.
         maxTokens: 2000,
         response_format: { type: 'json_object' }
     });
-    const content = response.messages[response.messages.length - 1].content || '{}';
+    let content = response.messages[response.messages.length - 1].content || '{}';
 
     let tickets: { filename: string; content: string }[] = [];
     try {
-        const parsed = JSON.parse(content);
-        tickets = parsed.tickets || [];
+        let raw = content.trim();
+
+        // Strip markdown fences if provider ignored response_format and wrapped JSON.
+        if (raw.startsWith('```')) {
+            const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
+            if (fenceMatch && fenceMatch[1]) {
+                raw = fenceMatch[1].trim();
+            }
+        }
+
+        try {
+            const parsed = JSON.parse(raw);
+            tickets = parsed.tickets || [];
+        } catch {
+            // Last resort: jsonrepair
+            const repaired = jsonrepair(raw);
+            const parsed = JSON.parse(repaired);
+            tickets = parsed.tickets || [];
+        }
     } catch (e) {
         console.error('Failed to parse tickets JSON:', e);
-        // Fallback or throw? For now, log and continue.
+        // We will fall back to a single coarse-grained ticket below.
+    }
+
+    // Fallback: if no tickets were produced, create a single coarse-grained ticket
+    if (!tickets || tickets.length === 0) {
+        console.warn('No tickets returned by LLM; creating a fallback ticket derived from the goal.');
+        const safeGoal = goal.length > 200 ? `${goal.slice(0, 200)}…` : goal;
+        tickets = [
+            {
+                filename: '01-main-goal.md',
+                content: `# Ticket: 01 Main Goal\n\nSpec version: v1.0\n\n## Context\n\nThis ticket was generated automatically because ticket decomposition failed. It captures the main user goal so you can refine it manually.\n\n- Goal: \`${safeGoal}\`\n- See SDD files in \`.sdd/\` for project, architecture, and best practices.\n\n## Objective & Definition of Done\n\nImplement the main goal described above according to:\n- .sdd/project.md (Definition of Done)\n- .sdd/architect.md (architecture & constraints)\n- .sdd/best_practices.md (stack-specific guidance)\n\n## Steps\n1. Review .sdd/project.md, .sdd/architect.md, and .sdd/best_practices.md for this repo.\n2. Break the goal into smaller sub-tickets under \`.sdd/backlog/tickets/open/NN-*.md\`.\n3. Implement the most critical sub-ticket first.\n\n## Affected files/modules\n- To be refined by the developer/agent.\n\n## Tests\n- To be defined per refined sub-tickets.\n\n## Risks & Edge Cases\n- Ticket decomposition failed in the automatic step; ensure manual review of the goal and SDD before implementation.\n\n## Dependencies\n- None yet; use this ticket as the root for further backlog items.\n`
+            }
+        ];
     }
 
     // 3. Write files

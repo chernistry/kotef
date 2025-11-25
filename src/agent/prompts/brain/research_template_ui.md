@@ -17,6 +17,10 @@ Create a comprehensive UI best‑practices guide for {{PROJECT_NAME}} that is:
 2) Specific — tailored to {{TECH_STACK}} and {{DOMAIN}} with UI considerations.
 3) Practical — include concrete CSS/HTML/JS code examples, design system tokens, UI component patterns.
 4) Complete — cover design system, user experience, accessibility, responsive design, and visual design.
+5) **Bad‑practice‑aware** — explicitly search for UI/UX anti‑patterns and red flags (e.g. inaccessible components, janky animations, layout traps) and describe:
+   - how they show up in real interfaces,
+   - why they’re harmful now ({{YEAR}}),
+   - what to do instead.
 
 ## Output Structure (Markdown)
 ### 1. TL;DR (≤10 bullets)
@@ -30,6 +34,9 @@ For {{TECH_STACK}}:
 - UI tooling maturity: design systems, theming, component libraries
 - Accessibility & A11Y updates; WCAG 2.2 guidelines
 - Alternative approaches and when to choose them
+- **Red flags & trends to avoid**:
+  - popular but harmful UI patterns (e.g. poor contrast, scroll‑jacking, excessive motion),
+  - “cool” layouts/animations from old articles that conflict with modern accessibility/perf expectations.
 
 ### 3. UI Architecture Patterns (2–4 for {{DOMAIN}} with {{TECH_STACK}})
 Pattern A — [NAME] (MVP)
@@ -101,7 +108,10 @@ Failure Modes & Recovery → detection→remediation→rollback
 - [ADR‑001] [UI Choice] over [alternatives] because [reason]
 
 ### 15. Anti‑Patterns to Avoid
-- For {{TECH_STACK}}/{{DOMAIN}} with “what, why bad for UX, what instead”
+- For {{TECH_STACK}}/{{DOMAIN}} list specific UI anti‑patterns with:
+  - **What** (concrete component/interaction/layout examples),
+  - **Why bad for UX now** (accessibility, performance, conversion, user trust),
+  - **What instead** (better interaction or visual pattern).
 
 ### 16. Evidence & Citations
 - List sources inline near claims; add links; include “Last updated” dates when possible.
