@@ -98,6 +98,15 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             sameErrorCount: {
                 reducer: (a, b) => b ?? a,
                 default: () => 0,
+            },
+            progressHistory: {
+                reducer: (a, b) => {
+                    if (!b) return a;
+                    const merged = (a || []).concat(b);
+                    // Keep only last 10 snapshots to avoid unbounded growth
+                    return merged.slice(-10);
+                },
+                default: () => [],
             }
         }
     });

@@ -72,6 +72,9 @@ export interface AgentState {
     consecutiveNoOps: number; // For coder
     lastTestSignature?: string; // For verifier
     sameErrorCount: number; // For verifier
+
+    /** History of progress snapshots for stuck detection. */
+    progressHistory?: import('./utils/progress_controller.js').ProgressSnapshot[];
 }
 
 export type TerminalStatus = 'done_success' | 'done_partial' | 'aborted_stuck' | 'aborted_constraint';

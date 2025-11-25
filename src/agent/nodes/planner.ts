@@ -6,6 +6,7 @@ import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
 import { buildProjectSummary } from '../utils/project_summary.js';
 import { deriveFunctionalStatus } from '../utils/functional_checks.js';
+import { makeSnapshot, assessProgress } from '../utils/progress_controller.js';
 
 function initializeBudget(profile: ExecutionProfile, scope: TaskScope): BudgetState {
     const zeros = { commandsUsed: 0, testRunsUsed: 0, webRequestsUsed: 0, commandHistory: [] };
@@ -197,6 +198,26 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                     };
                 }
             }
+        }
+
+        // (Ticket 30) Progress Controller: Check for stuck states
+        const snapshot = makeSnapshot(state, 'planner');
+        const progressHistory = [...(state.progressHistory || []), snapshot];
+        const progressCheck = assessProgress(progressHistory);
+
+        if (progressCheck.status === 'stuck_candidate') {
+            log.warn('Agent appears stuck', { reason: progressCheck.reason });
+            return {
+                terminalStatus: 'aborted_stuck',
+                plan: {
+                    next: 'snitch',
+                    reason: `${progressCheck.reason}`,
+                    profile: state.runProfile,
+                    plan: []
+                },
+                done: true,
+                progressHistory
+            };
         }
 
         if (currentSteps >= MAX_STEPS) {
