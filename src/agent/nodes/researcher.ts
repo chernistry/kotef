@@ -72,14 +72,20 @@ export function researcherNode(cfg: KotefConfig) {
             }
         } catch (e) {
             log.error('Researcher LLM failed', { error: e });
-            // Fallback: derive at least one explicit, grounded query from the goal
-            const fallbackGoal = state.sdd.goal || 'Analyze project';
-            plan = {
-                queries: [
-                    fallbackGoal,
-                    `best practices ${fallbackGoal}`.slice(0, 200)
+            // Fallback: derive explicit, grounded queries from the goal instead of generic "Analyze project"
+            const goalText = state.sdd.goal || '';
+            const fallbackQueries = goalText.trim().length > 0
+                ? [
+                    goalText.slice(0, 200), // Primary: the goal itself
+                    `best practices ${goalText}`.slice(0, 200) // Secondary: best practices + goal
                 ]
+                : ['software development best practices', 'modern coding practices']; // Last resort when no goal
+
+            plan = {
+                queries: fallbackQueries,
+                reason: 'LLM plan parsing failed; using goal-derived fallback queries'
             };
+            log.warn('Using fallback research queries', { queries: fallbackQueries });
         }
 
         const queries = plan.queries || [];
