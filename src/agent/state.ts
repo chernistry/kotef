@@ -4,6 +4,15 @@ import { DetectedCommands } from './utils/verification.js';
 
 export type TaskScope = 'tiny' | 'normal' | 'large';
 
+export interface FunctionalCheck {
+    command: string;
+    exitCode: number;
+    timestamp: number;
+    node: 'coder' | 'verifier';
+    stdoutSample?: string;
+    stderrSample?: string;
+}
+
 export interface SddContext {
     /** Optional natural-language goal that triggered this run. */
     goal?: string;
@@ -27,6 +36,8 @@ export interface AgentState {
     // Verification
     detectedCommands?: DetectedCommands;
     testResults?: any;
+    /** History of functional probes (e.g. "npm run dev", "python app.py") and their outcomes. */
+    functionalChecks?: FunctionalCheck[];
     /** History of failures encountered during this run, for loop detection. */
     failureHistory?: Array<{
         step: string;

@@ -108,6 +108,18 @@ export async function writeRunReport(
   - Build: \`${state.detectedCommands.buildCommand || 'none'}\`
 ` : '';
 
+        let functionalProbesSection = '';
+        if (state.functionalChecks && state.functionalChecks.length > 0) {
+            functionalProbesSection = `\n## Functional Probes\n`;
+            state.functionalChecks.forEach(check => {
+                const icon = check.exitCode === 0 ? '✅' : '❌';
+                functionalProbesSection += `- ${icon} \`${check.command}\` (exit ${check.exitCode})\n`;
+                if (check.stderrSample) {
+                    functionalProbesSection += `  - Stderr: \`${check.stderrSample.replace(/`/g, '')}\`\n`;
+                }
+            });
+        }
+
         const testSection = state.testResults ? `
 ## Verification Results
 - **Command**: \`${state.testResults.command}\`
@@ -129,6 +141,7 @@ ${state.testResults.stderr ? `\n**Stderr**:\n\`\`\`\n${state.testResults.stderr.
         // will be replaced by the more detailed `verificationSection` and `testSection` if `state` is available.
 
         report += verificationSection;
+        report += functionalProbesSection;
         report += testSection;
 
         // Budget usage section (Ticket 19)

@@ -749,7 +749,7 @@ The `verifierNode` and `plannerNode` use the following logic:
 - **yolo**: `done = (functionalOk AND attempts >= 2) OR (all tests pass)`
 
 Where:
-- `functionalOk`: Derived from successful execution of run commands (e.g., `npm start`, `python app.py`) or explicit functional probes.
+- `functionalOk`: Derived from successful execution of run commands (e.g., `npm start`, `python app.py`) or explicit functional probes. A probe is considered OK if it exits 0 and has no obvious crash markers.
 - `non-critical failures`: Lint warnings, coverage gaps, type errors in non-core paths, flaky E2E tests.
 - `critical failures`: Runtime crashes, failing core unit tests, security vulnerabilities.
 

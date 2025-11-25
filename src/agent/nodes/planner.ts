@@ -5,6 +5,7 @@ import { loadRuntimePrompt } from '../../core/prompts.js';
 import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
 import { buildProjectSummary } from '../utils/project_summary.js';
+import { deriveFunctionalStatus } from '../utils/functional_checks.js';
 
 function initializeBudget(profile: ExecutionProfile, scope: TaskScope): BudgetState {
     const zeros = { commandsUsed: 0, testRunsUsed: 0, webRequestsUsed: 0, commandHistory: [] };
@@ -148,6 +149,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{TASK_SCOPE}}': state.taskScope || 'normal',
             '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
             '{{DETECTED_COMMANDS}}': safe(state.detectedCommands),
+            '{{FUNCTIONAL_OK}}': deriveFunctionalStatus(state.functionalChecks) ? 'true' : 'false',
         };
 
         // Budget exhaustion check (Ticket 19)
@@ -159,16 +161,22 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
 
             if (nearLimit) {
                 log.warn('Budget limits reached', { budget: state.budget });
-                // Check if functional goal met despite budget exhaustion
+
+                // Check if functional goal met despite budget exhaustion (Ticket 28)
+                const functionalOk = deriveFunctionalStatus(state.functionalChecks);
+                const isStrict = state.runProfile === 'strict';
+
+                // In strict mode, we require tests to pass.
+                // In non-strict, functionalOk is enough to declare partial success.
                 const functionallyDone = state.testResults?.passed ||
-                    (state.runProfile && ['smoke', 'yolo'].includes(state.runProfile));
+                    (!isStrict && functionalOk);
 
                 if (functionallyDone) {
                     return {
                         terminalStatus: 'done_partial',
                         plan: {
                             next: 'done',
-                            reason: `Budget exhausted but functional goal met. Commands: ${state.budget.commandsUsed}/${state.budget.maxCommands}, Tests: ${state.budget.testRunsUsed}/${state.budget.maxTestRuns}`,
+                            reason: `Budget exhausted but functional goal met (functionalOk=${functionalOk}). Commands: ${state.budget.commandsUsed}/${state.budget.maxCommands}, Tests: ${state.budget.testRunsUsed}/${state.budget.maxTestRuns}`,
                             profile: state.runProfile,
                             plan: []
                         },

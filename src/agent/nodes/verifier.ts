@@ -5,6 +5,7 @@ import { createLogger } from '../../core/logger.js';
 import { runCommand } from '../../tools/test_runner.js';
 import { resolveExecutionProfile, PROFILE_POLICIES } from '../profiles.js';
 import { detectCommands, DetectedCommands } from '../utils/verification.js';
+import { recordFunctionalProbe, deriveFunctionalStatus } from '../utils/functional_checks.js';
 
 export function verifierNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
@@ -127,6 +128,18 @@ export function verifierNode(cfg: KotefConfig) {
                 stdout: res.stdout,
                 stderr: res.stderr
             });
+
+            // Record functional probe (Ticket 28)
+            const probes = recordFunctionalProbe(cmd, res, 'verifier');
+            if (probes.length > 0) {
+                // We need to return these.
+                // Verifier doesn't loop like coder, so we can just append to a list to return.
+                // But wait, we need to add them to the state passed to deriveFunctionalStatus later?
+                // Yes.
+                if (!state.functionalChecks) state.functionalChecks = [];
+                state.functionalChecks.push(...probes);
+            }
+
             if (!res.passed) {
                 allPassed = false;
                 // In strict mode, fail fast? Or run all to get full picture?
@@ -178,6 +191,8 @@ export function verifierNode(cfg: KotefConfig) {
             return text.slice(0, maxChars) + '\n\n...[truncated]';
         };
 
+        const functionalOk = deriveFunctionalStatus(state.functionalChecks);
+
         const replacements: Record<string, string> = {
             '{{TICKET}}': safe(state.sdd.ticket),
             '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),
@@ -186,7 +201,8 @@ export function verifierNode(cfg: KotefConfig) {
             '{{TEST_COMMANDS}}': commandsToRun.join(', '),
             '{{EXECUTION_PROFILE}}': executionProfile,
             '{{TASK_SCOPE}}': state.taskScope || 'normal',
-            '{{TEST_RESULTS}}': safe(results)
+            '{{TEST_RESULTS}}': safe(results),
+            '{{FUNCTIONAL_OK}}': functionalOk ? 'true' : 'false'
         };
 
         let systemPrompt = promptTemplate;
@@ -228,7 +244,8 @@ export function verifierNode(cfg: KotefConfig) {
             lastTestSignature,
             sameErrorCount,
             done: decision.next === 'done',
-            terminalStatus: decision.terminalStatus // e.g. 'done_partial'
+            terminalStatus: decision.terminalStatus, // e.g. 'done_partial'
+            functionalChecks: state.functionalChecks
         };
     };
 }

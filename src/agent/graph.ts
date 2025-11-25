@@ -44,6 +44,10 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
                 reducer: (a, b) => b,
                 default: () => undefined,
             },
+            functionalChecks: {
+                reducer: (a, b) => (a || []).concat(b || []),
+                default: () => [],
+            },
             done: {
                 reducer: (a, b) => b,
                 default: () => false,

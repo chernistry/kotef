@@ -8,6 +8,7 @@ import { readFile, writeFile, writePatch, applyEdits } from '../../tools/fs.js';
 import { runCommand } from '../../tools/test_runner.js';
 import { resolveExecutionProfile, PROFILE_POLICIES, looksLikeInstall, ExecutionProfile } from '../profiles.js';
 import { detectCommands } from '../utils/verification.js';
+import { recordFunctionalProbe } from '../utils/functional_checks.js';
 import crypto from 'node:crypto';
 
 export function coderNode(cfg: KotefConfig, chatFn = callChat) {
@@ -279,6 +280,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         let commandCount = 0;
         let testCount = 0;
         let fileChanges = state.fileChanges || {};
+        let functionalChecks = state.functionalChecks || [];
         let patchFingerprints = state.patchFingerprints || new Map<string, number>();
         let diagnosticRun = false;
 
@@ -385,6 +387,17 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                                     stderr: cmdResult.stderr,
                                     passed: cmdResult.passed
                                 };
+
+                                // Record functional probe if applicable (Ticket 28)
+                                const probes = recordFunctionalProbe(commandStr, cmdResult, 'coder');
+                                if (probes.length > 0) {
+                                    // We need to merge this into state, but we are inside the tool loop.
+                                    // We can accumulate them in a local variable and return them at the end.
+                                    // However, coderNode returns Partial<AgentState>.
+                                    // Let's add a local `functionalChecks` array to the node scope.
+                                    functionalChecks = [...(functionalChecks || []), ...probes];
+                                }
+
                                 log.info('Command executed', {
                                     command: commandStr,
                                     exitCode: cmdResult.exitCode,
@@ -519,7 +532,8 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             fileChanges,
             messages: currentMessages.slice(messages.length),
             consecutiveNoOps,
-            patchFingerprints
+            patchFingerprints,
+            functionalChecks
         };
     };
 }
