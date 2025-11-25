@@ -103,6 +103,7 @@ program
     .option('--dry-run', 'Run in dry-run mode (no file writes)', false)
     .option('--max-time <seconds>', 'Maximum run time in seconds')
     .option('--max-tokens <count>', 'Maximum tokens per run')
+    .option('--profile <profile>', 'Execution profile (strict, fast, smoke, yolo)')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .option('--auto-approve', 'Skip interactive approval', false)
     .action(async (options) => {
@@ -188,7 +189,7 @@ program
                 },
                 hasSdd: true,
                 // In YOLO mode we bias the planner/coder towards the most aggressive profile.
-                runProfile: options.yolo ? 'yolo' : undefined,
+                runProfile: options.profile || (options.yolo ? 'yolo' : undefined),
                 taskScope,
                 sddSummaries, // Add summaries to state
                 fileChanges: {},
@@ -207,13 +208,30 @@ program
             const endTime = Date.now();
             const durationSeconds = (endTime - startTime) / 1000;
 
+            // Calculate metrics from state
+            const messages = (result.messages || []) as any[];
+            const llmCalls = messages.filter(m => m.role === 'assistant').length;
+            const toolCalls = messages.filter(m => m.role === 'tool').length; // Approximation, or count tool_calls in assistant messages
+            // Better tool call count:
+            const actualToolCalls = messages.reduce((acc, m) => {
+                if (m.role === 'assistant' && m.tool_calls) {
+                    return acc + m.tool_calls.length;
+                }
+                return acc;
+            }, 0);
+
             const summary: RunSummary = {
                 status: result.done ? 'success' : 'partial',
                 plan: result.plan ? JSON.stringify(result.plan, null, 2) : 'No plan',
                 filesChanged: Object.keys(result.fileChanges || {}),
                 tests: JSON.stringify(result.testResults || {}, null, 2),
                 issues: (result.sdd as any)?.issues,
-                durationSeconds
+                durationSeconds,
+                metrics: {
+                    llmCalls,
+                    toolCalls: actualToolCalls,
+                    totalTokens: 0 // We don't track tokens yet
+                }
             };
 
             await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);

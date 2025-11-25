@@ -228,8 +228,6 @@ export async function deepResearch(
                 query: currentQuery,
                 error: (e as Error).message,
             });
-            // Treat as 0 results to trigger graceful exit or potential retry logic if we change it later.
-            // Currently 0 results -> break loop.
             searchResults = [];
         }
 
@@ -243,8 +241,6 @@ export async function deepResearch(
                 findings: [],
                 quality: null,
             });
-            // If we have no results, we can't really score or refine based on results.
-            // We could try to refine based on "I found nothing", but for now we stop.
             break;
         }
 

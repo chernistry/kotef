@@ -13,8 +13,6 @@ export interface FsContext {
  */
 export function resolvePath(ctx: FsContext, relativePath: string): string {
     const abs = path.resolve(ctx.rootDir, relativePath);
-    // Ensure the path is within the rootDir
-    // We add a separator to ensure we don't match partial prefixes (e.g. /root vs /root_suffix)
     const rootWithSep = path.resolve(ctx.rootDir) + path.sep;
     if (!abs.startsWith(rootWithSep) && abs !== path.resolve(ctx.rootDir)) {
         throw new Error(`Path escapes workspace root: ${relativePath}`);
@@ -30,7 +28,7 @@ export async function readFile(ctx: FsContext, relativePath: string): Promise<st
     const fullPath = resolvePath(ctx, relativePath);
     const stats = await fs.stat(fullPath);
 
-    if (stats.size > 1024 * 1024) { // 1MB limit
+    if (stats.size > 1024 * 1024) {
         throw new Error(`File too large: ${relativePath} (${stats.size} bytes)`);
     }
 
@@ -43,11 +41,7 @@ export async function readFile(ctx: FsContext, relativePath: string): Promise<st
 export async function writeFile(ctx: FsContext, relativePath: string, content: string): Promise<void> {
     const fullPath = resolvePath(ctx, relativePath);
     const dir = path.dirname(fullPath);
-    
-    // Create directory if it doesn't exist
     await fs.mkdir(dir, { recursive: true });
-    
-    // Write file
     await fs.writeFile(fullPath, content, 'utf8');
 }
 
@@ -63,7 +57,7 @@ export async function listFiles(ctx: FsContext, pattern: string | string[]): Pro
 
     const entries = await fg(patterns, {
         cwd: ctx.rootDir,
-        ignore: ['**/node_modules/**', '**/.git/**', '**/.sdd/**'], // Standard ignores
+        ignore: ['**/node_modules/**', '**/.git/**', '**/.sdd/**'],
         dot: true,
         absolute: false,
     });
@@ -78,7 +72,6 @@ export async function listFiles(ctx: FsContext, pattern: string | string[]): Pro
 export async function writePatch(ctx: FsContext, relativePath: string, diffContent: string): Promise<void> {
     const fullPath = resolvePath(ctx, relativePath);
 
-    // 1. Read original content
     let originalContent = '';
     try {
         originalContent = await fs.readFile(fullPath, 'utf8');
@@ -87,24 +80,15 @@ export async function writePatch(ctx: FsContext, relativePath: string, diffConte
         if (err.code !== 'ENOENT') {
             throw error;
         }
-        // If file doesn't exist, we assume original content is empty (creating new file)
-        // But usually patches expect a source file. 
-        // If the patch is creating a file, the source file in diff header might be /dev/null
-        // We'll proceed with empty string and see if patch applies.
     }
 
-    // 2. Apply patch
-    // jsdiff.applyPatch returns string or boolean (false if failed)
     const patchedContent = Diff.applyPatch(originalContent, diffContent);
 
     if (patchedContent === false) {
         throw new Error(`Failed to apply patch to ${relativePath}. Hunk mismatch or invalid diff.`);
     }
 
-    // 3. Write to temp file
     const tempPath = `${fullPath}.kotef.tmp`;
     await fs.writeFile(tempPath, patchedContent as string, 'utf8');
-
-    // 4. Atomic rename
     await fs.rename(tempPath, fullPath);
 }

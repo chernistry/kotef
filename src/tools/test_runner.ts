@@ -47,11 +47,6 @@ export async function runCommand(
     command: string,
     timeoutMs: number = 30000
 ): Promise<TestRunResult> {
-    // Security check: prevent obvious shell injection if command comes from untrusted source
-    // For now, we assume the agent generates the command, but we should be careful.
-    // Ideally, we'd use spawn with arguments array, but test commands are often complex strings.
-    // We rely on the agent being trusted and the sandbox being the container.
-
     if (cfg.mockMode) {
         return {
             command,
@@ -77,7 +72,6 @@ export async function runCommand(
             passed: true
         };
     } catch (error: any) {
-        // exec throws if exit code is non-zero
         const stdout = (error.stdout || '').trim();
         const stderr = (error.stderr || '').trim();
         const exitCode = error.code || 1;

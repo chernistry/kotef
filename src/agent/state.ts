@@ -41,6 +41,7 @@ export interface AgentState {
         bestPracticesSummary: string;
     };
     researchQuality?: ResearchQuality;
+    metrics?: RunMetrics;
 }
 
 export interface ResearchQuality {
@@ -51,4 +52,12 @@ export interface ResearchQuality {
     shouldRetry: boolean;
     reasons: string;
     attemptCount: number;
+}
+
+export interface RunMetrics {
+    toolCalls: number;
+    llmCalls: number;
+    totalTokens: number;
+    startTime: number;
+    endTime?: number;
 }

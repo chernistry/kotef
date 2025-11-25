@@ -202,16 +202,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             }
         ];
 
-        // Call LLM with tools
-        // We might need a loop here if the LLM wants to make multiple tool calls.
-        // For MVP, let's do one turn: LLM -> Tool -> LLM (confirmation).
-        // Or better, use a loop until LLM stops calling tools.
-        // But `callChat` in core/llm.ts handles tool execution if we pass a handler?
-        // Let's check callChat signature. It returns `toolCalls`. It does NOT execute them automatically unless we implemented that loop in `llm.ts`.
-        // The `callChat` in `src/core/llm.ts` (Ticket 01) was a "thin wrapper".
-        // So we likely need to execute tools here.
-
-        // Let's do a simple loop for max turns.
+        // Tool execution loop
         const currentMessages = [...messages];
         let turns = 0;
         const maxTurns = profileTurns[executionProfile] ?? 20;
@@ -233,9 +224,9 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         while (turns < maxTurns) {
             log.info(`Coder turn ${turns + 1}/${maxTurns}: Calling LLM...`);
             const response = await chatFn(cfg, trimHistory(currentMessages), {
-                model: cfg.modelStrong, // Coder uses strong model
-                tools: tools as any, // Cast to avoid strict type mismatch if any
-                maxTokens: 32000, // Increased to 32k for large file generation
+                model: cfg.modelStrong,
+                tools: tools as any,
+                maxTokens: 32000,
                 temperature: 0
             });
 
@@ -244,13 +235,11 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
 
             if (!msg.tool_calls || msg.tool_calls.length === 0) {
                 log.info('No more tool calls, coder finished');
-                // No more tools, we are done
                 break;
             }
 
             log.info(`Executing ${msg.tool_calls.length} tool calls`);
 
-            // Execute tools
             for (const toolCall of msg.tool_calls) {
                 const args = JSON.parse(toolCall.function.arguments);
                 let result: any;
@@ -262,7 +251,6 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         result = await readFile({ rootDir: cfg.rootDir! }, args.path);
                         log.info('File read', { path: args.path, size: result.length });
                     } else if (toolCall.function.name === 'list_files') {
-                        // Lazy-load to avoid circular imports at top
                         const { listFiles } = await import('../../tools/fs.js');
                         const pattern =
                             typeof args.pattern === 'string' && args.pattern.trim().length > 0
@@ -278,14 +266,12 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         } else {
                             await writeFile({ rootDir: cfg.rootDir! }, args.path, args.content);
                             result = "File written successfully.";
-                            // Record change
                             fileChanges = { ...(fileChanges || {}), [args.path]: 'created' };
                             log.info('File written', { path: args.path, size: args.content.length });
                         }
                     } else if (toolCall.function.name === 'write_patch') {
                         await writePatch({ rootDir: cfg.rootDir! }, args.path, args.diff);
                         result = "Patch applied successfully.";
-                        // Record change
                         fileChanges = { ...(fileChanges || {}), [args.path]: 'patched' };
                         log.info('Patch applied', { path: args.path });
                     } else if (toolCall.function.name === 'run_command') {
@@ -332,7 +318,6 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                                 if (typeof args.command === 'string' && args.command.trim().length > 0) {
                                     command = args.command;
                                 } else {
-                                    // Simple heuristic: prefer pytest if Python structure is detected.
                                     const hasPy = state.sdd.project?.includes('Python') || state.sdd.project?.includes('pyproject.toml');
                                     command = hasPy ? 'pytest' : 'npm test';
                                 }
@@ -372,7 +357,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
 
         return {
             fileChanges,
-            messages: currentMessages.slice(messages.length) // Append new messages
+            messages: currentMessages.slice(messages.length)
         };
     };
 }

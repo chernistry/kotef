@@ -11,6 +11,11 @@ export interface RunSummary {
     error?: string;
     durationSeconds?: number;
     tokenUsage?: number;
+    metrics?: {
+        toolCalls: number;
+        llmCalls: number;
+        totalTokens: number;
+    };
 }
 
 export async function writeRunReport(
@@ -44,6 +49,14 @@ export async function writeRunReport(
     if (summary.error) {
         report += `**Error:** ${summary.error}\n`;
     }
+
+    if (summary.metrics) {
+        report += `\n## Metrics\n`;
+        report += `- **Tool Calls:** ${summary.metrics.toolCalls}\n`;
+        report += `- **LLM Calls:** ${summary.metrics.llmCalls}\n`;
+        report += `- **Total Tokens:** ${summary.metrics.totalTokens}\n`;
+    }
+
     report += `\n## Plan\n${summary.plan || 'No plan generated.'}\n`;
 
     report += `\n## Files Changed\n`;

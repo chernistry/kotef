@@ -30,6 +30,11 @@ export function snitchNode(cfg: KotefConfig) {
             ''
         ].filter(Boolean);
 
+        if (state.metrics) {
+            entryLines.push(`**Metrics at failure:** Tool Calls: ${state.metrics.toolCalls}, LLM Calls: ${state.metrics.llmCalls}`);
+            entryLines.push('');
+        }
+
         // Add failure history if present
         if (state.failureHistory && state.failureHistory.length > 0) {
             entryLines.push('**Failure History:**');

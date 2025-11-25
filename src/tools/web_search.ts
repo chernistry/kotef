@@ -46,8 +46,6 @@ export async function webSearch(
         return searchCache.get(cacheKey)!;
     }
 
-    // TODO: Add rate limiting / budget check against cfg.maxWebRequestsPerRun (needs state tracking)
-
     let results: WebSearchResult[] = [];
 
     try {
