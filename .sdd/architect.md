@@ -542,10 +542,20 @@ graph TD
 ### 6.3. Agent Layer (`src/agent/`)
 -   **`state.ts`**: Defines LangGraph state schema.
 -   **`graph.ts`**: Defines the nodes (Planner, Researcher, Coder, Verifier) and edges.
--   **`prompts/`**:
-    -   `meta_agent.md`: Main system prompt.
-    -   `planner.md`: Planning logic.
-    -   `researcher.md`: Search & summarization logic.
+-   **`prompts/`** (runtime agent prompts):
+    -   `meta_agent.md`: Meta-level system prompt describing Kotef’s SDD-first, error-first, diff-first, budget-aware policies and overall LangGraph flow.
+    -   `planner.md`: Planner policies and JSON contract (`next`, `reason`, `profile`, `plan`, `needs`, optional `terminalStatus`). Explicitly loop-aware (`loopCounters`, `failureHistory`) and goal-first (`FUNCTIONAL_OK`) so it can choose between `done_success`, `done_partial`, `aborted_stuck`, and `aborted_constraint`.
+    -   `researcher.md`: Research behaviour, including shallow vs deep research, host allowlists, source hierarchy, and strong prompt-injection defences. Returns a single JSON object (`queries`, `findings`, `risks`, `ready_for_coder`, `reason`).
+    -   `coder.md`: Coding policies and tools (`read_file`, `list_files`, `write_file`, `write_patch`, `apply_edits`, `run_command`, `run_tests`, `run_diagnostic`). Enforces error-first diagnostics, diff-first editing, budget awareness, and JSON-only status output (`status`, `changes`, `tests`, `notes`).
+    -   `verifier.md`: Verification behaviour, wired to `detectCommands` and functional probes. Encodes goal-first / partial-success semantics (`done_success` vs `done_partial`) in a JSON object (`status`, `command`, `summary`, `next`, `terminalStatus`, `notes`).
+    -   `research_query_refiner.md`, `research_relevance_evaluator.md`, `search_query_optimizer.md`: Helper prompts used by deep research to refine queries and score findings. All are JSON-only and explicitly describe when to retry vs stop.
+
+    These runtime prompts are part of the architecture contract: they **must** stay aligned with the node implementations in `src/agent/nodes/*.ts` (fields, enums, and stop conditions) and with SDD rules (`.sdd/best_practices.md`). When evolving them, treat them like code: keep JSON contracts stable or versioned, and update tests under `test/core/prompts.test.ts` and `test/agent/prompt_contracts.test.ts`.
+
+-   **Prompt design references**:
+    -   External inspiration is drawn from modern coding agents (Cursor, Claude Code, Same.dev, OpenAI Codex-style prompts) stored under `prompts/CL4R1T4S/*` and `prompts/cursor/*`.
+    -   Kotef intentionally adapts patterns from these prompts (error-first debugging, diff-first edits, JSON-only tools, budget-aware planning) while avoiding environment-specific assumptions.
+    -   Future prompt work should continue to pull in proven patterns from these references but remain consistent with this architect spec and SDD guardrails (no chain-of-thought leakage, no direct tool names exposed to the user, strong safety defaults).
 
 ### 6.4. CLI (`src/cli.ts`)
 -   Entry point `bin/kotef`.
