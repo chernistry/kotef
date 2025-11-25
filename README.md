@@ -1,11 +1,12 @@
-# kotef — an agent with a brain and a toolbox
+# kotef — unapologetically spec‑driven coding agent
 
 > “Give me a repo and a goal. I’ll figure out the rest.”
 
-kotef is a LangGraph‑based coding agent that:
-- keeps a **“brain”** — it thinks in goals, tickets, and project rules, and
-- drives a **“body”** — tools that read/edit files, run tests, and hit the web,
-with a hard bias towards small diffs and not trashing your repo.
+kotef is a LangGraph‑based coding agent that is **shamelessly meticulous** about three things:
+
+- reading and updating a **real project spec** (its “brain”),  
+- doing **fresh research** so it doesn’t hallucinate from some random 2019 blog post, and  
+- touching your code only via **small, validated diffs** (its “body”).
 
 It grew out of:
 - [synapse](https://chernistry.github.io/synapse/) — adaptive governance, metric‑driven agents.
@@ -37,13 +38,14 @@ node bin/kotef chat --root /path/to/repo
 ## What it actually does (brain vs body)
 
 - **Brain (project understanding).**
-  - If there’s no `.sdd/` folder yet, kotef creates a tiny “spec brain” for your repo: `project.md`, `architect.md`, `best_practices.md` and an initial ticket backlog from templates (`src/agent/prompts/brain/`).
-  - That folder becomes the source of truth for goals, constraints, and coding standards.
+  - If there’s no `.sdd/` folder yet, kotef creates a tiny spec brain for your repo: `project.md`, `architect.md`, `best_practices.md` and an initial ticket backlog from templates (`src/agent/prompts/brain/`).
+  - That folder becomes the source of truth for goals, constraints, and coding standards, and is updated via tickets instead of vibes.
+  - The agent always goes back to this “brain” when deciding what to do next.
 - **Body (tools that touch the repo).**
   - Main flow is a small graph: `planner → researcher → coder → verifier → snitch/ticket_closer`, with budgets and execution profiles (`strict/fast/smoke/yolo`).
-  - Coder runs diagnostics first, then applies minimal unified diffs with strict validation instead of rewriting whole files.
-  - Verifier runs stack‑appropriate commands (build/tests/lint), and can say “functionally done but some global checks still red” via `done_partial`.
-  - Snitch writes structured issues into `.sdd/issues.md` when requests conflict with rules or the run is stuck, instead of silently looping.
+  - It **thinks before it pokes the repo**: planner decides, researcher fetches fresh context, only then coder touches files.
+  - Researcher does web search + deep research with quality scoring, so the agent works off up‑to‑date docs instead of cargo‑culting stale answers.
+  - Verifier runs sanity checks so changes aren’t just “looks good to me”, and Snitch files issues instead of silently looping when something is off.
 
 ---
 
@@ -51,8 +53,9 @@ node bin/kotef chat --root /path/to/repo
 
 - You probably want this if you want an agent that:
   - actually reads specs and tickets instead of “guessing the API”,
-  - respects tests but can say “functionally done, remaining stuff is tech debt”,
-  - doesn’t burn 200 shell commands re‑reading the same files.
+  - uses **current docs** (and can admit “not enough info”) instead of confidently hallucinating outdated answers,
+  - thinks through a goal and plan before it starts hammering your filesystem,
+  - can say “functionally done, remaining stuff is tech debt” instead of chasing tiny nits forever.
 - Inside:
   - Node.js 20 + TypeScript + LangGraph,
   - strongly‑typed `AgentState`,
