@@ -4,6 +4,7 @@ import { KotefConfig } from '../core/config.js';
 import { plannerNode } from './nodes/planner.js';
 import { researcherNode } from './nodes/researcher.js';
 import { coderNode } from './nodes/coder.js';
+import { kiroCoderNode } from './nodes/kiro_coder.js';
 import { verifierNode } from './nodes/verifier.js';
 import { snitchNode } from './nodes/snitch.js';
 import { ticketCloserNode } from './nodes/ticket_closer.js';
@@ -114,7 +115,13 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
     // Add nodes (cast to any to avoid LangGraph.js type inference issues)
     graph.addNode("planner" as any, plannerNode(cfg, chatFn));
     graph.addNode("researcher" as any, researcherNode(cfg));
-    graph.addNode("coder" as any, coderNode(cfg, chatFn));
+
+    // Select coder implementation based on config
+    const coderImpl = cfg.coderMode === 'kiro'
+        ? (state: AgentState) => kiroCoderNode(state, cfg)
+        : coderNode(cfg, chatFn);
+
+    graph.addNode("coder" as any, coderImpl);
     graph.addNode("verifier" as any, verifierNode(cfg));
     graph.addNode("snitch" as any, snitchNode(cfg));
     graph.addNode("ticket_closer" as any, ticketCloserNode(cfg));

@@ -48,6 +48,21 @@ export const KotefConfigSchema = z.object({
      * e.g. { "serena": "npx serena-mcp" }
      */
     mcpServers: z.record(z.string(), z.string()).default({}),
+
+    /** LLM provider: 'openai' (default) or 'kiro' */
+    llmProvider: z.enum(['openai', 'kiro']).default('openai'),
+
+    /** Path to kiro-cli binary */
+    kiroCliPath: z.string().default('kiro-cli'),
+
+    /** Kiro model to use (e.g., 'claude-sonnet-4.5') */
+    kiroModel: z.string().default('claude-sonnet-4.5'),
+
+    /** Coder implementation: 'internal' (default) or 'kiro' */
+    coderMode: z.enum(['internal', 'kiro']).default('internal'),
+
+    /** Timeout for Kiro agent sessions in ms (default: 5 minutes) */
+    kiroSessionTimeout: z.number().default(300000),
 });
 
 export type KotefConfig = z.infer<typeof KotefConfigSchema>;
@@ -85,6 +100,15 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         // MCP config
         mcpEnabled: env.MCP_ENABLED === 'true',
         mcpServers: env.MCP_SERVERS ? JSON.parse(env.MCP_SERVERS) : {},
+
+        // LLM provider config
+        llmProvider: (env.CHAT_LLM_PROVIDER || 'openai') as 'openai' | 'kiro',
+        kiroCliPath: env.KIRO_CLI_PATH || 'kiro-cli',
+        kiroModel: env.KIRO_MODEL || 'claude-sonnet-4.5',
+
+        // Coder mode config
+        coderMode: (env.KOTEF_CODER_MODE || 'internal') as 'internal' | 'kiro',
+        kiroSessionTimeout: parseInt(env.KIRO_SESSION_TIMEOUT || '300000', 10),
     };
 
     return KotefConfigSchema.parse(config);

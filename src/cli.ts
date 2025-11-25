@@ -28,11 +28,47 @@ interface BlockParts {
 }
 
 const FRAME_BAR = '─'.repeat(44);
+const PIPELINE_BAR = '─'.repeat(40);
+const PIPELINE_TOP_TEXT = `┌─ PIPELINE ${PIPELINE_BAR}`;
+const PIPELINE_BOTTOM_TEXT = `└${'─'.repeat(Math.max(PIPELINE_TOP_TEXT.length - 1, 0))}`;
+const PIPELINE_TOP = chalk.gray(PIPELINE_TOP_TEXT);
+const PIPELINE_BOTTOM = chalk.gray(PIPELINE_BOTTOM_TEXT);
 
 const md = new MarkdownIt({
     breaks: true,
     linkify: true
 });
+
+function decodeHtmlEntities(value: string): string {
+    const named: Record<string, string> = {
+        '&amp;': '&',
+        '&lt;': '<',
+        '&gt;': '>',
+        '&quot;': '"',
+        '&#34;': '"',
+        '&#39;': "'",
+        '&apos;': "'",
+        '&nbsp;': ' ',
+        '&ldquo;': '"',
+        '&rdquo;': '"',
+        '&lsquo;': "'",
+        '&rsquo;': "'"
+    };
+
+    return value
+        .replace(/&#x([0-9a-f]+);/gi, (_match: string, hex: string) => {
+            return String.fromCodePoint(parseInt(hex, 16));
+        })
+        .replace(/&#(\d+);/g, (_match: string, dec: string) => {
+            return String.fromCodePoint(Number.parseInt(dec, 10));
+        })
+        .replace(/&[a-z]+;|&#\d+;|&#x[0-9a-f]+;/gi, (entity: string): string => {
+            if (Object.prototype.hasOwnProperty.call(named, entity)) {
+                return named[entity]!;
+            }
+            return entity;
+        });
+}
 
 function createBlock(title: string, message: string, accent: Styler, body: Styler): BlockParts {
     const lines = message.split('\n').map(line => (line.length === 0 ? ' ' : line));
@@ -53,11 +89,11 @@ function renderMarkdownToTerminal(markdown: string): string {
 
     const formatted = html
         // Headers
-        .replace(/<h1>(.*?)<\/h1>/gi, `${chalk.bold.blue('\n$1\n')}${'='.repeat(50)}`)
-        .replace(/<h2>(.*?)<\/h2>/gi, `${chalk.bold.cyan('\n$1\n')}${'-'.repeat(30)}`)
+        .replace(/<h1>(.*?)<\/h1>/gi, chalk.bold.blue('\n$1\n') + '='.repeat(50))
+        .replace(/<h2>(.*?)<\/h2>/gi, chalk.bold.cyan('\n$1\n') + '-'.repeat(30))
         .replace(/<h3>(.*?)<\/h3>/gi, chalk.bold.yellow('\n$1'))
         .replace(/<h[4-6]>(.*?)<\/h[4-6]>/gi, chalk.bold.magenta('\n$1'))
-        // Bold / italic
+        // Bold and italic
         .replace(/<strong>(.*?)<\/strong>/gi, chalk.bold('$1'))
         .replace(/<b>(.*?)<\/b>/gi, chalk.bold('$1'))
         .replace(/<em>(.*?)<\/em>/gi, chalk.italic('$1'))
@@ -67,7 +103,7 @@ function renderMarkdownToTerminal(markdown: string): string {
         .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/gi, (_m: string, code: string) => {
             return '\n' + chalk.bgGray.white(' ' + code.trim() + ' ') + '\n';
         })
-        // Links
+        // Links: show both text and URL
         .replace(/<a href="([^"]+)">(.*?)<\/a>/gi, (_m: string, href: string, text: string) => {
             return chalk.blue.underline(text) + ' ' + chalk.gray('(' + href + ')');
         })
@@ -81,12 +117,114 @@ function renderMarkdownToTerminal(markdown: string): string {
         .replace(/<p>(.*?)<\/p>/gi, '$1\n')
         // Line breaks
         .replace(/<br\s*\/?>(?!\n)/gi, '\n')
-        // Strip remaining tags
+        // Clean up remaining HTML tags
         .replace(/<\/?[^>]+(>|$)/g, '')
+        // Normalize whitespace and line breaks
         .replace(/\n\s*\n/g, '\n\n')
         .trim();
 
-    return formatted;
+    return decodeHtmlEntities(formatted);
+}
+
+// Get streaming delay from environment or use default
+const STREAMING_DELAY_MS = parseInt(process.env.CLI_STREAMING_DELAY_MS || '2');
+
+async function streamText(text: string, delayMs = STREAMING_DELAY_MS) {
+    for (const char of text) {
+        process.stdout.write(char);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+}
+
+type PipelineStageKey = 'research' | 'plan' | 'code' | 'verify' | 'finalize';
+
+class Spinner {
+    private readonly frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    private readonly stageOrder: PipelineStageKey[] = [
+        'research',
+        'plan',
+        'code',
+        'verify',
+        'finalize'
+    ];
+    private readonly stageLabels: Record<PipelineStageKey, string> = {
+        research: 'Researching codebase...',
+        plan: 'Planning changes...',
+        code: 'Writing code...',
+        verify: 'Running tests...',
+        finalize: 'Finalizing changes...'
+    };
+    private interval: NodeJS.Timeout | null = null;
+    private currentFrame = 0;
+    private currentStage: PipelineStageKey = 'research';
+    private customStatus: string | null = null;
+    private customStatusTime = 0;
+    private readonly CUSTOM_STATUS_TIMEOUT = 3000; // 3 seconds
+
+    start() {
+        this.currentFrame = 0;
+        this.customStatus = null;
+        this.customStatusTime = 0;
+        this.currentStage = 'research';
+        if (this.interval) clearInterval(this.interval);
+        this.interval = setInterval(() => {
+            const displayStatus = this.getCurrentDisplayStatus();
+            const frame = chalk.yellow(this.frames[this.currentFrame]);
+            const prefix = chalk.gray('│');
+            const text = chalk.gray(displayStatus);
+            process.stdout.write(`\r\x1b[2K${prefix} ${frame} ${text}`);
+            this.currentFrame = (this.currentFrame + 1) % this.frames.length;
+        }, 80);
+    }
+
+    setStage(stage: PipelineStageKey) {
+        if (this.stageOrder.includes(stage)) {
+            this.currentStage = stage;
+            if (this.interval && !this.customStatus) {
+                const frame = chalk.yellow(this.frames[this.currentFrame]);
+                const prefix = chalk.gray('│');
+                const text = chalk.gray(this.getStageStatus());
+                process.stdout.write(`\r\x1b[2K${prefix} ${frame} ${text}`);
+            }
+        }
+    }
+
+    setStatus(status: string) {
+        const newStatus = status || 'Processing...';
+        this.customStatus = newStatus;
+        this.customStatusTime = Date.now();
+        if (this.interval) {
+            const frame = chalk.yellow(this.frames[this.currentFrame]);
+            const prefix = chalk.gray('│');
+            const text = chalk.gray(newStatus);
+            process.stdout.write(`\r\x1b[2K${prefix} ${frame} ${text}`);
+        }
+    }
+
+    private getStageStatus(): string {
+        return this.stageLabels[this.currentStage] || 'Processing...';
+    }
+
+    private getCurrentDisplayStatus(): string {
+        if (this.customStatus && Date.now() - this.customStatusTime < this.CUSTOM_STATUS_TIMEOUT) {
+            return this.customStatus;
+        }
+        if (this.customStatus) {
+            this.customStatus = null;
+        }
+        return this.getStageStatus();
+    }
+
+    stop() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+            this.customStatus = null;
+            this.customStatusTime = 0;
+            process.stdout.write('\r'.padEnd(50, ' ') + '\r');
+        }
+        this.currentStage = 'research';
+    }
 }
 
 program
@@ -329,10 +467,15 @@ program
             }
             console.log(userBlock.bottom);
 
+            // Create spinner for orchestration
+            const spinner = new Spinner();
+            let pipelineOpen = false;
+
             // Orchestrate SDD (research → architect → tickets)
-            console.log(chalk.gray('\n┌─ ORCHESTRATOR ' + '─'.repeat(40)));
-            console.log(chalk.gray('│ Running SDD bootstrap/orchestration...'));
-            console.log(chalk.gray('└' + '─'.repeat(53)));
+            console.log(PIPELINE_TOP);
+            pipelineOpen = true;
+            spinner.start();
+            spinner.setStatus('Running SDD bootstrap/orchestration...');
 
             try {
                 const sddDir = path.join(rootDir, '.sdd');
@@ -345,11 +488,26 @@ program
                 }
 
                 if (!sddExists) {
+                    spinner.setStage('research');
+                    spinner.setStatus('Bootstrapping project from goal...');
                     await bootstrapSddForProject(cfg, rootDir, goal);
                 } else {
+                    spinner.setStage('plan');
+                    spinner.setStatus('Updating SDD artifacts...');
                     await runSddOrchestration(cfg, rootDir, goal);
                 }
+
+                spinner.stop();
+                if (pipelineOpen) {
+                    console.log(PIPELINE_BOTTOM);
+                    pipelineOpen = false;
+                }
             } catch (e: any) {
+                spinner.stop();
+                if (pipelineOpen) {
+                    console.log(PIPELINE_BOTTOM);
+                    pipelineOpen = false;
+                }
                 const msg = e?.message || String(e);
                 console.log(chalk.red(`❌ SDD Orchestration failed: ${msg}`));
                 options.goal = undefined;
@@ -391,6 +549,10 @@ program
                 const log = createLogger(runId);
                 const startTime = Date.now();
 
+                // Create spinner for ticket execution
+                const ticketSpinner = new Spinner();
+                let ticketPipelineOpen = false;
+
                 try {
                     const sddDir = path.join(rootDir, '.sdd');
                     const projectMd = await fs.readFile(path.join(sddDir, 'project.md'), 'utf-8').catch(() => '');
@@ -417,8 +579,33 @@ program
                         researchResults: []
                     };
 
+                    console.log(PIPELINE_TOP);
+                    ticketPipelineOpen = true;
+                    ticketSpinner.start();
+                    ticketSpinner.setStage('research');
+                    ticketSpinner.setStatus('Analyzing ticket requirements...');
+
                     const graph = buildKotefGraph(cfg);
+
+                    ticketSpinner.setStage('plan');
+                    ticketSpinner.setStatus('Creating execution plan...');
+
+                    ticketSpinner.setStage('code');
+                    ticketSpinner.setStatus('Writing code changes...');
+
                     const result = await graph.invoke(initialState, { recursionLimit: 100 });
+
+                    ticketSpinner.setStage('verify');
+                    ticketSpinner.setStatus('Running verification...');
+
+                    ticketSpinner.setStage('finalize');
+                    ticketSpinner.setStatus('Finalizing changes...');
+
+                    ticketSpinner.stop();
+                    if (ticketPipelineOpen) {
+                        console.log(PIPELINE_BOTTOM);
+                        ticketPipelineOpen = false;
+                    }
 
                     const endTime = Date.now();
                     const durationSeconds = (endTime - startTime) / 1000;
@@ -436,9 +623,9 @@ program
 
                     await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
 
-                    const reportText = `Status: ${summary.status}\n` +
-                        `Files changed: ${summary.filesChanged.join(', ') || 'none'}\n` +
-                        `Duration: ${durationSeconds.toFixed(2)}s`;
+                    const reportText = `**Status:** ${summary.status}\n` +
+                        `**Files changed:** ${summary.filesChanged.join(', ') || 'none'}\n` +
+                        `**Duration:** ${durationSeconds.toFixed(2)}s`;
 
                     const assistantBlock = createBlock(
                         'Kotef',
@@ -449,7 +636,7 @@ program
                     console.log();
                     console.log(assistantBlock.top);
                     if (assistantBlock.body.length > 0) {
-                        console.log(assistantBlock.body);
+                        await streamText(`${assistantBlock.body}\n`);
                     }
                     console.log(assistantBlock.bottom);
 
@@ -460,6 +647,11 @@ program
                         console.log(chalk.yellow(`⚠️  Ticket ${ticket} finished with partial/blocked status.`));
                     }
                 } catch (e: any) {
+                    ticketSpinner.stop();
+                    if (ticketPipelineOpen) {
+                        console.log(PIPELINE_BOTTOM);
+                        ticketPipelineOpen = false;
+                    }
                     log.error('Ticket execution failed', { ticket, error: e?.message });
                     const errorMessage = e instanceof Error ? e.message : String(e);
                     console.error(chalk.red(`Error: Failed to execute ticket ${ticket}: ${(e as any).message}`));
