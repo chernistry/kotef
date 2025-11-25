@@ -42,8 +42,10 @@ describe('Deep Research Flow', () => {
 
         // Mock fetch page
         vi.spyOn(fetchPageModule, 'fetchPage').mockResolvedValue({
-            content: 'Page content',
-            markdown: 'Page markdown'
+            content: 'Mock page content',
+            title: 'Mock Title',
+            url: 'http://mock.url',
+            status: 200
         });
     });
 

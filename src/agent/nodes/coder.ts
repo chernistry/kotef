@@ -66,7 +66,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             strict: 20,
             fast: 12,
             smoke: 6,
-            yolo: 50
+            yolo: 500
         };
 
         const replacements: Record<string, string> = {
@@ -77,7 +77,8 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),
             '{{RESEARCH_RESULTS}}': safe(state.researchResults),
             '{{STATE_PLAN}}': safe(state.plan),
-            '{{EXECUTION_PROFILE}}': executionProfile
+            '{{EXECUTION_PROFILE}}': executionProfile,
+            '{{TASK_SCOPE}}': state.taskScope || 'normal'
         };
 
         let systemPrompt = promptTemplate;

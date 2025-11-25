@@ -26,7 +26,11 @@ describe('Goal-First DoD & Yolo Behaviour', () => {
                 bestPractices: ''
             },
             runProfile: 'strict' as ExecutionProfile,
-            failureHistory: []
+            failureHistory: [],
+            loopCounters: { planner_to_researcher: 0, planner_to_verifier: 0, planner_to_coder: 0 },
+            totalSteps: 0,
+            consecutiveNoOps: 0,
+            sameErrorCount: 0
         };
 
         const node = verifierNode(baseCfg);
@@ -48,7 +52,11 @@ describe('Goal-First DoD & Yolo Behaviour', () => {
             failureHistory: [
                 { step: 'verifier', error: 'Test failed: lint error', timestamp: Date.now() },
                 { step: 'verifier', error: 'Test failed: lint error', timestamp: Date.now() }
-            ]
+            ],
+            loopCounters: { planner_to_researcher: 0, planner_to_verifier: 0, planner_to_coder: 0 },
+            totalSteps: 0,
+            consecutiveNoOps: 0,
+            sameErrorCount: 0
         };
 
         // This test would need a way to mock failing tests

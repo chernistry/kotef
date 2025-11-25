@@ -15,6 +15,7 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Test results so far: `{{TEST_RESULTS}}`
 - Failure History: `{{FAILURE_HISTORY}}`
 - Execution Profile: `{{EXECUTION_PROFILE}}`
+- Task Scope: `{{TASK_SCOPE}}`
 - Loop Counters: `{{LOOP_COUNTERS}}`
 - Total Steps: `{{TOTAL_STEPS}}`
 
@@ -39,22 +40,13 @@ Your goal is to create a step-by-step plan to implement the given ticket.
     - If `relevance >= 0.7` and `coverage >= 0.6`, consider research sufficient. Do not request more research unless a new topic arises.
 - **No chain-of-thought leakage**: produce only the JSON output described below.
 
-# Execution profiles
-- You must choose an execution **profile** for this run:
-  - `"strict"` – production-like, heavy checks (full tests, linters, coverage, type-checkers). Use when:
-    - SDD architect / best_practices emphasize high coverage, static analysis, or security,
-    - The goal touches core architecture, infra, or safety-critical code.
-  - `"fast"` – normal development loop (main tests, minimal extra tools). Use when:
-    - Typical feature/bug ticket,
-    - Tests exist and should be run, but heavy tooling is optional.
-  - `"smoke"` – quick prototype / exploration. Use when:
-    - Project has no real tests yet or goal is tiny (one-off script, micro-fix),
-    - Or when tools/linters are clearly not installed.
-  - `"yolo"` – **aggressive mode** (user explicitly opted in via CLI):
-    - Prioritize completing the user-visible goal quickly over exhaustive test/coverage perfection.
-    - You may run more tool calls and a few heavier commands, but avoid infinite retries or chasing tiny lint issues.
-    - Still respect hard SDD constraints and obvious safety bounds.
-- Coder and Verifier will respect this profile (e.g. `strict` → full pipeline; `smoke` → minimal checks).
+# Execution profiles & Scope
+- **`strict`**: production-like, heavy checks. Use for core architecture or safety-critical code.
+- **`fast`**: normal development loop. Use for typical features.
+- **`smoke`**: quick prototype. Use for tiny tasks or when tools are missing.
+- **`yolo`**: aggressive mode. Prioritize speed.
+- **`tiny` scope**: Prefer minimal steps. Skip broad `npm test` if out of scope.
+- **`large` scope**: Allow deeper reasoning and more tool calls.
 
 # Output format (must strictly match schema)
 Respond with a single JSON object (no markdown, no prose). It **must** validate against this schema:
@@ -80,8 +72,8 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
         "required": ["id", "owner", "action", "detail"],
         "properties": {
           "id": { "type": "string" },
-          "owner": { "type": "string", "enum": ["researcher", "coder", "verifier"] },
-          "action": { "type": "string", "enum": ["research", "read", "code", "test", "summarize"] },
+          "owner": { "type": "string", "enum": ["planner", "coder", "researcher", "verifier"] },
+          "action": { "type": "string" },
           "detail": { "type": "string" },
           "targets": { "type": "array", "items": { "type": "string" } },
           "evidence": { "type": "array", "items": { "type": "string" } },

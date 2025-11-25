@@ -46,7 +46,11 @@ describe('Coder Node - Execution Profiles', () => {
             },
             runProfile: 'fast',
             plan: 'Step 1: Do it',
-            fileChanges: {}
+            fileChanges: {},
+            loopCounters: { planner_to_researcher: 0, planner_to_verifier: 0, planner_to_coder: 0 },
+            totalSteps: 0,
+            consecutiveNoOps: 0,
+            sameErrorCount: 0
         };
     });
 

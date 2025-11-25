@@ -13,7 +13,11 @@ describe('Failure Feedback Loop', () => {
                 architect: 'Test architecture',
                 bestPractices: 'Test practices'
             },
-            failureHistory: []
+            failureHistory: [],
+            loopCounters: { planner_to_researcher: 0, planner_to_verifier: 0, planner_to_coder: 0 },
+            totalSteps: 0,
+            consecutiveNoOps: 0,
+            sameErrorCount: 0
         };
     });
 

@@ -2,15 +2,19 @@ import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { deepResearch } from '../../tools/deep_research.js';
 import { createLogger } from '../../core/logger.js';
-import { buildResearchQuery, loadProjectMetadata } from '../graphs/sdd_orchestrator.js';
 
 export function researcherNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('researcher');
         log.info('Researcher node started');
 
+        const safe = (value: unknown) => {
+            if (value === undefined || value === null) return '';
+            if (typeof value === 'string') return value;
+            return JSON.stringify(value, null, 2);
+        };
+
         // If SDD already provides best practices, treat them as primary research source
-        // and avoid hitting the web again unless we explicitly carry over prior findings.
         const sddBest = state.sdd.bestPractices || '';
         if (sddBest.trim().length > 0) {
             log.info('Existing SDD best_practices.md detected; skipping external deep research.');
@@ -22,7 +26,7 @@ export function researcherNode(cfg: KotefConfig) {
             };
         }
 
-        // Only research if not already done (check if results exist and are non-empty)
+        // Only research if not already done
         const hasResults =
             state.researchResults &&
             (Array.isArray(state.researchResults)
@@ -30,45 +34,98 @@ export function researcherNode(cfg: KotefConfig) {
                 : Object.keys(state.researchResults).length > 0);
 
         if (hasResults) {
-            log.info('Research already done, skipping', {
-                resultsCount: Array.isArray(state.researchResults)
-                    ? state.researchResults.length
-                    : Object.keys(state.researchResults).length
-            });
+            log.info('Research already done, skipping');
             return {};
         }
 
-        // Build a goal-aware, LLM-optimized query if possible
-        const goalFromSdd = state.sdd.goal;
-        const goalFromMessages =
-            state.messages.find(m => m.role === 'user' && typeof m.content === 'string')?.content || '';
-        const baseGoal = goalFromSdd || goalFromMessages || 'Analyze project structure';
+        // Load prompt
+        const { loadRuntimePrompt } = await import('../../core/prompts.js');
+        const promptTemplate = await loadRuntimePrompt('researcher');
 
-        let query = baseGoal;
-        try {
-            const metadata = await loadProjectMetadata(cfg.rootDir, baseGoal);
-            query = await buildResearchQuery(cfg, baseGoal, metadata);
-            log.info('Starting deep research', { query, originalGoal: baseGoal });
-        } catch (error) {
-            log.warn('Failed to build optimized research query; falling back to raw goal', {
-                error: String(error),
-            });
-            log.info('Starting deep research', { query: baseGoal });
-            query = baseGoal;
+        const replacements: Record<string, string> = {
+            '{{GOAL}}': safe(state.sdd.goal),
+            '{{TICKET}}': safe(state.sdd.ticket),
+            '{{SDD_BEST_PRACTICES}}': safe(state.sdd.bestPractices),
+            '{{RESEARCH_NEEDS}}': safe(state.plan?.needs?.research_queries),
+            '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
+            '{{TASK_SCOPE}}': state.taskScope || 'normal'
+        };
+
+        let systemPrompt = promptTemplate;
+        for (const [token, value] of Object.entries(replacements)) {
+            systemPrompt = systemPrompt.replaceAll(token, value);
         }
 
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...state.messages,
+            {
+                role: 'user',
+                content: 'Plan the research. Output JSON.'
+            }
+        ];
+
+        let plan: any;
         try {
-            const result = await deepResearch(cfg, query, {
-                originalGoal: baseGoal,
-                maxAttempts: 3,
+            const { callChat } = await import('../../core/llm.js');
+            const response = await callChat(cfg, messages as any, {
+                model: cfg.modelFast,
+                response_format: { type: 'json_object' } as any
             });
-            log.info('Research completed', { findingsCount: result.findings.length });
-            return {
-                researchResults: result.findings,
-                researchQuality: result.quality || undefined
-            };
+            const content = response.messages[response.messages.length - 1].content || '{}';
+            plan = JSON.parse(content);
+        } catch (e) {
+            log.error('Researcher LLM failed', { error: e });
+            plan = { queries: [state.sdd.goal || 'Analyze project'] };
+        }
+
+        const queries = plan.queries || [];
+        if (queries.length === 0) {
+            return { researchResults: { note: 'No queries generated' } };
+        }
+
+        const profile = state.runProfile || 'fast';
+        const useDeep = profile === 'strict';
+        // Profile enum: strict, fast, smoke, yolo.
+        // Deep research is expensive. Use it for strict.
+        // For fast/yolo, use shallow web search unless explicitly requested?
+        // Ticket 15 optimized deep research, so it's good.
+        // But let's respect profile.
+
+        // Actually, let's use deepResearch for the *primary* query if strict, and webSearch for others?
+        // Or just use deepResearch for the first query, as it covers a lot.
+
+        const primaryQuery = queries[0];
+        log.info('Executing research', { primaryQuery, count: queries.length, profile });
+
+        try {
+            if (profile === 'strict') {
+                const result = await deepResearch(cfg, primaryQuery, {
+                    originalGoal: state.sdd.goal,
+                    maxAttempts: 3
+                });
+                return {
+                    researchResults: result.findings,
+                    researchQuality: result.quality || undefined
+                };
+            } else {
+                // Shallow search for all queries
+                const { webSearch } = await import('../../tools/web_search.js');
+                const allFindings = [];
+                for (const q of queries) {
+                    const results = await webSearch(cfg, q, { maxResults: 3 });
+                    allFindings.push(...results.map(r => ({
+                        summary: r.snippet,
+                        sources: [r.url],
+                        title: r.title
+                    })));
+                }
+                return {
+                    researchResults: allFindings
+                };
+            }
         } catch (error) {
-            log.error('Research failed', { error });
+            log.error('Research execution failed', { error });
             return {
                 researchResults: { error: String(error) }
             };

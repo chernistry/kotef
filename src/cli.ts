@@ -232,7 +232,7 @@ program
                     toolCalls: actualToolCalls,
                     totalTokens: 0 // We don't track tokens yet
                 },
-                terminalStatus: result.terminalStatus,
+                terminalStatus: result.terminalStatus as any,
                 stopReason: (result.plan as any)?.reason as string
             };
 
@@ -240,7 +240,7 @@ program
 
         } catch (error: any) {
             log.error('Run failed', { error: error.message, stack: error.stack });
-            console.error('Run failed:', error.message);
+            console.error(chalk.red(`Fatal error: ${(error as any).message}`));
 
             // Try to write failure report
             try {
@@ -426,7 +426,7 @@ program
                         tests: JSON.stringify(result.testResults || {}, null, 2),
                         issues: (result.sdd as any)?.issues,
                         durationSeconds,
-                        terminalStatus: result.terminalStatus,
+                        terminalStatus: result.terminalStatus as any,
                         stopReason: (result.plan as any)?.reason as string
                     };
 
@@ -457,7 +457,8 @@ program
                     }
                 } catch (e: any) {
                     log.error('Ticket execution failed', { ticket, error: e?.message });
-                    console.error(chalk.red(`❌ Failed to execute ticket ${ticket}: ${e?.message}`));
+                    const errorMessage = e instanceof Error ? e.message : String(e);
+                    console.error(chalk.red(`Error: Failed to execute ticket ${ticket}: ${(e as any).message}`));
                 }
             }
 

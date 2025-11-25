@@ -6,6 +6,7 @@ export interface FetchedPage {
     status: number;
     content: string;
     contentType?: string;
+    title?: string;
 }
 
 const pageCache = new Map<string, FetchedPage>();
@@ -43,7 +44,8 @@ export async function fetchPage(
             url,
             status: 200,
             content: 'Mock page content for ' + url,
-            contentType: 'text/html'
+            contentType: 'text/html',
+            title: 'Mock Page'
         };
     }
 
@@ -71,6 +73,7 @@ export async function fetchPage(
 
     // Strip HTML to text
     const $ = cheerio.load(html);
+    const title = $('title').text().trim() || '';
 
     // Remove scripts, styles, etc.
     $('script, style, noscript, iframe, svg').remove();
@@ -92,6 +95,7 @@ export async function fetchPage(
         status: response.status,
         content: text,
         contentType,
+        title,
     };
 
     pageCache.set(url, result);

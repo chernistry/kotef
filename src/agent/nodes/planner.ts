@@ -57,6 +57,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{FAILURE_HISTORY}}': safe(state.failureHistory),
             '{{LOOP_COUNTERS}}': safe(state.loopCounters),
             '{{TOTAL_STEPS}}': safe(currentSteps),
+            '{{TASK_SCOPE}}': state.taskScope || 'normal',
         };
 
         if (currentSteps >= MAX_STEPS) {
