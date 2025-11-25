@@ -321,6 +321,7 @@ program
             const initialState: Partial<AgentState> = {
                 messages: options.goal ? [{ role: 'user', content: options.goal }] : [],
                 sdd: {
+                    goal: options.goal,
                     project: projectMd,
                     architect: architectMd,
                     bestPractices: bestPracticesMd,
@@ -563,6 +564,7 @@ program
                     const initialState: Partial<AgentState> = {
                         messages: [{ role: 'user', content: `Execute ticket: ${ticket}` }],
                         sdd: {
+                            goal: `Execute ticket: ${ticket}`,
                             project: projectMd,
                             architect: architectMd,
                             bestPractices: bestPracticesMd,
