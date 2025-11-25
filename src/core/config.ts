@@ -37,6 +37,17 @@ export const KotefConfigSchema = z.object({
     lspTimeout: z.number().default(30000),
     /** Max number of files to check with LSP in one run (default: 50) */
     lspMaxFiles: z.number().default(50),
+
+    /**
+     * Enable experimental MCP integration
+     */
+    mcpEnabled: z.boolean().default(false),
+
+    /**
+     * Map of MCP server names to their command lines (for stdio transport)
+     * e.g. { "serena": "npx serena-mcp" }
+     */
+    mcpServers: z.record(z.string(), z.string()).default({}),
 });
 
 export type KotefConfig = z.infer<typeof KotefConfigSchema>;
@@ -70,6 +81,10 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         enableTsLspDiagnostics: env.ENABLE_TS_LSP_DIAGNOSTICS !== 'false',
         lspTimeout: parseInt(env.LSP_TIMEOUT || '30000', 10),
         lspMaxFiles: parseInt(env.LSP_MAX_FILES || '50', 10),
+
+        // MCP config
+        mcpEnabled: env.MCP_ENABLED === 'true',
+        mcpServers: env.MCP_SERVERS ? JSON.parse(env.MCP_SERVERS) : {},
     };
 
     return KotefConfigSchema.parse(config);

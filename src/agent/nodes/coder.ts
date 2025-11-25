@@ -121,8 +121,27 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             }
         ];
 
+        // Initialize MCP (Ticket 36)
+        let mcpManager: any; // Type as any to avoid circular deps or complex imports for now
+        let mcpTools: any[] = [];
+
+        if (cfg.mcpEnabled) {
+            try {
+                const { McpManager } = await import('../../mcp/client.js');
+                const { createMcpTools } = await import('../../tools/mcp.js');
+
+                mcpManager = new McpManager(cfg);
+                await mcpManager.initialize();
+                mcpTools = await createMcpTools(mcpManager);
+                log.info('MCP initialized', { toolCount: mcpTools.length });
+            } catch (error: any) {
+                log.error('Failed to initialize MCP', { error: error.message });
+            }
+        }
+
         // Define tools for the coder
         const tools = [
+            ...mcpTools,
             {
                 type: 'function',
                 function: {
@@ -549,6 +568,10 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         await applyEdits(args.path, args.edits);
                         result = `Successfully applied ${args.edits.length} edits to ${args.path}`;
                         fileChanges[args.path] = 'modified';
+                    } else if (mcpManager && mcpTools.some(t => t.function.name === toolCall.function.name)) {
+                        // Handle MCP tool call
+                        const { executeMcpTool } = await import('../../tools/mcp.js');
+                        result = await executeMcpTool(mcpManager, toolCall.function.name, args);
                     } else {
                         result = "Unknown tool";
                         log.warn('Unknown tool called', { tool: toolCall.function.name });
@@ -579,6 +602,10 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             newChanges: hasNewChanges,
             consecutiveNoOps
         });
+
+        if (mcpManager) {
+            await mcpManager.closeAll();
+        }
 
         return {
             fileChanges,

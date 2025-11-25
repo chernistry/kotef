@@ -558,6 +558,21 @@ graph TD
 -   Commands:
     -   `kotef run [ticket-id]`: Execute a task.
     -   `kotef init`: Scaffold .sdd in a new project.
+    -   `kotef run [ticket-id]`: Execute a task.
+
+### 6.5. MCP Integration (Experimental)
+-   **Purpose**: Connect to external Model Context Protocol (MCP) servers for enhanced code intelligence and tools.
+-   **Components**:
+    -   `src/mcp/client.ts`: `McpManager` handles connections to multiple MCP servers via stdio transport.
+    -   `src/tools/mcp.ts`: Adapter to convert MCP tools to OpenAI-compatible tool definitions.
+-   **Configuration**:
+    -   Enabled via `mcpEnabled` config flag.
+    -   Servers defined in `mcpServers` map (name -> command).
+-   **Flow**:
+    -   `coderNode` initializes `McpManager` if enabled.
+    -   MCP tools are injected into the LLM's toolset.
+    -   Tool calls are routed to the appropriate MCP server.
+    -   Connections are closed gracefully on node exit.
 
 ## 7. Code Standards & Conventions
 
