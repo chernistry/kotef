@@ -1,10 +1,8 @@
 import { runCommandSafe } from './command_runner.js';
-import { KotefConfig } from '../core/config.js';
+import { startServer, stopServer, getDiagnostics, LspDiagnostic as LspClientDiagnostic } from './ts_lsp_client.js';
 import { createLogger } from '../core/logger.js';
-import path from 'node:path';
-import fs from 'node:fs/promises';
-import { spawn, ChildProcess } from 'node:child_process';
-import { createInterface } from 'node:readline';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 
 const log = createLogger('lsp');
 
@@ -18,52 +16,49 @@ export interface LspDiagnostic {
 }
 
 /**
- * Runs a one-shot LSP diagnostics check on the project.
- * Note: A full persistent LSP client is complex. For this MVP, we might use tsc directly
- * or a simplified LSP interaction if we want to support open files.
- * 
- * However, the ticket explicitly mentions `typescript-language-server`.
- * Interacting with it via stdio JSON-RPC is the standard way.
- * 
- * For a robust "one-shot" diagnostic without keeping a server alive, 
- * we can actually just run `tsc --noEmit` which is what the LSP does under the hood for full project checks.
- * 
- * BUT, the ticket says "Augment... with LSP... so that the agent has a cheap... signal".
- * And "uses typescript-language-server... launched as a child process".
- * 
- * Let's implement a minimal LSP client that starts the server, sends 'initialize', 
- * waits for diagnostics (or requests them), and then shuts down.
- * 
- * Actually, `tsc --noEmit` is often slower than a warm LSP, but for a one-shot, LSP cold start might be similar.
- * The benefit of LSP is getting diagnostics for *specific files* even if they are in a broken state that stops full emit.
- * 
- * Let's try to implement a minimal client.
+ * Runs LSP diagnostics using the full TypeScript Language Server (JSON-RPC).
+ * This is the preferred method as it provides file-level diagnostics and better error resolution.
+ */
+export async function runTsLspDiagnosticsViaServer(
+    rootDir: string,
+    files?: string[]
+): Promise<LspDiagnostic[]> {
+    try {
+        const handle = await startServer({ rootDir, timeout: 30000 });
+        try {
+            const diagnostics = await getDiagnostics(handle, files);
+            // Filter to only error/warning/info (exclude hint)
+            return diagnostics
+                .filter(d => d.severity !== 'hint')
+                .map(d => ({
+                    file: d.file,
+                    line: d.line,
+                    column: d.column,
+                    severity: d.severity as 'error' | 'warning' | 'info',
+                    message: d.message,
+                    code: d.code
+                }));
+        } finally {
+            await stopServer(handle);
+        }
+    } catch (error) {
+        log.error('LSP server diagnostics failed', { error });
+        // Fallback to tsc
+        return runTsLspDiagnostics(rootDir, files);
+    }
+}
+
+/**
+ * Runs LSP diagnostics using tsc (fallback method).
+ * This is faster to start but only provides project-wide diagnostics.
  */
 export async function runTsLspDiagnostics(rootDir: string, files?: string[]): Promise<LspDiagnostic[]> {
-    // Fallback to tsc for simplicity and robustness if we just want project-wide errors.
-    // Implementing a full JSON-RPC handshake here is risky for a "fast" ticket.
-    // Let's stick to the "tsc" approach for the "LSP" signal for now, as it's effectively the same source of truth for TS.
-    // 
-    // WAIT, the ticket says: "uses typescript-language-server (or equivalent)".
-    // If I use `tsc`, I am technically using the "equivalent" compiler.
-    // But `tsc` output parsing is brittle.
-    // 
-    // Let's try to use `typescript-language-server` if possible, but it requires a proper client loop.
-    // 
-    // Alternative: Use `tsc` with a structured output formatter?
-    // 
-    // Let's implement a wrapper around `tsc` first as it's much safer and achieves the goal of "compile-time errors".
-    // We can parse the output reliably.
-
     // Check if tsconfig exists
     try {
         await fs.access(path.join(rootDir, 'tsconfig.json'));
     } catch {
         return []; // Not a TS project
     }
-
-    const tscPath = path.join(rootDir, 'node_modules', '.bin', 'tsc');
-    // If local tsc doesn't exist, try global or npx, but command_runner handles path.
 
     const result = await runCommandSafe('tsc --noEmit --pretty false', { cwd: rootDir, timeoutMs: 60000 });
 

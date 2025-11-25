@@ -156,16 +156,26 @@ export function verifierNode(cfg: KotefConfig) {
             }
         }
 
-        // Run LSP diagnostics if appropriate (Ticket 32)
-        // Heuristic: Run if strict profile OR (fast profile and we have file changes)
-        // And only if we haven't already run a build command that probably covered it (though LSP is better structured)
-        // For now, let's run it if we are in strict mode or if explicitly enabled.
-        // Also check if it's a TS project.
+        // Run LSP diagnostics if appropriate (Ticket 33)
+        // Use full LSP server for file-level diagnostics when possible
         if (executionProfile === 'strict' || (executionProfile === 'fast' && hasFileChanges)) {
             try {
-                const { runTsLspDiagnostics } = await import('../../tools/lsp.js');
-                // We pass rootDir. We could pass changed files to optimize if we had a smarter LSP client.
-                const lspDiagnostics = await runTsLspDiagnostics(cfg.rootDir);
+                const { runTsLspDiagnosticsViaServer } = await import('../../tools/lsp.js');
+
+                // Get changed files for targeted diagnostics (max 50 files to avoid overhead)
+                const changedFiles = hasFileChanges
+                    ? Object.keys(state.fileChanges || {})
+                        .filter(f => f.endsWith('.ts') || f.endsWith('.tsx') || f.endsWith('.js') || f.endsWith('.jsx'))
+                        .slice(0, 50)
+                    : undefined;
+
+                log.info('Running LSP diagnostics', {
+                    profile: executionProfile,
+                    fileCount: changedFiles?.length || 'project-wide'
+                });
+
+                const lspDiagnostics = await runTsLspDiagnosticsViaServer(cfg.rootDir, changedFiles);
+
                 if (lspDiagnostics.length > 0) {
                     log.info(`LSP found ${lspDiagnostics.length} diagnostics`);
                     // Convert to DiagnosticsEntry
@@ -181,16 +191,17 @@ export function verifierNode(cfg: KotefConfig) {
                     }));
                     currentDiagnostics = mergeDiagnostics(currentDiagnostics, lspEntries);
 
-                    // If LSP has errors, we might consider that a failure even if tests passed?
-                    // Ticket 32 says: "uses LSP as an additional gate".
-                    // If strict, yes.
+                    // LSP as additional gate (Ticket 32/33)
+                    // In strict mode, LSP errors block verification
                     if (executionProfile === 'strict' && lspDiagnostics.some(d => d.severity === 'error')) {
                         allPassed = false;
                         log.warn('LSP errors detected in strict mode, marking as failed.');
                     }
+                } else {
+                    log.info('LSP diagnostics: no issues found');
                 }
-            } catch (e) {
-                log.warn('Failed to run LSP diagnostics', { error: e });
+            } catch (e: any) {
+                log.warn('Failed to run LSP diagnostics', { error: e.message || String(e) });
             }
         }
 

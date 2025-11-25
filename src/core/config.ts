@@ -29,6 +29,14 @@ export const KotefConfigSchema = z.object({
     mockMode: z.boolean().default(false),
     /** Max wall-clock seconds per run before graceful stop. */
     maxRunSeconds: z.number().default(300),
+
+    /** LSP Diagnostics (Ticket 33) */
+    /** Enable TypeScript LSP diagnostics (default: true) */
+    enableTsLspDiagnostics: z.boolean().default(true),
+    /** Timeout for LSP server operations in ms (default: 30000) */
+    lspTimeout: z.number().default(30000),
+    /** Max number of files to check with LSP in one run (default: 50) */
+    lspMaxFiles: z.number().default(50),
 });
 
 export type KotefConfig = z.infer<typeof KotefConfigSchema>;
@@ -57,6 +65,11 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         maxWebRequestsPerRun: parseInt(env.MAX_WEB_REQUESTS_PER_RUN || '20', 10),
         maxCoderTurns,
         mockMode: env.KOTEF_MOCK_MODE === 'true',
+
+        // LSP config
+        enableTsLspDiagnostics: env.ENABLE_TS_LSP_DIAGNOSTICS !== 'false',
+        lspTimeout: parseInt(env.LSP_TIMEOUT || '30000', 10),
+        lspMaxFiles: parseInt(env.LSP_MAX_FILES || '50', 10),
     };
 
     return KotefConfigSchema.parse(config);

@@ -3,7 +3,9 @@
         "target": "ES2022",
         "module": "NodeNext",
         "outDir": "./dist",
-        "forceConsistentCasingInFileNames": true
+        "forceConsistentCasingInFileNames": true,
+        "downlevelIteration": true,
+        "esModuleInterop": true
     },
     "include": [
         "src/**/*",
