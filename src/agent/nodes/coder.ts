@@ -353,11 +353,23 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             turns++;
         }
 
-        log.info('Coder node completed', { turns, filesChanged: Object.keys(fileChanges).length });
+        const initialFileCount = Object.keys(state.fileChanges || {}).length;
+        const finalFileCount = Object.keys(fileChanges).length;
+        const hasNewChanges = finalFileCount > initialFileCount;
+
+        const consecutiveNoOps = hasNewChanges ? 0 : (state.consecutiveNoOps || 0) + 1;
+
+        log.info('Coder node completed', {
+            turns,
+            filesChanged: finalFileCount,
+            newChanges: hasNewChanges,
+            consecutiveNoOps
+        });
 
         return {
             fileChanges,
-            messages: currentMessages.slice(messages.length)
+            messages: currentMessages.slice(messages.length),
+            consecutiveNoOps
         };
     };
 }

@@ -151,66 +151,67 @@ async function refineResearchQuery(
 ): Promise<string | null> {
     const log = createLogger('deep-research');
 
-    let promptTemplate: string;
     try {
-        promptTemplate = await loadPrompt('research_query_refiner');
-    } catch (e) {
-        log.warn('research_query_refiner prompt missing or failed to load; skipping refinement', {
-            error: (e as Error).message,
-        });
+        const promptTemplate = await loadPrompt('research_query_refiner');
+        const qualitySummary = quality
+            ? `Relevance: ${quality.relevance}, Confidence: ${quality.confidence}, Coverage: ${quality.coverage}. Reasons: ${quality.reasons}`
+            : 'No quality scores available.';
+
+        const filled = promptTemplate
+            .replace('{{GOAL}}', goal)
+            .replace('{{PREVIOUS_QUERY}}', previousQuery)
+            .replace('{{QUALITY_SUMMARY}}', qualitySummary)
+            .replace('{{RESULTS_SUMMARY}}', searchResultsSummary);
+
+        const messages: ChatMessage[] = [{ role: 'user', content: filled }];
+        const resp = await callChat(cfg, messages, { model: cfg.modelFast, temperature: 0 });
+        const jsonStr = (resp.messages[resp.messages.length - 1]?.content || '').replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(jsonStr);
+
+        if (parsed.should_retry && parsed.query) {
+            return parsed.query;
+        }
         return null;
-    }
-
-    const qualitySummary = quality
-        ? `Relevance: ${quality.relevance.toFixed(2)}, Confidence: ${quality.confidence.toFixed(
-            2,
-        )}, Coverage: ${quality.coverage.toFixed(2)}. Reasons: ${quality.reasons}`
-        : 'No quality scores available.';
-
-    const filled = promptTemplate
-        .replace('{goal}', goal)
-        .replace('{previousQuery}', previousQuery)
-        .replace('{qualitySummary}', qualitySummary)
-        .replace('{resultsSummary}', searchResultsSummary);
-
-    const messages: ChatMessage[] = [
-        {
-            role: 'system',
-            content:
-                'You refine web search queries for software engineering tasks. Respond with a single optimized English query line, nothing else.',
-        },
-        { role: 'user', content: filled },
-    ];
-
-    try {
-        const resp = await callChat(cfg, messages, {
-            model: cfg.modelFast,
-            temperature: 0,
-            maxTokens: 64,
-        });
-        const raw = (resp.messages[resp.messages.length - 1]?.content || '').trim();
-        const line = raw.split('\n')[0] || '';
-        const cleaned = line.replace(/^("|')|("|')$/g, '').trim();
-        return cleaned || null;
     } catch (e) {
         log.warn('Failed to refine research query', { error: (e as Error).message });
         return null;
     }
 }
 
+
 export async function deepResearch(
     cfg: KotefConfig,
-    query: string,
-    options: DeepResearchOptions = {},
+    goal: string,
+    options: DeepResearchOptions & { techStackHint?: string } = {},
 ): Promise<DeepResearchResult> {
     const log = createLogger('deep-research');
-    const originalGoal = options.originalGoal || query;
-    const maxAttempts = Math.max(1, options.maxAttempts ?? 1);
+    const maxAttempts = Math.max(1, options.maxAttempts ?? 3);
+    const techStackHint = options.techStackHint || '';
 
-    log.info('Starting deep research', { query, originalGoal, maxAttempts });
+    log.info('Starting deep research', { goal, techStackHint, maxAttempts });
+
+    // 1. Optimize initial query
+    let currentQuery = goal;
+    try {
+        const optimizerPrompt = await loadPrompt('search_query_optimizer');
+        const filled = optimizerPrompt
+            .replace('{{GOAL}}', goal)
+            .replace('{{TECH_STACK_HINT}}', techStackHint)
+            .replace('{{CONTEXT}}', ''); // Could pass SDD context here if available
+
+        const messages: ChatMessage[] = [{ role: 'user', content: filled }];
+        const resp = await callChat(cfg, messages, { model: cfg.modelFast, temperature: 0 });
+        const jsonStr = (resp.messages[resp.messages.length - 1]?.content || '').replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.query) {
+            currentQuery = parsed.query;
+            log.info('Optimized initial query', { original: goal, optimized: currentQuery, reason: parsed.reason });
+        }
+    } catch (e) {
+        log.warn('Failed to optimize query, using goal as is', { error: (e as Error).message });
+    }
 
     const attempts: ResearchAttempt[] = [];
-    let currentQuery = query;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         log.info('Performing web search...', { attempt: attempt + 1, query: currentQuery });
@@ -218,187 +219,108 @@ export async function deepResearch(
         let searchResults: any[] = [];
         try {
             searchResults = await webSearch(cfg, currentQuery, { maxResults: 5 });
-            log.info('Web search completed', {
-                attempt: attempt + 1,
-                resultsCount: searchResults.length,
-            });
         } catch (e) {
-            log.warn('Web search failed', {
-                attempt: attempt + 1,
-                query: currentQuery,
-                error: (e as Error).message,
-            });
-            searchResults = [];
+            log.warn('Web search failed', { error: (e as Error).message });
         }
 
         if (searchResults.length === 0) {
-            log.warn('No search results found (or search failed)', {
-                attempt: attempt + 1,
-                query: currentQuery,
-            });
-            attempts.push({
-                query: currentQuery,
-                findings: [],
-                quality: null,
-            });
+            log.warn('No search results found', { attempt: attempt + 1 });
+            attempts.push({ query: currentQuery, findings: [], quality: null });
+
+            // Try to refine even if empty, maybe the query was bad
+            const refined = await refineResearchQuery(cfg, goal, currentQuery, 'No results found.', null);
+            if (refined && refined !== currentQuery) {
+                currentQuery = refined;
+                continue;
+            }
             break;
         }
 
+        // Fetch pages
         const topResults = searchResults.slice(0, 3);
-        log.info('Fetching top pages', { attempt: attempt + 1, count: topResults.length });
         const pageContents: string[] = [];
-
         for (const result of topResults) {
             try {
-                log.info('Fetching page', { url: result.url });
                 const page = await fetchPage(cfg, result.url);
-                pageContents.push(
-                    `Source: ${result.url}\nTitle: ${result.title}\nContent:\n${page.content}\n---`,
-                );
-                log.info('Page fetched successfully', {
-                    url: result.url,
-                    contentLength: page.content.length,
-                });
+                pageContents.push(`Source: ${result.url}\nTitle: ${result.title}\nContent:\n${page.content}\n---`);
             } catch (e) {
-                log.warn('Failed to fetch page, using snippet', {
-                    url: result.url,
-                    error: (e as Error).message,
-                });
-                pageContents.push(
-                    `Source: ${result.url}\nTitle: ${result.title}\nContent (Snippet only):\n${result.snippet}\n---`,
-                );
+                pageContents.push(`Source: ${result.url}\nTitle: ${result.title}\nContent (Snippet):\n${result.snippet}\n---`);
             }
         }
 
         const context = pageContents.join('\n\n');
-
-        log.info('Summarizing findings with LLM...', { attempt: attempt + 1 });
         const findings = await summarizeFindings(cfg, currentQuery, context);
 
-        const searchResultsSummary = searchResults
-            .map(r => `- ${r.title || 'Untitled'} (${r.url})`)
-            .join('\n')
-            .slice(0, 2000);
+        const searchResultsSummary = searchResults.map(r => `- ${r.title} (${r.url})`).join('\n').slice(0, 2000);
 
-        const quality = await scoreResearchAttempt(
-            cfg,
-            originalGoal,
-            currentQuery,
-            searchResultsSummary,
-            findings,
-        );
+        // Score attempt
+        let quality: ResearchQuality | null = null;
+        try {
+            const evalPrompt = await loadPrompt('research_relevance_evaluator');
+            const filledEval = evalPrompt
+                .replace('{{GOAL}}', goal)
+                .replace('{{QUERY}}', currentQuery)
+                .replace('{{RESULTS_SUMMARY}}', searchResultsSummary)
+                .replace('{{FINDINGS_JSON}}', JSON.stringify(findings.slice(0, 5), null, 2));
 
-        if (quality) {
-            log.info('Research quality scored', {
-                attempt: attempt + 1,
-                relevance: quality.relevance,
-                confidence: quality.confidence,
-                coverage: quality.coverage,
-                shouldRetry: quality.shouldRetry,
-                reasons: quality.reasons,
-            });
-        } else {
-            log.warn('Research quality scoring failed or returned null', { attempt: attempt + 1 });
+            const evalResp = await callChat(cfg, [{ role: 'user', content: filledEval }], { model: cfg.modelFast, temperature: 0 });
+            const evalJson = (evalResp.messages[evalResp.messages.length - 1]?.content || '').replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsedEval = JSON.parse(evalJson);
+
+            quality = {
+                relevance: parsedEval.relevance || 0,
+                confidence: parsedEval.confidence || 0,
+                coverage: parsedEval.coverage || 0,
+                shouldRetry: parsedEval.should_retry ?? true,
+                reasons: parsedEval.reasons || ''
+            };
+        } catch (e) {
+            log.warn('Failed to score research', { error: (e as Error).message });
         }
 
         attempts.push({ query: currentQuery, findings, quality });
 
-        const goodEnough =
-            quality &&
-            quality.relevance >= 0.7 &&
-            quality.coverage >= 0.6 &&
-            quality.confidence >= 0.6;
-
-        if (goodEnough) {
-            log.info('Research quality met thresholds; stopping early.', {
-                attempt: attempt + 1,
-                relevance: quality.relevance,
-                coverage: quality.coverage,
-            });
+        // Check if good enough
+        if (quality && quality.relevance >= 0.7 && quality.coverage >= 0.6) {
+            log.info('Research quality met thresholds', { quality });
             break;
         }
 
-        if (attempt === maxAttempts - 1) {
-            log.info('Max attempts reached; stopping.', { attempt: attempt + 1 });
-            break;
+        if (attempt === maxAttempts - 1) break;
+
+        // Refine query
+        if (quality?.shouldRetry !== false) {
+            const refined = await refineResearchQuery(cfg, goal, currentQuery, searchResultsSummary, quality);
+            if (refined && refined !== currentQuery) {
+                currentQuery = refined;
+                log.info('Refined query', { newQuery: currentQuery });
+                continue;
+            }
         }
-
-        if (!quality || !quality.shouldRetry) {
-            log.info('Quality scoring suggests no retry; stopping after current attempt.', {
-                attempt: attempt + 1,
-                shouldRetry: quality?.shouldRetry,
-            });
-            break;
-        }
-
-        const refined = await refineResearchQuery(
-            cfg,
-            originalGoal,
-            currentQuery,
-            searchResultsSummary,
-            quality,
-        );
-
-        if (!refined || refined === currentQuery) {
-            log.info('Refiner did not produce a new query; stopping retries.', {
-                attempt: attempt + 1,
-            });
-            break;
-        }
-
-        log.info('Refined research query for next attempt', {
-            attempt: attempt + 2,
-            previousQuery: currentQuery,
-            refinedQuery: refined,
-        });
-        currentQuery = refined;
+        break;
     }
 
-    if (attempts.length === 0) {
-        log.warn('Deep research completed with no attempts; returning empty findings.');
-        return { findings: [], quality: null };
-    }
-
+    // Select best attempt
     let best = attempts[0];
     let bestScore = -1;
-
-    for (const attempt of attempts) {
-        if (attempt.quality) {
-            const q = attempt.quality;
-            const score = q.relevance * 0.6 + q.coverage * 0.25 + q.confidence * 0.15;
+    for (const att of attempts) {
+        if (att.quality) {
+            const score = att.quality.relevance * 0.5 + att.quality.coverage * 0.3 + att.quality.confidence * 0.2;
             if (score > bestScore) {
                 bestScore = score;
-                best = attempt;
+                best = att;
             }
         }
     }
 
-    // If no quality scores, fallback to findings count
-    if (bestScore < 0) {
-        best = attempts.reduce((acc, cur) =>
-            cur.findings.length > acc.findings.length ? cur : acc,
-        );
+    // Fallback if no quality
+    if (bestScore < 0 && attempts.length > 0) {
+        best = attempts.reduce((a, b) => b.findings.length > a.findings.length ? b : a);
     }
 
-    const chosenQuality = best.quality;
-    log.info('Deep research completed', {
-        totalAttempts: attempts.length,
-        chosenQuery: best.query,
-        findingsCount: best.findings.length,
-        quality: chosenQuality ? {
-            relevance: chosenQuality.relevance,
-            confidence: chosenQuality.confidence,
-            coverage: chosenQuality.coverage,
-        } : 'N/A',
-    });
-
     return {
-        findings: best.findings,
-        quality: chosenQuality ? {
-            ...chosenQuality,
-            lastQuery: best.query,
-            attemptCount: attempts.length
-        } : null
+        findings: best?.findings || [],
+        quality: best?.quality ? { ...best.quality, lastQuery: best.query, attemptCount: attempts.length } : null
     };
 }
 

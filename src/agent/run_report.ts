@@ -16,6 +16,8 @@ export interface RunSummary {
         llmCalls: number;
         totalTokens: number;
     };
+    terminalStatus?: string;
+    stopReason?: string;
 }
 
 export async function writeRunReport(
@@ -40,6 +42,12 @@ export async function writeRunReport(
     let report = `# Run Report: ${runId}\n\n`;
     report += `**Date:** ${new Date().toISOString()}\n`;
     report += `**Status:** ${summary.status}\n`;
+    if (summary.terminalStatus) {
+        report += `**Terminal Status:** ${summary.terminalStatus}\n`;
+    }
+    if (summary.stopReason) {
+        report += `**Stop Reason:** ${summary.stopReason}\n`;
+    }
     if (summary.durationSeconds) {
         report += `**Duration:** ${summary.durationSeconds.toFixed(2)}s\n`;
     }

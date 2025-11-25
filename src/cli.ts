@@ -231,7 +231,9 @@ program
                     llmCalls,
                     toolCalls: actualToolCalls,
                     totalTokens: 0 // We don't track tokens yet
-                }
+                },
+                terminalStatus: result.terminalStatus,
+                stopReason: (result.plan as any)?.reason as string
             };
 
             await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
@@ -423,7 +425,9 @@ program
                         filesChanged: Object.keys(result.fileChanges || {}),
                         tests: JSON.stringify(result.testResults || {}, null, 2),
                         issues: (result.sdd as any)?.issues,
-                        durationSeconds
+                        durationSeconds,
+                        terminalStatus: result.terminalStatus,
+                        stopReason: (result.plan as any)?.reason as string
                     };
 
                     await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);

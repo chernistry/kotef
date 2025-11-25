@@ -27,6 +27,7 @@ export function snitchNode(cfg: KotefConfig) {
             ticketSnippet ? `**Ticket:** ${ticketSnippet}` : '',
             '',
             `**Reason:** ${reason}`,
+            state.terminalStatus ? `**Terminal Status:** ${state.terminalStatus}` : '',
             ''
         ].filter(Boolean);
 

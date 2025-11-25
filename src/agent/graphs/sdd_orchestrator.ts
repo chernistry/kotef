@@ -72,61 +72,26 @@ export async function loadProjectMetadata(rootDir: string, goal: string): Promis
     return { techStack, domain, projectDescription };
 }
 
-export async function buildResearchQuery(
-    cfg: KotefConfig,
-    goal: string,
-    metadata: ProjectMetadata,
-): Promise<string> {
-    try {
-        const promptTemplate = await loadPrompt('search_query_optimizer');
-        const truncatedDescription = (metadata.projectDescription || '').slice(0, 1500);
-        const filled = promptTemplate
-            .replace('{goal}', goal)
-            .replace('{techStack}', metadata.techStack || 'unknown')
-            .replace('{domain}', metadata.domain || 'software engineering')
-            .replace('{projectDescription}', truncatedDescription);
-
-        const messages: ChatMessage[] = [
-            {
-                role: 'system',
-                content: 'You optimize web search queries for software engineering best-practices research.',
-            },
-            { role: 'user', content: filled },
-        ];
-
-        const response = await callChat(cfg, messages, {
-            model: cfg.modelFast,
-            temperature: 0,
-            maxTokens: 64,
-        });
-        const raw = (response.messages[response.messages.length - 1]?.content || '').trim();
-        const line = raw.split('\n')[0] || '';
-        const cleaned = line.replace(/^("|')|("|')$/g, '').trim();
-
-        return cleaned || goal;
-    } catch (err) {
-        console.warn('search_query_optimizer failed, falling back to raw goal', { error: String(err) });
-        return goal;
-    }
-}
 
 async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
     console.log('Running SDD Research...');
     const { goal, rootDir, config } = state;
     const metadata = await loadProjectMetadata(rootDir, goal);
-    const researchQuery = await buildResearchQuery(config, goal, metadata);
-
     // 1. Run web-backed deep research (Tavily + fetchPage + LLM summarization)
     console.log(`Starting deep research for goal: "${goal}"`);
-    console.log(`Web research query: "${researchQuery}"`);
+
     let findings: DeepResearchFinding[] = [];
     try {
-        const result = await deepResearch(config, researchQuery, {
+        const result = await deepResearch(config, goal, {
             originalGoal: goal,
             maxAttempts: 3,
+            techStackHint: metadata.techStack
         });
         findings = result.findings;
         console.log(`Deep research completed. Found ${findings.length} findings.`);
+        if (result.quality) {
+            console.log(`Research Quality: Relevance=${result.quality.relevance}, Confidence=${result.quality.confidence}, Coverage=${result.quality.coverage}`);
+        }
     } catch (e) {
         console.warn('Deep research failed, falling back to model-only research:', e);
         findings = [];

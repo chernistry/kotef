@@ -38,6 +38,11 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             if (text.length <= maxChars) return text;
             return text.slice(0, maxChars) + '\n\n...[truncated for planner; see SDD files for full spec]';
         };
+        // Flow Control & Stop Rules (Ticket 14)
+        const MAX_STEPS = 50;
+        const MAX_LOOP_EDGE = 5;
+        const currentSteps = (state.totalSteps || 0) + 1;
+
         const replacements: Record<string, string> = {
             '{{GOAL}}': safe(state.sdd.goal),
             '{{TICKET}}': safe(state.sdd.ticket),
@@ -53,11 +58,6 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{LOOP_COUNTERS}}': safe(state.loopCounters),
             '{{TOTAL_STEPS}}': safe(currentSteps),
         };
-
-        // Flow Control & Stop Rules (Ticket 14)
-        const MAX_STEPS = 50;
-        const MAX_LOOP_EDGE = 5;
-        const currentSteps = (state.totalSteps || 0) + 1;
 
         if (currentSteps >= MAX_STEPS) {
             log.warn('Max steps reached, aborting', { steps: currentSteps });
