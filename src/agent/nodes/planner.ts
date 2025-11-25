@@ -266,6 +266,27 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             };
         }
 
+        // Research Quality Guardrails (Ticket 15)
+        if (nextNode === 'researcher' && state.researchQuality) {
+            const q = state.researchQuality;
+            // If we have high quality research but planner wants to research again, check if it's a loop or redundant.
+            // But planner might want *different* research.
+            // However, if quality is very low after multiple attempts, we should stop.
+            if (q.relevance < 0.3 && q.attemptCount >= 3) {
+                log.warn('Research quality too low after max attempts, aborting research loop', { quality: q });
+                decision.next = 'snitch';
+                decision.reason = `Aborted: Research quality is too low (relevance ${q.relevance}) after ${q.attemptCount} attempts. Cannot proceed safely.`;
+                return {
+                    terminalStatus: 'aborted_stuck',
+                    plan: decision,
+                    messages: [assistantMsg],
+                    runProfile: resolvedProfile,
+                    loopCounters,
+                    totalSteps: currentSteps
+                };
+            }
+        }
+
         // Update state with the new plan/decision
         return {
             plan: decision,

@@ -34,6 +34,9 @@ Your goal is to create a step-by-step plan to implement the given ticket.
   - **Default**: when in doubt, prefer `next="researcher"` to gather web-backed information before coding.
   - **If `RESEARCH_RESULTS.source === "sdd"`**: treat research as already satisfied for this run and do **not** route back to `researcher` unless the user explicitly requests fresh web research.
   - **If `RESEARCH_RESULTS.error` is present**: do not loop on `researcher`; prefer `snitch` or `ask_human` with a short explanation.
+  - **Check `RESEARCH_QUALITY`**:
+    - If `relevance < 0.3` after retries, do **not** loop back to `researcher`. Escalate to `snitch` (if critical) or proceed with caution (if optional).
+    - If `relevance >= 0.7` and `coverage >= 0.6`, consider research sufficient. Do not request more research unless a new topic arises.
 - **No chain-of-thought leakage**: produce only the JSON output described below.
 
 # Execution profiles
