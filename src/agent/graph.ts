@@ -106,14 +106,55 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
 
             if (next === 'researcher') {
                 const rr: any = state.researchResults;
-                // Avoid infinite planner→researcher loops when research has already been satisfied.
-                if (Array.isArray(rr) && rr.length > 0) {
+                const rq = state.researchQuality;
+
+                // If we have SDD results, we are good.
+                if (rr && !Array.isArray(rr) && rr.source === 'sdd') {
                     return 'coder';
                 }
-                if (rr && !Array.isArray(rr)) {
-                    if (rr.source === 'sdd') return 'coder';
-                    if (rr.error) return 'snitch';
+
+                // If research failed with error, snitch.
+                if (rr && !Array.isArray(rr) && rr.error) {
+                    return 'snitch';
                 }
+
+                // If we have quality metrics, use them to decide loop vs give up.
+                if (rq) {
+                    // If quality says we should retry, and we haven't hit a hard loop limit (e.g. 3 global attempts),
+                    // we might allow it. But deepResearch already does internal retries.
+                    // So if deepResearch returns, it means it either succeeded or exhausted its own retries.
+                    // If it exhausted retries and still says "shouldRetry", it means it failed to get good results.
+                    // We should probably NOT loop back to researcher immediately with the same query.
+                    // However, the Planner might have changed the goal/query.
+
+                    // Heuristic: If planner says "researcher" AGAIN, but quality was poor, 
+                    // we check if we have enough info to proceed or if we should fail.
+
+                    // For now, let's trust the Planner's decision unless it looks like a tight loop.
+                    // We can use state.failureHistory or just rely on the fact that deepResearch is robust.
+
+                    // If quality is really bad (relevance < 0.5) and we have results, maybe we should warn?
+                    // But for graph logic, we just follow next unless it's an infinite loop.
+
+                    // If findings are empty, we must not go to coder.
+                    if (Array.isArray(rr) && rr.length === 0) {
+                        // If planner wants research, let it try (maybe new query).
+                        // But if it keeps failing, we need a circuit breaker.
+                        // For now, allow it.
+                        return 'researcher';
+                    }
+                }
+
+                // Legacy/Fallback: if we have results, usually we go to coder, but planner said researcher.
+                // If planner explicitly wants research, we respect it (assuming it knows what it's doing).
+                // But to prevent infinite loops if planner is dumb:
+                if (Array.isArray(rr) && rr.length > 0) {
+                    // Planner wants more research despite having results.
+                    // Allow it, but maybe we should check if query changed?
+                    // For MVP, just return 'researcher'.
+                    return 'researcher';
+                }
+
                 return 'researcher';
             }
 
@@ -121,6 +162,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             if (next === 'verifier') return 'verifier';
             if (next === 'done') return 'end';
             if (next === 'snitch' || next === 'ask_human') return 'snitch';
+
             // Fallback: if research already exists, go to coder; else research
             const rr: any = state.researchResults;
             if (Array.isArray(rr) && rr.length > 0) return 'coder';

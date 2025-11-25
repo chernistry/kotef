@@ -10,6 +10,7 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - SDD best practices (may be truncated): `{{SDD_BEST_PRACTICES}}`
 - Latest plan snapshot: `{{STATE_PLAN}}`
 - Research so far: `{{RESEARCH_RESULTS}}`
+- Research Quality: `{{RESEARCH_QUALITY}}`
 - File changes so far: `{{FILE_CHANGES}}`
 - Test results so far: `{{TEST_RESULTS}}`
 - Failure History: `{{FAILURE_HISTORY}}`

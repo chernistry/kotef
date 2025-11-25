@@ -46,6 +46,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),
             '{{STATE_PLAN}}': safe(state.plan),
             '{{RESEARCH_RESULTS}}': safe(state.researchResults),
+            '{{RESEARCH_QUALITY}}': safe(state.researchQuality),
             '{{FILE_CHANGES}}': safe(state.fileChanges),
             '{{TEST_RESULTS}}': safe(state.testResults),
             '{{FAILURE_HISTORY}}': safe(state.failureHistory),

@@ -40,4 +40,15 @@ export interface AgentState {
         architectSummary: string;
         bestPracticesSummary: string;
     };
+    researchQuality?: ResearchQuality;
+}
+
+export interface ResearchQuality {
+    lastQuery: string;
+    relevance: number;
+    confidence: number;
+    coverage: number;
+    shouldRetry: boolean;
+    reasons: string;
+    attemptCount: number;
 }

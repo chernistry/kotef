@@ -121,10 +121,11 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
     console.log(`Web research query: "${researchQuery}"`);
     let findings: DeepResearchFinding[] = [];
     try {
-        findings = await deepResearch(config, researchQuery, {
+        const result = await deepResearch(config, researchQuery, {
             originalGoal: goal,
             maxAttempts: 3,
         });
+        findings = result.findings;
         console.log(`Deep research completed. Found ${findings.length} findings.`);
     } catch (e) {
         console.warn('Deep research failed, falling back to model-only research:', e);
@@ -135,16 +136,16 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
         findings.length === 0
             ? 'No external web findings were available. Base recommendations on up-to-date, conservative defaults for this stack, and clearly mark low-confidence areas.'
             : findings
-                  .map((f, idx) => {
-                      const sources = f.citations
-                          .map(c => `- ${c.url}${c.title ? ` — ${c.title}` : ''}`)
-                          .join('\n');
-                      return `(${idx + 1}) ${f.statement}\nSources:\n${sources}`;
-                  })
-                  .join('\n\n');
+                .map((f, idx) => {
+                    const sources = f.citations
+                        .map(c => `- ${c.url}${c.title ? ` — ${c.title}` : ''}`)
+                        .join('\n');
+                    return `(${idx + 1}) ${f.statement}\nSources:\n${sources}`;
+                })
+                .join('\n\n');
 
     console.log('Generating best_practices.md with LLM...');
-    
+
     const { techStack, domain, projectDescription } = metadata;
 
     // 2. Render prompt with web research injected as additional context

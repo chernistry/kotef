@@ -202,7 +202,7 @@ export async function deepResearch(
     cfg: KotefConfig,
     query: string,
     options: DeepResearchOptions = {},
-): Promise<DeepResearchFinding[]> {
+): Promise<DeepResearchResult> {
     const log = createLogger('deep-research');
     const originalGoal = options.originalGoal || query;
     const maxAttempts = Math.max(1, options.maxAttempts ?? 1);
@@ -360,7 +360,7 @@ export async function deepResearch(
 
     if (attempts.length === 0) {
         log.warn('Deep research completed with no attempts; returning empty findings.');
-        return [];
+        return { findings: [], quality: null };
     }
 
     let best = attempts[0];
@@ -396,5 +396,17 @@ export async function deepResearch(
         } : 'N/A',
     });
 
-    return best.findings;
+    return {
+        findings: best.findings,
+        quality: chosenQuality ? {
+            ...chosenQuality,
+            lastQuery: best.query,
+            attemptCount: attempts.length
+        } : null
+    };
+}
+
+export interface DeepResearchResult {
+    findings: DeepResearchFinding[];
+    quality: (ResearchQuality & { lastQuery: string; attemptCount: number }) | null;
 }

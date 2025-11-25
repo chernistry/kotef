@@ -23,8 +23,8 @@ describe('Deep Research Hardening', () => {
         // Mock logger to avoid clutter
         // (Assuming logger is created inside, we might see console output, which is fine)
 
-        const findings = await deepResearch(mockConfig, 'test query', { maxAttempts: 1 });
-        expect(findings).toEqual([]);
+        const result = await deepResearch(mockConfig, 'test query', { maxAttempts: 1 });
+        expect(result.findings).toEqual([]);
     });
 
     it('should retry if quality is low and maxAttempts > 1', async () => {
@@ -70,7 +70,7 @@ describe('Deep Research Hardening', () => {
                 messages: [{ role: 'assistant', content: JSON.stringify({ relevance: 0.9, coverage: 0.9, confidence: 0.9, shouldRetry: false, reasons: 'Good' }) }]
             } as any);
 
-        const findings = await deepResearch(mockConfig, 'initial query', { maxAttempts: 2 });
+        const result = await deepResearch(mockConfig, 'initial query', { maxAttempts: 2 });
 
         // Verify webSearch was called twice
         expect(webSearchSpy).toHaveBeenCalledTimes(2);
@@ -78,7 +78,8 @@ describe('Deep Research Hardening', () => {
         expect(webSearchSpy).toHaveBeenNthCalledWith(2, expect.anything(), 'refined query', expect.anything());
 
         // Verify findings returned are from the best attempt (Attempt 2 has high score)
-        expect(findings).toHaveLength(1);
-        expect(findings[0].statement).toBe('Fact 2');
+        expect(result.findings).toHaveLength(1);
+        expect(result.findings[0].statement).toBe('Fact 2');
+        expect(result.quality?.relevance).toBe(0.9);
     });
 });
