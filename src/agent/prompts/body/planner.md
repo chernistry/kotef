@@ -103,6 +103,11 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
 }
 ```
 
+- **Use Diagnostics**: If `{{DIAGNOSTICS}}` shows compile errors (Source: 'build' or 'lsp') or test failures, your plan MUST address them.
+  - **Prioritize Compile/LSP Errors**: Fix syntax/type errors before worrying about test logic.
+  - **Prioritize Test Failures**: If build passes, focus on failing tests.
+  - If diagnostics point to a specific file, target that file in `needs.files`.
+
 # Decision rules
 - Choose `researcher` when SDD or current knowledge is insufficient; include concrete queries in `needs.research_queries`.
 - Choose `coder` when the work is clear and bounded; include target files in `needs.files`.

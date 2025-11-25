@@ -16,7 +16,8 @@ export type RuntimePromptName =
     | 'verifier'
     | 'research_query_refiner'
     | 'research_relevance_evaluator'
-    | 'search_query_optimizer';
+    | 'search_query_optimizer'
+    | 'kiro_coder';
 
 const RUNTIME_PROMPTS = new Set<RuntimePromptName>([
     'meta_agent',
@@ -26,7 +27,8 @@ const RUNTIME_PROMPTS = new Set<RuntimePromptName>([
     'verifier',
     'research_query_refiner',
     'research_relevance_evaluator',
-    'search_query_optimizer'
+    'search_query_optimizer',
+    'kiro_coder'
 ]);
 
 async function readPromptFile(promptName: string): Promise<string> {
