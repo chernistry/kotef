@@ -36,15 +36,19 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
 
         const stack: ProjectStack = isVite ? 'vite_frontend' : 'node';
 
-        const primaryTest = scripts.test ? 'npm test' : undefined;
-        const smokeTest = scripts.dev ? 'npm run dev' : (scripts.start ? 'npm start' : undefined);
-        const buildCommand = scripts.build ? 'npm run build' : undefined;
-        const lintCommand = scripts.lint ? 'npm run lint' : undefined;
+        // Ticket 30: Use package manager detection
+        const { detectPackageManager, resolveScriptCommand, resolveExecCommand } = await import('../../tools/package_manager.js');
+        const pm = await detectPackageManager(rootDir);
+
+        const primaryTest = scripts.test ? resolveScriptCommand(pm, 'test') : undefined;
+        const smokeTest = scripts.dev ? resolveScriptCommand(pm, 'dev') : (scripts.start ? resolveScriptCommand(pm, 'start') : undefined);
+        const buildCommand = scripts.build ? resolveScriptCommand(pm, 'build') : undefined;
+        const lintCommand = scripts.lint ? resolveScriptCommand(pm, 'lint') : undefined;
 
         if (scripts.lint) {
-            syntaxCheckCommand = 'npm run lint';
+            syntaxCheckCommand = resolveScriptCommand(pm, 'lint');
         } else if (await fileExists(rootDir, 'tsconfig.json')) {
-            syntaxCheckCommand = 'npx tsc --noEmit';
+            syntaxCheckCommand = resolveExecCommand(pm, 'tsc --noEmit');
         }
 
         // Error-first diagnostic preference:

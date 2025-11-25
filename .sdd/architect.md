@@ -528,16 +528,12 @@ graph TD
 
 ### 6.2. Tools Layer (`src/tools/`)
 -   **`fs.ts`**:
-    -   `readFile(path)`: Reads file content (with size limit).
-    -   `listFiles(pattern)`: Lists files respecting `.gitignore`.
-    -   `writePatch(path, diff)`: Applies a unified diff. **CRITICAL**: Validates path is within workspace.
--   **`web_search.ts`**:
-    -   `search(query)`: Shallow search (titles + snippets).
-    -   `fetchPage(url)`: Fetches page content (text only, stripped HTML). Respects `robots.txt` and allowlist.
--   **`deep_research.ts`**:
-    -   Orchestrates multi-step research: Plan Query -> Search -> Fetch -> Summarize -> Repeat if needed.
--   **`test_runner.ts`**:
-    -   Executes commands from `architect.md` (e.g., `npm test`). Captures stdout/stderr.
+- **FileSystem**: `fs.ts` (safe, sandboxed file operations).
+- **TestRunner**: `test_runner.ts` (executes commands via `execa` with configurable timeouts).
+  - Uses `package_manager.ts` to detect `npm`/`yarn`/`pnpm`/`bun`.
+  - Sanitizes PATH using `npm-run-path`.
+- **Search**: `web_search.ts` (Tavily API wrapper).
+- **DeepResearch**: `deep_research.ts` (multi-step research agent). Query -> Search -> Fetch -> Summarize -> Repeat if needed.
 
 ### 6.3. Agent Layer (`src/agent/`)
 -   **`state.ts`**: Defines LangGraph state schema.

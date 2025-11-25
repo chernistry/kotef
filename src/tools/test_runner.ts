@@ -1,8 +1,6 @@
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
+import { execa } from 'execa';
+import { npmRunPathEnv } from 'npm-run-path';
 import { KotefConfig } from '../core/config.js';
-
-const execAsync = promisify(exec);
 
 export type FailureKind = 'compilation' | 'test_failure' | 'timeout' | 'runtime_error' | 'unknown';
 
@@ -16,10 +14,10 @@ export interface TestRunResult {
     failureSummary?: string;
 }
 
-function classifyFailure(stdout: string, stderr: string, exitCode: number): { kind: FailureKind; summary: string } {
+function classifyFailure(stdout: string, stderr: string, exitCode: number, timedOut: boolean): { kind: FailureKind; summary: string } {
     const combined = (stdout + '\n' + stderr).toLowerCase();
 
-    if (combined.includes('etimedout') || combined.includes('timed out')) {
+    if (timedOut || combined.includes('etimedout') || combined.includes('timed out')) {
         return { kind: 'timeout', summary: 'Process timed out.' };
     }
 
@@ -41,6 +39,7 @@ function classifyFailure(stdout: string, stderr: string, exitCode: number): { ki
 /**
  * Executes a shell command (e.g., test runner) within the project root.
  * Enforces a timeout to prevent hanging processes.
+ * Uses execa for better process control and npm-run-path for local binaries.
  */
 export async function runCommand(
     cfg: KotefConfig,
@@ -58,24 +57,56 @@ export async function runCommand(
     }
 
     try {
-        const { stdout, stderr } = await execAsync(command, {
+        const result = await execa(command, {
             cwd: cfg.rootDir,
             timeout: timeoutMs,
-            killSignal: 'SIGTERM',
+            shell: true,
+            reject: false, // Don't throw on non-zero exit code
+            env: npmRunPathEnv({ cwd: cfg.rootDir }),
+            all: true // Capture interleaved output if needed, but we use stdout/stderr separately
         });
 
-        return {
-            command,
-            exitCode: 0,
-            stdout: stdout.trim(),
-            stderr: stderr.trim(),
-            passed: true
-        };
+        if (result.timedOut) {
+            const { kind, summary } = classifyFailure(result.stdout, result.stderr, result.exitCode, true);
+            return {
+                command,
+                exitCode: result.exitCode,
+                stdout: result.stdout.trim(),
+                stderr: result.stderr.trim(),
+                passed: false,
+                failureKind: kind,
+                failureSummary: summary
+            };
+        }
+
+        if (result.exitCode === 0) {
+            return {
+                command,
+                exitCode: 0,
+                stdout: result.stdout.trim(),
+                stderr: result.stderr.trim(),
+                passed: true
+            };
+        } else {
+            const { kind, summary } = classifyFailure(result.stdout, result.stderr, result.exitCode, false);
+            return {
+                command,
+                exitCode: result.exitCode,
+                stdout: result.stdout.trim(),
+                stderr: result.stderr.trim(),
+                passed: false,
+                failureKind: kind,
+                failureSummary: summary
+            };
+        }
     } catch (error: any) {
+        // execa throws on timeout even with reject: false in some versions, or returns result with timedOut
+        const isTimeout = error.timedOut || error.isCanceled || error.signal === 'SIGTERM';
         const stdout = (error.stdout || '').trim();
         const stderr = (error.stderr || '').trim();
-        const exitCode = error.code || 1;
-        const { kind, summary } = classifyFailure(stdout, stderr, exitCode);
+        const exitCode = error.exitCode || 1;
+
+        const { kind, summary } = classifyFailure(stdout, stderr, exitCode, isTimeout);
 
         return {
             command,
