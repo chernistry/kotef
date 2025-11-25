@@ -144,6 +144,25 @@ ${state.testResults.stderr ? `\n**Stderr**:\n\`\`\`\n${state.testResults.stderr.
         report += functionalProbesSection;
         report += testSection;
 
+        // Diagnostics Timeline (Ticket 31)
+        if (state.diagnosticsLog && state.diagnosticsLog.length > 0) {
+            report += `\n## Diagnostics Timeline\n`;
+            // Sort by occurrence count desc, then last seen
+            const sorted = [...state.diagnosticsLog].sort((a, b) => b.occurrenceCount - a.occurrenceCount);
+            const top = sorted.slice(0, 10);
+
+            top.forEach(d => {
+                const loc = d.file ? `${d.file}${d.location ? `:${d.location.line}` : ''}` : 'Global';
+                report += `- **[${d.source.toUpperCase()}]** ${loc} (x${d.occurrenceCount})\n`;
+                report += `  - Last seen: ${new Date(d.lastSeenAt).toISOString()}\n`;
+                report += `  - Message: \`${d.message.replace(/`/g, '')}\`\n`;
+            });
+
+            if (sorted.length > 10) {
+                report += `\n... and ${sorted.length - 10} more diagnostics.\n`;
+            }
+        }
+
         // Budget usage section (Ticket 19)
         if (state.budget) {
             report += `\n## Budget Usage\n`;

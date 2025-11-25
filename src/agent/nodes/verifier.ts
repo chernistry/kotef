@@ -111,6 +111,10 @@ export function verifierNode(cfg: KotefConfig) {
         // 3. Run commands
         const results = [];
         let allPassed = true;
+        let currentDiagnostics = state.diagnosticsLog || [];
+
+        // Import diagnostics utils
+        const { parseDiagnostics, mergeDiagnostics } = await import('../utils/diagnostics.js');
 
         for (const cmd of commandsToRun) {
             log.info(`Running verification command: ${cmd}`);
@@ -128,6 +132,11 @@ export function verifierNode(cfg: KotefConfig) {
                 stdout: res.stdout,
                 stderr: res.stderr
             });
+
+            // Parse diagnostics
+            const source = cmd.includes('test') ? 'test' : 'build'; // simplistic source detection
+            const newDiagnostics = parseDiagnostics(res.stdout + '\n' + res.stderr, source);
+            currentDiagnostics = mergeDiagnostics(currentDiagnostics, newDiagnostics);
 
             // Record functional probe (Ticket 28)
             const probes = recordFunctionalProbe(cmd, res, 'verifier');
@@ -245,7 +254,8 @@ export function verifierNode(cfg: KotefConfig) {
             sameErrorCount,
             done: decision.next === 'done',
             terminalStatus: decision.terminalStatus, // e.g. 'done_partial'
-            functionalChecks: state.functionalChecks
+            functionalChecks: state.functionalChecks,
+            diagnosticsLog: currentDiagnostics
         };
     };
 }

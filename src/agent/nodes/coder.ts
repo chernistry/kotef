@@ -2,7 +2,7 @@ import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { createLogger } from '../../core/logger.js';
 
-import { loadRuntimePrompt } from '../prompts.js';
+import { loadRuntimePrompt } from '../../core/prompts.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
 import { readFile, writeFile, writePatch, applyEdits } from '../../tools/fs.js';
 import { runCommand } from '../../tools/test_runner.js';
@@ -96,7 +96,8 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             '{{RESEARCH_RESULTS}}': safe(state.researchResults),
             '{{STATE_PLAN}}': safe(state.plan),
             '{{EXECUTION_PROFILE}}': executionProfile,
-            '{{TASK_SCOPE}}': state.taskScope || 'normal'
+            '{{TASK_SCOPE}}': state.taskScope || 'normal',
+            '{{DIAGNOSTICS}}': (await import('../utils/diagnostics.js')).summarizeDiagnostics(state.diagnosticsLog),
         };
 
         let systemPrompt = promptTemplate;

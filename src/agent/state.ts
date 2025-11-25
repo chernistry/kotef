@@ -75,6 +75,9 @@ export interface AgentState {
 
     /** History of progress snapshots for stuck detection. */
     progressHistory?: import('./utils/progress_controller.js').ProgressSnapshot[];
+
+    /** History of test/lint/build failures and errors. */
+    diagnosticsLog?: import('./utils/diagnostics.js').DiagnosticsEntry[];
 }
 
 export type TerminalStatus = 'done_success' | 'done_partial' | 'aborted_stuck' | 'aborted_constraint';

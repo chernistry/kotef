@@ -151,6 +151,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
             '{{DETECTED_COMMANDS}}': safe(state.detectedCommands),
             '{{FUNCTIONAL_OK}}': deriveFunctionalStatus(state.functionalChecks) ? 'true' : 'false',
+            '{{DIAGNOSTICS}}': (await import('../utils/diagnostics.js')).summarizeDiagnostics(state.diagnosticsLog),
         };
 
         // Budget exhaustion check (Ticket 19)
