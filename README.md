@@ -22,9 +22,9 @@ node bin/kotef run \
 Under the hood:
 
 - **LangGraph flow.** `planner → researcher → coder → verifier → snitch` with run reports, command/time budgets, execution profiles (`strict/fast/smoke/yolo`).
-- **Web search & deep research.** Tavily + scraping + LLM summarizer feed best practices into the spec so the agent isn’t hallucinating 2019 blog posts.
+- **Web search & deep research.** Tavily + scraping + LLM summarizer + self‑scored feedback loops (relevance/coverage/confidence) with up to 3 refined queries when results are weak.
 - **Command policies.** Profiles cap heavy commands/tests so `fast` stays fast and `yolo` finishes after functional success instead of chasing lint forever.
-- **Failure feedback loop.** Runs are bounded: failing tests get summarised, attempts are tracked, and unresolved issues land in `.sdd/issues.md`.
+- **Failure feedback loop.** Runs are bounded: failing tests get summarised, attempts are tracked, research quality is logged, and unresolved issues land in `.sdd/issues.md`.
 
 CLI modes:
 
