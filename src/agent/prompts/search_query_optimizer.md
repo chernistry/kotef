@@ -10,7 +10,7 @@ Your goal is to convert a user's high-level goal and technical context into a si
 - **Context**: `{{CONTEXT}}`
 
 ## Constraints
-1. Output MUST be valid JSON only. No markdown fences.
+1. Output MUST be valid JSON only. No markdown fences or extra text.
 2. The query should be in English.
 3. The query should be specific to the tech stack if provided.
 4. Avoid generic terms; use specific libraries or patterns if inferred.
@@ -23,3 +23,5 @@ Your goal is to convert a user's high-level goal and technical context into a si
   "expected_domains": ["string", "string"]
 }
 ```
+
+Your entire response must be a **single JSON object** of this form. Do not include the schema itself, backticks, or any explanatory prose.

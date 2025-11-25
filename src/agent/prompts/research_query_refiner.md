@@ -11,7 +11,7 @@ Your goal is to refine a search query based on previous results to improve relev
 - **Results Summary**: `{{RESULTS_SUMMARY}}`
 
 ## Constraints
-1. Output MUST be valid JSON only. No markdown fences.
+1. Output MUST be valid JSON only. No markdown fences or extra text.
 2. If the previous results were poor (low relevance/coverage), propose a different angle or more specific terms.
 3. If the previous results were good but incomplete, propose a query to fill the gaps.
 4. If no retry is needed, set `should_retry` to false.
@@ -24,3 +24,5 @@ Your goal is to refine a search query based on previous results to improve relev
   "reason": "string (why refine or stop)"
 }
 ```
+
+Your entire response must be a **single JSON object** of this form. Do not include the schema itself, backticks, or any explanatory prose.
