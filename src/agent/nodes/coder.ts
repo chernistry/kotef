@@ -7,6 +7,7 @@ import { callChat, ChatMessage } from '../../core/llm.js';
 import { readFile, writeFile, writePatch } from '../../tools/fs.js';
 import { runCommand } from '../../tools/test_runner.js';
 import { resolveExecutionProfile, PROFILE_POLICIES, looksLikeInstall, ExecutionProfile } from '../profiles.js';
+import { detectCommands } from '../utils/verification.js';
 import crypto from 'node:crypto';
 
 export function coderNode(cfg: KotefConfig, chatFn = callChat) {
@@ -216,6 +217,26 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         required: []
                     }
                 }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'run_diagnostic',
+                    description:
+                        'Run the best-fit build/test command once to see real errors before making changes (error-first strategy).',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            kind: {
+                                type: 'string',
+                                enum: ['auto', 'build', 'test', 'lint'],
+                                description:
+                                    'Optional hint: prefer build vs test vs lint; defaults to auto selection.'
+                            }
+                        },
+                        required: []
+                    }
+                }
             }
         ];
 
@@ -227,6 +248,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         let testCount = 0;
         let fileChanges = state.fileChanges || {};
         let patchFingerprints = state.patchFingerprints || new Map<string, number>();
+        let diagnosticRun = false;
 
         log.info('Starting coder tool execution loop', { maxTurns, profile: executionProfile });
 
@@ -365,6 +387,62 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                                 };
                                 log.info('Tests executed', {
                                     command,
+                                    exitCode: cmdResult.exitCode,
+                                    passed: cmdResult.passed
+                                });
+                            }
+                        }
+                    } else if (toolCall.function.name === 'run_diagnostic') {
+                        const kind = typeof args.kind === 'string' ? args.kind : 'auto';
+
+                        if (diagnosticRun && kind === 'auto') {
+                            result = 'Diagnostic already executed in this coder run; reuse its output and focus on fixing the top errors.';
+                            log.info('Diagnostic skipped (already run)');
+                        } else {
+                            const detected = await detectCommands(cfg);
+                            let cmd: string | undefined;
+
+                            if (kind === 'build') {
+                                cmd = detected.buildCommand || detected.primaryTest || detected.lintCommand;
+                            } else if (kind === 'test') {
+                                cmd = detected.primaryTest || detected.buildCommand || detected.lintCommand;
+                            } else if (kind === 'lint') {
+                                cmd = detected.lintCommand || detected.primaryTest || detected.buildCommand;
+                            } else {
+                                cmd =
+                                    detected.diagnosticCommand ||
+                                    detected.primaryTest ||
+                                    detected.buildCommand ||
+                                    detected.lintCommand;
+                            }
+
+                            if (!cmd) {
+                                result = {
+                                    kind: 'diagnostic_unavailable',
+                                    message:
+                                        'No suitable diagnostic command (build/test/lint) was detected for this stack. Inspect the repo and choose a specific command with run_command or run_tests.',
+                                    stack: detected.stack
+                                };
+                                log.info('No diagnostic command available', { detected });
+                            } else if (isTinyTask && executionProfile !== 'strict') {
+                                result = `Skipped diagnostic "${cmd}" because task scope is tiny under profile "${executionProfile}". Prefer minimal, targeted edits instead.`;
+                                log.info('Diagnostic skipped by tiny-task policy', { command: cmd });
+                            } else if (commandCount >= policy.maxCommands) {
+                                result = `Skipped diagnostic: command budget exceeded for profile "${executionProfile}" (max ${policy.maxCommands}).`;
+                                log.info('Diagnostic skipped by profile limit', { command: cmd });
+                            } else {
+                                commandCount += 1;
+                                const cmdResult = await runCommand(cfg, cmd);
+                                diagnosticRun = true;
+                                result = {
+                                    command: cmd,
+                                    exitCode: cmdResult.exitCode,
+                                    stdout: cmdResult.stdout,
+                                    stderr: cmdResult.stderr,
+                                    passed: cmdResult.passed
+                                };
+                                log.info('Diagnostic command executed', {
+                                    command: cmd,
                                     exitCode: cmdResult.exitCode,
                                     passed: cmdResult.passed
                                 });

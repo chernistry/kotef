@@ -19,18 +19,6 @@ export function researcherNode(cfg: KotefConfig) {
             log.info('Existing SDD best_practices.md detected; will use it as context but allow fresh research.');
         }
 
-        // Only research if not already done
-        const hasResults =
-            state.researchResults &&
-            (Array.isArray(state.researchResults)
-                ? state.researchResults.length > 0
-                : Object.keys(state.researchResults).length > 0);
-
-        if (hasResults) {
-            log.info('Research already done, skipping');
-            return {};
-        }
-
         // Load prompt
         const { loadRuntimePrompt } = await import('../../core/prompts.js');
         const promptTemplate = await loadRuntimePrompt('researcher');
@@ -87,6 +75,23 @@ export function researcherNode(cfg: KotefConfig) {
 
         try {
             if (profile === 'strict') {
+                // If we already have research for this query and quality says "no retry",
+                // avoid redundant deep research and surface a "no new info" signal.
+                if (
+                    state.researchQuality &&
+                    state.researchQuality.lastQuery === primaryQuery &&
+                    state.researchQuality.shouldRetry === false
+                ) {
+                    log.info('Repeated strict research request with no new info; reusing existing findings.');
+                    return {
+                        researchResults: state.researchResults,
+                        researchQuality: {
+                            ...state.researchQuality,
+                            reasons: `${state.researchQuality.reasons}\n\n[researcher] No new information found; repeated query "${primaryQuery}".`
+                        }
+                    };
+                }
+
                 const result = await deepResearch(cfg, primaryQuery, {
                     originalGoal: state.sdd.goal,
                     maxAttempts: 3

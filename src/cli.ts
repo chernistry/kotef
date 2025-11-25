@@ -202,7 +202,7 @@ program
             // Run Graph
             log.info('Building and running agent graph...');
             const graph = buildKotefGraph(cfg);
-            const result = await graph.invoke(initialState);
+            const result = await graph.invoke(initialState, { recursionLimit: 100 });
 
             log.info('Run completed.', { done: result.done });
 
@@ -418,7 +418,7 @@ program
                     };
 
                     const graph = buildKotefGraph(cfg);
-                    const result = await graph.invoke(initialState);
+                    const result = await graph.invoke(initialState, { recursionLimit: 100 });
 
                     const endTime = Date.now();
                     const durationSeconds = (endTime - startTime) / 1000;

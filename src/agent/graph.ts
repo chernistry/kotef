@@ -66,7 +66,14 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             },
             loopCounters: {
                 reducer: (a, b) => b ?? a,
-                default: () => ({ planner_to_researcher: 0, planner_to_verifier: 0, planner_to_coder: 0 }),
+                default: () => ({
+                    planner_to_researcher: 0,
+                    planner_to_verifier: 0,
+                    planner_to_coder: 0,
+                    lastResearchSignature: undefined,
+                    lastFileChangeCount: 0,
+                    lastTestSignature: undefined
+                }),
             },
             totalSteps: {
                 reducer: (a, b) => b ?? a,

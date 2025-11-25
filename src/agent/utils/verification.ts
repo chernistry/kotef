@@ -11,6 +11,7 @@ export interface DetectedCommands {
     smokeTest?: string;     // e.g. "npm run dev", "python app.py"
     buildCommand?: string;  // e.g. "npm run build"
     lintCommand?: string;   // e.g. "npm run lint", "pylint"
+    diagnosticCommand?: string; // best single command for "error-first" diagnostics
 }
 
 /**
@@ -32,12 +33,28 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
 
         const stack: ProjectStack = isVite ? 'vite_frontend' : 'node';
 
+        const primaryTest = scripts.test ? 'npm test' : undefined;
+        const smokeTest = scripts.dev ? 'npm run dev' : (scripts.start ? 'npm start' : undefined);
+        const buildCommand = scripts.build ? 'npm run build' : undefined;
+        const lintCommand = scripts.lint ? 'npm run lint' : undefined;
+
+        // Error-first diagnostic preference:
+        // 1) build (compilation errors)
+        // 2) primary test
+        // 3) lint
+        const diagnosticCommand =
+            buildCommand ||
+            primaryTest ||
+            lintCommand ||
+            undefined;
+
         return {
             stack,
-            primaryTest: scripts.test ? 'npm test' : undefined,
-            smokeTest: scripts.dev ? 'npm run dev' : (scripts.start ? 'npm start' : undefined),
-            buildCommand: scripts.build ? 'npm run build' : undefined,
-            lintCommand: scripts.lint ? 'npm run lint' : undefined
+            primaryTest,
+            smokeTest,
+            buildCommand,
+            lintCommand,
+            diagnosticCommand
         };
     } catch (e) {
         // Not a Node project or invalid package.json
@@ -52,22 +69,36 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
         // Try to find main app file for smoke test
         let mainApp = pyFiles.find(f => f === 'app.py' || f === 'main.py' || f === 'manage.py');
 
+        const primaryTest = 'pytest'; // default assumption
+        const smokeTest = mainApp ? `python ${mainApp}` : undefined;
+        const lintCommand = 'pylint';
+
+        // Diagnostics: prefer tests, then a generic compile step if tests are missing.
+        const diagnosticCommand = primaryTest || 'python -m compileall .';
+
         return {
             stack: 'python',
-            primaryTest: 'pytest', // Default assumption
-            smokeTest: mainApp ? `python ${mainApp}` : undefined,
-            lintCommand: 'pylint' // Default assumption
+            primaryTest,
+            smokeTest,
+            lintCommand,
+            diagnosticCommand
         };
     }
 
     // 3. Check for Go
     const hasGoMod = await fileExists(rootDir, 'go.mod');
     if (hasGoMod) {
+        const primaryTest = 'go test ./...';
+        const smokeTest = 'go run .';
+        const buildCommand = 'go build';
+        const diagnosticCommand = primaryTest || buildCommand;
+
         return {
             stack: 'go',
-            primaryTest: 'go test ./...',
-            smokeTest: 'go run .',
-            buildCommand: 'go build'
+            primaryTest,
+            smokeTest,
+            buildCommand,
+            diagnosticCommand
         };
     }
 

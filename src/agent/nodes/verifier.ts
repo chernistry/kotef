@@ -36,7 +36,10 @@ export function verifierNode(cfg: KotefConfig) {
             if (detected?.buildCommand) commandsToRun.push(detected.buildCommand);
             if (detected?.lintCommand) commandsToRun.push(detected.lintCommand);
         } else if (executionProfile === 'fast') {
-            if (forceBuild && detected?.buildCommand) {
+            // Align with error-first strategy: prefer the same diagnostic command coder used.
+            if (detected?.diagnosticCommand) {
+                commandsToRun.push(detected.diagnosticCommand);
+            } else if (forceBuild && detected?.buildCommand) {
                 commandsToRun.push(detected.buildCommand);
             }
             if (detected?.primaryTest) {
@@ -46,7 +49,9 @@ export function verifierNode(cfg: KotefConfig) {
             }
         } else {
             // smoke / yolo
-            if (forceBuild && detected?.buildCommand) {
+            if (!isTinyTask && detected?.diagnosticCommand) {
+                commandsToRun.push(detected.diagnosticCommand);
+            } else if (forceBuild && detected?.buildCommand) {
                 commandsToRun.push(detected.buildCommand);
             } else if (detected?.smokeTest) {
                 commandsToRun.push(detected.smokeTest);

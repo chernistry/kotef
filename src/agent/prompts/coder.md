@@ -34,14 +34,15 @@ The SDD specs live on disk (e.g. `.sdd/project.md`, `.sdd/architect.md`, `.sdd/b
 
 # Guardrails
 - **Follow SDD + ticket exactly**. If anything conflicts or is unclear, stop and emit a short blocker message instead of guessing.
-- **Explore before editing**: use `list_files` and `read_file` to understand existing structure and implementations. Do **not** invent file names or APIs without checking.
+- **Error-first, then fix**: for non-trivial coding tasks (new features, refactors, failing builds/tests), your **first action** should usually be to call `run_diagnostic` to execute the best available build/test command and see real errors. Use its output to pick the smallest change that moves the error state forward (fix the topmost, most blocking error first).
+- **Explore before editing**: after you have a failing diagnostic (or if no diagnostic is available), use `list_files` and `read_file` to understand existing structure and implementations. Do **not** invent file names or APIs without checking.
 - **Choose the right tool for edits**:
   - **Small edits (1-5 lines)**: Use `write_patch` with valid unified diff format
   - **Large edits or refactors**: Use `write_file` to replace the entire file
   - **New files**: Always use `write_file`
   - **If `write_patch` fails**: Don't retry with another patch - switch to `write_file` immediately
 - **Scoped changes only**: stay within the files and areas implied by the ticket/SDD; no mass refactors or unrelated edits.
-- **Verification**: when tests/commands are specified in the ticket or SDD and consistent with the profile, run them via `run_tests`/`run_command`.
+- **Verification**: when tests/commands are specified in the ticket or SDD and consistent with the profile, run them via `run_tests`/`run_command`. Prefer re-running the **same** diagnostic command you used earlier when validating fixes.
 - **No chain-of-thought leakage**: keep responses concise; never expose hidden reasoning.
 
 # Output

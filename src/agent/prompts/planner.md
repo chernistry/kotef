@@ -101,7 +101,7 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
 # Decision rules
 - Choose `researcher` when SDD or current knowledge is insufficient; include concrete queries in `needs.research_queries`.
 - Choose `coder` when the work is clear and bounded; include target files in `needs.files`.
-- Choose `verifier` after code changes; list exact test commands in `needs.tests`.
+- Choose `verifier` after code changes; list exact test commands in `needs.tests`. When the goal involves builds/tests, prefer an **error-first** step: suggest a single diagnostic command (e.g. `npm run build`, `npm test`, `pytest`) that coder can run via `run_diagnostic`.
 - Choose `done` only when the Definition of Done is satisfied.
   - If goal is met but unrelated global tests fail (and profile is NOT strict), use `terminalStatus: "done_partial"` and explain in `reason`.
   - If all checks pass, use `terminalStatus: "done_success"`.

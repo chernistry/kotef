@@ -84,6 +84,52 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         const MAX_LOOP_EDGE = 5;
         const currentSteps = (state.totalSteps || 0) + 1;
 
+        // Progress / loop tracking
+        const currentLoopCounters = state.loopCounters || {
+            planner_to_researcher: 0,
+            planner_to_verifier: 0,
+            planner_to_coder: 0,
+            lastResearchSignature: undefined,
+            lastFileChangeCount: 0,
+            lastTestSignature: undefined
+        };
+
+        const computeResearchSignature = () => {
+            if (!state.researchResults) return undefined;
+            try {
+                const isArray = Array.isArray(state.researchResults);
+                const length = isArray
+                    ? state.researchResults.length
+                    : Object.keys(state.researchResults).length;
+                const lastQuery = state.researchQuality?.lastQuery;
+                const payload = JSON.stringify({ lastQuery, length });
+                return payload.slice(0, 256);
+            } catch {
+                return undefined;
+            }
+        };
+
+        const newResearchSig = computeResearchSignature();
+        let loopCounters = { ...currentLoopCounters };
+
+        // Reset per-edge counters when we see clear signs of progress
+        if (newResearchSig && newResearchSig !== currentLoopCounters.lastResearchSignature) {
+            loopCounters.planner_to_researcher = 0;
+            loopCounters.lastResearchSignature = newResearchSig;
+        }
+
+        const fileChangeCount = Object.keys(state.fileChanges || {}).length;
+        if (fileChangeCount !== (currentLoopCounters.lastFileChangeCount ?? 0)) {
+            loopCounters.planner_to_coder = 0;
+            loopCounters.lastFileChangeCount = fileChangeCount;
+        }
+
+        const lastTestSig = state.lastTestSignature;
+        if (lastTestSig && lastTestSig !== currentLoopCounters.lastTestSignature) {
+            loopCounters.planner_to_verifier = 0;
+            loopCounters.lastTestSignature = lastTestSig;
+        }
+
         const replacements: Record<string, string> = {
             '{{GOAL}}': safe(state.sdd.goal),
             '{{TICKET}}': safe(state.sdd.ticket),
@@ -320,7 +366,6 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
 
         // Update loop counters based on decision
         const nextNode = decision.next;
-        const loopCounters = { ...state.loopCounters };
 
         if (nextNode === 'researcher') loopCounters.planner_to_researcher = (loopCounters.planner_to_researcher || 0) + 1;
         if (nextNode === 'verifier') loopCounters.planner_to_verifier = (loopCounters.planner_to_verifier || 0) + 1;
@@ -329,7 +374,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         // Enforce loop limits
         if (nextNode === 'researcher' && loopCounters.planner_to_researcher > MAX_LOOP_EDGE) {
             decision.next = 'snitch';
-            decision.reason = `Aborted: Planner->Researcher loop limit exceeded (${MAX_LOOP_EDGE}).`;
+            decision.reason = `Planner detected loop planner→researcher without progress after ${loopCounters.planner_to_researcher} hops.`;
             return {
                 terminalStatus: 'aborted_stuck',
                 plan: decision,
@@ -341,7 +386,19 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         }
         if (nextNode === 'verifier' && loopCounters.planner_to_verifier > MAX_LOOP_EDGE) {
             decision.next = 'snitch';
-            decision.reason = `Aborted: Planner->Verifier loop limit exceeded (${MAX_LOOP_EDGE}).`;
+            decision.reason = `Planner detected loop planner→verifier without progress after ${loopCounters.planner_to_verifier} hops.`;
+            return {
+                terminalStatus: 'aborted_stuck',
+                plan: decision,
+                messages: [assistantMsg],
+                runProfile: resolvedProfile,
+                loopCounters,
+                totalSteps: currentSteps
+            };
+        }
+        if (nextNode === 'coder' && loopCounters.planner_to_coder > MAX_LOOP_EDGE) {
+            decision.next = 'snitch';
+            decision.reason = `Planner detected loop planner→coder without progress after ${loopCounters.planner_to_coder} hops.`;
             return {
                 terminalStatus: 'aborted_stuck',
                 plan: decision,
