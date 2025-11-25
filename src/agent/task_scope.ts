@@ -5,8 +5,57 @@ function containsKeyword(text: string, keywords: string[]): boolean {
 }
 
 export function estimateTaskScope(goal?: string, ticket?: string, architect?: string): TaskScope {
-    const blob = `${goal ?? ''}\n${ticket ?? ''}`.toLowerCase();
+    const goalText = (goal ?? '').toLowerCase();
+    const ticketText = (ticket ?? '').toLowerCase();
+    const blob = `${goalText}\n${ticketText}`;
     const wordCount = blob.split(/\s+/).filter(Boolean).length;
+
+    const projectCreationSignals = [
+        'create a new',
+        'create new',
+        'build a new',
+        'scaffold',
+        'bootstrap',
+        'greenfield',
+        'from scratch',
+        'portfolio',
+        'landing page',
+        'landing-page',
+        'fullstack app',
+        'full-stack app',
+        'react app',
+        'vite app',
+        // Russian equivalents commonly used in goals
+        'создай',
+        'создать',
+        'сделай',
+        'сделать',
+        'построй',
+        'новый проект',
+        'новое приложение',
+        'портфолио-сайт',
+        'портфолио сайт'
+    ];
+
+    const tinyChangeSignals = [
+        'typo',
+        'misspell',
+        'rename variable',
+        'rename method',
+        'rename function',
+        'comment only',
+        'docs only',
+        'documentation only',
+        'readme',
+        'changelog',
+        'small tweak',
+        'one-liner',
+        'one line',
+        'formatting',
+        'prettier',
+        'eslint fix'
+    ];
+
     const heavyKeywords = [
         'architecture',
         'platform',
@@ -30,17 +79,26 @@ export function estimateTaskScope(goal?: string, ticket?: string, architect?: st
         'kubernetes'
     ];
 
+    // Obvious architecture / platform work → large
     if (containsKeyword(blob, heavyKeywords)) {
         return 'large';
     }
-    if (wordCount <= 80) {
+
+    // Greenfield / new app creation goals without an explicit ticket → at least normal
+    if (!ticket && containsKeyword(goalText, projectCreationSignals)) {
+        return 'normal';
+    }
+
+    // Very long specs or architect docs imply multi-step / large work
+    if (wordCount >= 200 || (architect ?? '').length > 20000) {
+        return 'large';
+    }
+
+    // Tiny, text-level tweaks with explicit tiny signals
+    if (wordCount <= 80 && containsKeyword(blob, tinyChangeSignals)) {
         return 'tiny';
     }
-    if (wordCount >= 200) {
-        return 'large';
-    }
-    if ((architect ?? '').length > 20000) {
-        return 'large';
-    }
+
+    // Default: treat as normal-sized coding task
     return 'normal';
 }

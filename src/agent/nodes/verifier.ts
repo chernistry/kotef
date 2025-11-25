@@ -158,7 +158,10 @@ export function verifierNode(cfg: KotefConfig) {
 
         // Run LSP diagnostics if appropriate (Ticket 33)
         // Use full LSP server for file-level diagnostics when possible
-        if (executionProfile === 'strict' || (executionProfile === 'fast' && hasFileChanges)) {
+        if (
+            cfg.enableTsLspDiagnostics &&
+            (executionProfile === 'strict' || (executionProfile === 'fast' && hasFileChanges))
+        ) {
             try {
                 const { runTsLspDiagnosticsViaServer } = await import('../../tools/lsp.js');
 

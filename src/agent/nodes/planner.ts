@@ -231,7 +231,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                     profile: state.runProfile,
                     plan: []
                 },
-                done: true // Snitch will handle logging
+                done: true, // Snitch will handle logging
+                progressHistory
             };
         }
 
@@ -248,7 +249,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                     profile: state.runProfile,
                     plan: []
                 },
-                done: true
+                done: true,
+                progressHistory
             };
         }
 
@@ -464,6 +466,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             runProfile: resolvedProfile,
             loopCounters,
             totalSteps: currentSteps,
+            progressHistory,
             // Set terminal status if done
             ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success' } : {})
         };

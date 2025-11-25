@@ -61,7 +61,11 @@ node bin/kotef chat --root /path/to/repo
   - strongly‑typed `AgentState`,
   - runtime prompts in `src/agent/prompts/body/`,
   - SDD templates in `src/agent/prompts/brain/`,
-  - deep web research in `src/tools/deep_research.ts`.
+  - deep web research in `src/tools/deep_research.ts`,
+  - hybrid patch pipeline (unified diff + AST fallback),
+  - LSP diagnostics for TypeScript/JS (real-time),
+  - progress controller (loop/stuck detection),
+  - experimental MCP support for external code servers.
 
 ---
 
@@ -86,11 +90,18 @@ Full technical docs (CLI flags, env, architecture, profiles, safety) live in `do
 
 ## Contributing
 
-- Things that would be especially useful:
+Recent capabilities (see closed tickets):
+- **LSP diagnostics** for TypeScript/JavaScript (real-time error detection)
+- **Hybrid patch pipeline** (AST fallback when diffs fail)
+- **MCP integration** (experimental support for external code-intel servers)
+- **Progress controller** (loop detection, stuck-state handling)
+- **Functional probes** (goal-first verification beyond just tests)
+
+Things that would be especially useful:
   - a stricter Verifier,
   - a smarter Planner (fewer loops, more common sense),
   - custom profiles/strategies for different stacks,
-  - MCP integration with external code servers.
+  - more MCP tool integrations.
 - See `CONTRIBUTING.md` and SDD tickets under `.sdd/backlog/tickets/`.
 
 PRs, “here’s how X solves this, let’s steal/beat it” issues, and stress tests on your real‑world repos are very welcome.

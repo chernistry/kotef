@@ -199,11 +199,21 @@ MVP implementation
 
         resultMessages.push(assistantMessage);
 
-        const toolCalls: ToolCallResult[] = message.tool_calls?.map(tc => ({
-            toolName: tc.function.name,
-            args: JSON.parse(tc.function.arguments),
-            result: undefined // Result is not known yet
-        })) || [];
+        const toolCalls: ToolCallResult[] = message.tool_calls?.map(tc => {
+            let parsedArgs: unknown;
+            const rawArgs = tc.function.arguments;
+            try {
+                parsedArgs = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
+            } catch {
+                // If arguments are not valid JSON, pass through the raw string so callers can handle it.
+                parsedArgs = rawArgs;
+            }
+            return {
+                toolName: tc.function.name,
+                args: parsedArgs,
+                result: undefined // Result is not known yet
+            };
+        }) || [];
 
         return {
             messages: resultMessages,

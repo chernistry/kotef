@@ -2,6 +2,7 @@ import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { deepResearch } from '../../tools/deep_research.js';
 import { createLogger } from '../../core/logger.js';
+import { jsonrepair } from 'jsonrepair';
 
 export function researcherNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
@@ -53,11 +54,32 @@ export function researcherNode(cfg: KotefConfig) {
                 model: cfg.modelFast,
                 response_format: { type: 'json_object' } as any
             });
-            const content = response.messages[response.messages.length - 1].content || '{}';
-            plan = JSON.parse(content);
+            let content = response.messages[response.messages.length - 1].content || '{}';
+            let raw = content.trim();
+
+            // Some providers may still wrap JSON in fences despite response_format
+            if (raw.startsWith('```')) {
+                const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
+                if (fenceMatch && fenceMatch[1]) {
+                    raw = fenceMatch[1].trim();
+                }
+            }
+
+            try {
+                plan = JSON.parse(raw);
+            } catch {
+                plan = JSON.parse(jsonrepair(raw));
+            }
         } catch (e) {
             log.error('Researcher LLM failed', { error: e });
-            plan = { queries: [state.sdd.goal || 'Analyze project'] };
+            // Fallback: derive at least one explicit, grounded query from the goal
+            const fallbackGoal = state.sdd.goal || 'Analyze project';
+            plan = {
+                queries: [
+                    fallbackGoal,
+                    `best practices ${fallbackGoal}`.slice(0, 200)
+                ]
+            };
         }
 
         const queries = plan.queries || [];
