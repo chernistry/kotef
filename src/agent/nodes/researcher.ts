@@ -15,15 +15,11 @@ export function researcherNode(cfg: KotefConfig) {
         };
 
         // If SDD already provides best practices, treat them as primary research source
+        // If SDD already provides best practices, we still might need specific research.
+        // We do NOT return early here anymore.
         const sddBest = state.sdd.bestPractices || '';
         if (sddBest.trim().length > 0) {
-            log.info('Existing SDD best_practices.md detected; skipping external deep research.');
-            return {
-                researchResults: {
-                    source: 'sdd',
-                    note: 'Using .sdd/best_practices.md as primary best-practices reference; no fresh web research performed in this run.'
-                }
-            };
+            log.info('Existing SDD best_practices.md detected; will use it as context but allow fresh research.');
         }
 
         // Only research if not already done

@@ -58,6 +58,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{LOOP_COUNTERS}}': safe(state.loopCounters),
             '{{TOTAL_STEPS}}': safe(currentSteps),
             '{{TASK_SCOPE}}': state.taskScope || 'normal',
+            '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
         };
 
         if (currentSteps >= MAX_STEPS) {

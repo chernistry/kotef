@@ -136,10 +136,11 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
                 const rr: any = state.researchResults;
                 const rq = state.researchQuality;
 
-                // If we have SDD results, we are good.
-                if (rr && !Array.isArray(rr) && rr.source === 'sdd') {
-                    return 'coder';
-                }
+                // If we have SDD results, we used to force coder, but that blocks fresh research.
+                // Now we respect planner's decision.
+                // if (rr && !Array.isArray(rr) && rr.source === 'sdd') {
+                //    return 'coder';
+                // }
 
                 // If research failed with error, snitch.
                 if (rr && !Array.isArray(rr) && rr.error) {

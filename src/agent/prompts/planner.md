@@ -44,7 +44,7 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - **`strict`**: production-like, heavy checks. Use for core architecture or safety-critical code.
 - **`fast`**: normal development loop. Use for typical features.
 - **`smoke`**: quick prototype. Use for tiny tasks or when tools are missing.
-- **`yolo`**: aggressive mode. Prioritize speed.
+- **`yolo`**: aggressive mode. Prioritize speed. **NEVER** ask for clarification; assume reasonable defaults or research it yourself.
 - **`tiny` scope**: Prefer minimal steps. Skip broad `npm test` if out of scope.
 - **`large` scope**: Allow deeper reasoning and more tool calls.
 
