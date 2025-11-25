@@ -340,14 +340,41 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         result = await readFile({ rootDir: cfg.rootDir! }, args.path);
                         log.info('File read', { path: args.path, size: result.length });
                     } else if (toolCall.function.name === 'get_code_context') {
-                        const { getCodeContext } = await import('../utils/code_context.js');
-                        const snippets = await getCodeContext({
-                            rootDir: cfg.rootDir!,
+                        const { getCodeIndex } = await import('../../tools/code_index.js');
+                        const index = getCodeIndex();
+
+                        // Lazy build index on first use
+                        if (!state.codeIndexBuilt) {
+                            log.info('Building code index (first use)');
+                            await index.build(cfg.rootDir!);
+                            state.codeIndexBuilt = true;
+                        }
+
+                        // Update index with changed files
+                        const changedFiles = Object.keys(fileChanges || {});
+                        if (changedFiles.length > 0) {
+                            await index.update(changedFiles);
+                        }
+
+                        // Query index
+                        let snippets;
+                        if (args.symbol) {
+                            snippets = index.querySymbol(args.symbol);
+                        } else if (args.file) {
+                            snippets = index.queryFile(args.file);
+                        } else {
+                            snippets = [];
+                        }
+
+                        result = {
+                            count: snippets.length,
+                            snippets: snippets.slice(0, 10) // Limit to 10 results
+                        };
+                        log.info('Code context retrieved from index', {
+                            symbol: args.symbol,
                             file: args.file,
-                            symbol: args.symbol
+                            count: snippets.length
                         });
-                        result = snippets;
-                        log.info('Code context retrieved', { count: snippets.length });
                     } else if (toolCall.function.name === 'list_files') {
                         const { listFiles } = await import('../../tools/fs.js');
                         const pattern =

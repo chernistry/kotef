@@ -80,6 +80,8 @@ export interface AgentState {
     diagnosticsLog?: import('./utils/diagnostics.js').DiagnosticsEntry[];
     /** Concise summary of top diagnostics for prompt injection. */
     diagnosticsSummary?: string;
+    /** Flag indicating if code index has been built for this run. */
+    codeIndexBuilt?: boolean;
 }
 
 export type TerminalStatus = 'done_success' | 'done_partial' | 'aborted_stuck' | 'aborted_constraint';
