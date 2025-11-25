@@ -8,7 +8,7 @@
         "kotef": "bin/kotef"
     },
     "scripts": {
-        "build": "rm -rf dist && tsc && mkdir -p dist/src/agent && cp -r src/agent/prompts dist/src/agent/ && mkdir -p dist/brain && cp -r brain/templates dist/brain/",
+        "build": "rm -rf dist && tsc && mkdir -p dist/src/agent && cp -r src/agent/prompts dist/src/agent/",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:e2e": "npm run build && vitest run test/e2e.test.ts",

@@ -27,7 +27,7 @@ node bin/kotef chat --root /path/to/repo
 
 Under the hood:
 
-- **SDD‑first brain.** If there is no `.sdd/` yet and you give it a `--goal`, it runs a small LangGraph “orchestrator” (`sdd_orchestrator`) that does deep research, writes `.sdd/project.md`, `.sdd/architect.md`, `.sdd/best_practices.md` and a backlog of tickets from templates in `brain/templates/`.
+- **SDD‑first brain.** If there is no `.sdd/` yet and you give it a `--goal`, it runs a small LangGraph “orchestrator” (`sdd_orchestrator`) that does deep research, writes `.sdd/project.md`, `.sdd/architect.md`, `.sdd/best_practices.md` and a backlog of tickets from templates in `src/agent/prompts/brain/`.
 - **LangGraph flow.** After SDD exists, it switches to the main graph: `planner → researcher → coder → verifier → snitch/ticket_closer`, with run reports, command/time budgets, and execution profiles (`strict/fast/smoke/yolo`).
 - **Web search & deep research.** Tavily + scraping + LLM summarizer + self‑scored feedback loops (relevance/coverage/confidence) with up to 3 refined queries when results are weak.
 - **Command policies.** Profiles cap heavy commands/tests so `fast` stays fast and `yolo` finishes after functional success instead of chasing lint forever.
@@ -44,7 +44,7 @@ Very hand‑wavy, but enough to get the vibe:
 
 - **Spec first, code later.** The SDD orchestrator graph (`sdd_research → sdd_architect → sdd_tickets`) uses deep research plus prompt templates to build best practices, an architecture doc, and a ticket backlog before the main agent ever touches your code.
 - **Stateful brain.** The main LangGraph keeps a single `AgentState` with SDD text, the current ticket, plan JSON, research findings, file diffs, test results, loop counters, and a run profile. Every node reads that state and writes back a small patch.
-- **Planner as dispatcher.** `planner` uses a runtime prompt (`src/agent/prompts/planner.md`) to decide the next hop (`researcher` / `coder` / `verifier` / `snitch` / `done`), plus a mini plan and “needs” (files to inspect, tests to run, queries to ask). JSON is enforced and auto‑repaired with `jsonrepair` so bad LLM output does not crash the run.
+- **Planner as dispatcher.** `planner` uses a runtime prompt (`src/agent/prompts/body/planner.md`) to decide the next hop (`researcher` / `coder` / `verifier` / `snitch` / `done`), plus a mini plan and “needs” (files to inspect, tests to run, queries to ask). JSON is enforced and auto‑repaired with `jsonrepair` so bad LLM output does not crash the run.
 - **Research that can say “not enough”.** `researcher` plans queries via its prompt, then either calls the deep research module (`src/tools/deep_research.ts`) or a shallow web search, and returns findings plus a quality signal (`relevance/coverage/confidence/shouldRetry`). SDD best practices are always in the context so the agent does not re‑discover the obvious.
 - **Coder as tools‑only agent.** `coder` runs a tool‑calling LLM over a fixed toolbox (`read_file`, `list_files`, `write_file`, `write_patch`, `run_command`, `run_tests`) with budgets defined per profile in `src/agent/profiles.ts`. It prefers small patches, keeps an internal chat history, and bails once it runs out of turns or useful tool calls.
 - **Verifier as grumpy QA.** `verifier` autodetects stack (`node`, `vite_frontend`, `python`, `go`…) and picks sane test/build/lint commands, then runs them respecting profile limits. A verifier prompt decides if the goal is actually met (including “partial success” when global tests are flaky but the requested feature works).

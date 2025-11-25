@@ -86,7 +86,11 @@ This is where “avant‑garde” behaviour comes from: grounded agents that act
 
 ### 4. Prompt engineering & PE2‑style tuning
 
-The prompts live under `src/agent/prompts/` and in `.sdd/architect.md` / `.sdd/best_practices.md`.
+The prompts live under:
+
+- runtime agent “body” prompts: `src/agent/prompts/body/`
+- SDD/brain templates: `src/agent/prompts/brain/`
+- plus policy context in `.sdd/architect.md` / `.sdd/best_practices.md`.
 
 Useful contributions:
 
@@ -217,4 +221,3 @@ No long manifesto here:
 - Strong opinions are welcome; personal attacks are not.
 
 If something feels off, open an issue instead of letting it simmer.
-

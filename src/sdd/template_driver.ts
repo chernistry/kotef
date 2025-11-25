@@ -40,9 +40,9 @@ const TEMPLATE_FILES: Record<BrainTemplateKind, string> = {
 
 export function loadBrainTemplate(kind: BrainTemplateKind): string {
     // Resolve path relative to this file
-    // In dev: src/sdd/template_driver.ts -> ../../brain/templates
-    // In prod: dist/src/sdd/template_driver.js -> ../../brain/templates
-    const templatesDir = path.resolve(__dirname, '../../brain/templates');
+    // In dev: src/sdd/template_driver.ts -> ../agent/prompts/brain
+    // In prod: dist/src/sdd/template_driver.js -> ../agent/prompts/brain
+    const templatesDir = path.resolve(__dirname, '../agent/prompts/brain');
     const filename = TEMPLATE_FILES[kind];
 
     if (!filename) {

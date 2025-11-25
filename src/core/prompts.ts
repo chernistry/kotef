@@ -30,21 +30,40 @@ const RUNTIME_PROMPTS = new Set<RuntimePromptName>([
 ]);
 
 async function readPromptFile(promptName: string): Promise<string> {
-    const promptsDir = path.resolve(__dirname, '../agent/prompts');
-    const promptPath = path.join(promptsDir, `${promptName}.md`);
+    const promptsRoot = path.resolve(__dirname, '../agent/prompts');
 
-    try {
-        const content = await fs.readFile(promptPath, 'utf8');
-        if (!content.trim()) {
-            throw new Error(`Prompt is empty: ${promptName} (${promptPath})`);
+    // New layout: prompts are grouped under body/ (runtime agent) and brain/ (SDD templates).
+    // Keep a fallback to the root for backwards-compatibility / incremental migrations.
+    const candidatePaths = [
+        path.join(promptsRoot, 'body', `${promptName}.md`),
+        path.join(promptsRoot, 'brain', `${promptName}.md`),
+        path.join(promptsRoot, `${promptName}.md`)
+    ];
+
+    let lastError: any;
+
+    for (const promptPath of candidatePaths) {
+        try {
+            const content = await fs.readFile(promptPath, 'utf8');
+            if (!content.trim()) {
+                throw new Error(`Prompt is empty: ${promptName} (${promptPath})`);
+            }
+            return content;
+        } catch (error: any) {
+            lastError = error;
+            if (error.code === 'ENOENT') {
+                // Try next candidate.
+                continue;
+            }
+            // For non-ENOENT errors, surface immediately.
+            throw error;
         }
-        return content;
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            throw new Error(`Prompt not found: ${promptName} (at ${promptPath})`);
-        }
-        throw error;
     }
+
+    if (lastError?.code === 'ENOENT') {
+        throw new Error(`Prompt not found: ${promptName} (searched under ${promptsRoot})`);
+    }
+    throw lastError || new Error(`Prompt not found: ${promptName} (no candidates matched)`);
 }
 
 /**
