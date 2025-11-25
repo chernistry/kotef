@@ -73,6 +73,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         const replacements: Record<string, string> = {
             '{{TICKET}}': safe(state.sdd.ticket),
             '{{GOAL}}': safe(state.sdd.goal),
+            '{{PROJECT_SUMMARY}}': safe(JSON.stringify(state.projectSummary, null, 2)),
             '{{SDD_PROJECT}}': summarize(state.sdd.project, 2500),
             '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),
             '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),

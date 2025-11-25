@@ -46,6 +46,8 @@ export interface AgentState {
         architectSummary: string;
         bestPracticesSummary: string;
     };
+
+    projectSummary?: import('./utils/project_summary.js').ProjectSummary;
     researchQuality?: ResearchQuality;
     metrics?: RunMetrics;
     budget?: BudgetState;

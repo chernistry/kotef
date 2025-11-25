@@ -23,6 +23,8 @@ export const KotefConfigSchema = z.object({
     maxTokensPerRun: z.number().default(10000),
     /** Max number of outbound web requests per run (search + fetch). */
     maxWebRequestsPerRun: z.number().default(30),
+    /** Max tool call turns in coder node (overrides profile defaults). */
+    maxCoderTurns: z.number().optional(),
     /** If true, use deterministic mock responses for LLM calls */
     mockMode: z.boolean().default(false),
     /** Max wall-clock seconds per run before graceful stop. */

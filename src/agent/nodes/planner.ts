@@ -4,6 +4,7 @@ import { ChatMessage, callChat } from '../../core/llm.js';
 import { loadRuntimePrompt } from '../../core/prompts.js';
 import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
+import { buildProjectSummary } from '../utils/project_summary.js';
 
 function initializeBudget(profile: ExecutionProfile, scope: TaskScope): BudgetState {
     const zeros = { commandsUsed: 0, testRunsUsed: 0, webRequestsUsed: 0, commandHistory: [] };
@@ -36,6 +37,18 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             const scope = state.taskScope || 'normal';
             state.budget = initializeBudget(profile, scope);
             log.info('Budget initialized', { profile, scope, budget: state.budget });
+        }
+
+        // Initialize project summary if not present (Ticket 20)
+        if (!state.projectSummary) {
+            try {
+                const summary = await buildProjectSummary(cfg.rootDir || process.cwd(), cfg);
+                state.projectSummary = summary;
+                log.info('Project summary built', { summary });
+            } catch (err) {
+                log.warn('Failed to build project summary', { error: (err as Error).message });
+                // Continue without summary - not critical
+            }
         }
 
         const tryParseDecision = (raw: string) => {
@@ -74,6 +87,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         const replacements: Record<string, string> = {
             '{{GOAL}}': safe(state.sdd.goal),
             '{{TICKET}}': safe(state.sdd.ticket),
+            '{{PROJECT_SUMMARY}}': safe(JSON.stringify(state.projectSummary, null, 2)),
             '{{SDD_PROJECT}}': summarize(state.sdd.project, 2500),
             '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),
             '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),
