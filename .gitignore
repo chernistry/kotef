@@ -78,3 +78,5 @@ coverage/
 *.tsbuildinfo
 temp-e2e/*
 test_*
+src/agent/nodes/verifier.ts
+devdata/eval/*
