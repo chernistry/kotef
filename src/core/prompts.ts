@@ -13,14 +13,20 @@ export type RuntimePromptName =
     | 'planner'
     | 'researcher'
     | 'coder'
-    | 'verifier';
+    | 'verifier'
+    | 'research_query_refiner'
+    | 'research_relevance_evaluator'
+    | 'search_query_optimizer';
 
 const RUNTIME_PROMPTS = new Set<RuntimePromptName>([
     'meta_agent',
     'planner',
     'researcher',
     'coder',
-    'verifier'
+    'verifier',
+    'research_query_refiner',
+    'research_relevance_evaluator',
+    'search_query_optimizer'
 ]);
 
 async function readPromptFile(promptName: string): Promise<string> {

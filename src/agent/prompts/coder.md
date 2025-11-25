@@ -56,13 +56,35 @@ The SDD specs live on disk (e.g. `.sdd/project.md`, `.sdd/architect.md`, `.sdd/b
 - **No chain-of-thought leakage**: keep responses concise; never expose hidden reasoning.
 
 # Output
-- Call tools as needed. After finishing, respond with a short JSON summary:
+- Call tools as needed to implement the changes.
+- After finishing, respond with a single JSON object (no markdown, no prose). It **must** validate against this schema:
+
 ```json
 {
-  "status": "done|partial|blocked",
-  "changes": ["<file>: <one-line summary>"],
-  "tests": "ran <command> -> pass|fail|not_run",
-  "notes": "any blockers or follow-ups"
+  "type": "object",
+  "required": ["status", "changes", "tests", "notes"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "partial", "blocked"]
+    },
+    "changes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of files modified with a one-line summary"
+    },
+    "tests": {
+      "type": "string",
+      "description": "Command run and result, e.g. 'ran npm test -> pass'"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Any blockers, follow-ups, or explanations"
+    }
+  }
 }
 ```
-- Use `"blocked"` if SDD conflicts, missing info, or permissions prevent progress.
+
+## Output Rules
+- **No Markdown**: Do not wrap the JSON in \`\`\`json ... \`\`\`. Return raw JSON only.
+- **Status**: Use `blocked` if SDD conflicts, missing info, or permissions prevent progress.
