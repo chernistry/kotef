@@ -156,6 +156,44 @@ export function verifierNode(cfg: KotefConfig) {
             }
         }
 
+        // Run LSP diagnostics if appropriate (Ticket 32)
+        // Heuristic: Run if strict profile OR (fast profile and we have file changes)
+        // And only if we haven't already run a build command that probably covered it (though LSP is better structured)
+        // For now, let's run it if we are in strict mode or if explicitly enabled.
+        // Also check if it's a TS project.
+        if (executionProfile === 'strict' || (executionProfile === 'fast' && hasFileChanges)) {
+            try {
+                const { runTsLspDiagnostics } = await import('../../tools/lsp.js');
+                // We pass rootDir. We could pass changed files to optimize if we had a smarter LSP client.
+                const lspDiagnostics = await runTsLspDiagnostics(cfg.rootDir);
+                if (lspDiagnostics.length > 0) {
+                    log.info(`LSP found ${lspDiagnostics.length} diagnostics`);
+                    // Convert to DiagnosticsEntry
+                    const lspEntries: import('../utils/diagnostics.js').DiagnosticsEntry[] = lspDiagnostics.map(d => ({
+                        source: 'lsp',
+                        file: d.file,
+                        location: { line: d.line, column: d.column },
+                        message: `${d.code ? `[${d.code}] ` : ''}${d.message}`,
+                        severity: d.severity,
+                        firstSeenAt: Date.now(),
+                        lastSeenAt: Date.now(),
+                        occurrenceCount: 1
+                    }));
+                    currentDiagnostics = mergeDiagnostics(currentDiagnostics, lspEntries);
+
+                    // If LSP has errors, we might consider that a failure even if tests passed?
+                    // Ticket 32 says: "uses LSP as an additional gate".
+                    // If strict, yes.
+                    if (executionProfile === 'strict' && lspDiagnostics.some(d => d.severity === 'error')) {
+                        allPassed = false;
+                        log.warn('LSP errors detected in strict mode, marking as failed.');
+                    }
+                }
+            } catch (e) {
+                log.warn('Failed to run LSP diagnostics', { error: e });
+            }
+        }
+
         // 4. Update failure history
         let failureHistory = state.failureHistory || [];
         let lastTestSignature = state.lastTestSignature;

@@ -243,6 +243,21 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             {
                 type: 'function',
                 function: {
+                    name: 'get_code_context',
+                    description: 'Get relevant code snippets from the project using semantic search (file, symbol). Prefer this over reading entire files when looking for specific definitions.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            file: { type: 'string', description: 'Optional file path to scope the search' },
+                            symbol: { type: 'string', description: 'Optional symbol name (function, class, etc.) to find' }
+                        },
+                        required: []
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
                     name: 'apply_edits',
                     description: 'Apply a JSON-described set of text edits to a file.',
                     parameters: {
@@ -324,6 +339,15 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                     if (toolCall.function.name === 'read_file') {
                         result = await readFile({ rootDir: cfg.rootDir! }, args.path);
                         log.info('File read', { path: args.path, size: result.length });
+                    } else if (toolCall.function.name === 'get_code_context') {
+                        const { getCodeContext } = await import('../utils/code_context.js');
+                        const snippets = await getCodeContext({
+                            rootDir: cfg.rootDir!,
+                            file: args.file,
+                            symbol: args.symbol
+                        });
+                        result = snippets;
+                        log.info('Code context retrieved', { count: snippets.length });
                     } else if (toolCall.function.name === 'list_files') {
                         const { listFiles } = await import('../../tools/fs.js');
                         const pattern =
@@ -497,7 +521,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                     } else if (toolCall.function.name === 'apply_edits') {
                         await applyEdits(args.path, args.edits);
                         result = `Successfully applied ${args.edits.length} edits to ${args.path}`;
-                        fileChanges[args.path] = (fileChanges[args.path] || 0) + 1;
+                        fileChanges[args.path] = 'modified';
                     } else {
                         result = "Unknown tool";
                         log.warn('Unknown tool called', { tool: toolCall.function.name });

@@ -1,12 +1,15 @@
-# kotef — spec‑driven coding agent
+# kotef — an agent with a brain and a toolbox
 
 > “Give me a repo and a goal. I’ll figure out the rest.”
 
-kotef is a LangGraph‑based coding agent that **treats SDD as law**, does its own research/architecture/tickets, and then edits your repo via safe diffs.
+kotef is a LangGraph‑based coding agent that:
+- keeps a **“brain”** — it thinks in goals, tickets, and project rules, and
+- drives a **“body”** — tools that read/edit files, run tests, and hit the web,
+with a hard bias towards small diffs and not trashing your repo.
 
 It grew out of:
 - [synapse](https://chernistry.github.io/synapse/) — adaptive governance, metric‑driven agents.
-- [sddrush](https://github.com/chernistry/sddrush) — tiny SDD toolkit and prompt templates.
+- [sddrush](https://github.com/chernistry/sddrush) — tiny spec‑driven dev toolkit and prompt templates.
 
 kotef basically fuses them into a coding agent.
 
@@ -14,7 +17,7 @@ kotef basically fuses them into a coding agent.
 
 ## TL;DR
 
-One‑shot run:
+One‑shot run (brain + tools in one go):
 
 ```bash
 node bin/kotef run \
@@ -31,13 +34,16 @@ node bin/kotef chat --root /path/to/repo
 
 ---
 
-## What it actually does
+## What it actually does (brain vs body)
 
-- **SDD‑first.** If `.sdd/` is missing, the orchestrator builds `project.md`, `architect.md`, `best_practices.md` and an initial ticket backlog from templates (`src/agent/prompts/brain/`).
-- **Graph, not spaghetti.** Main flow: `planner → researcher → coder → verifier → snitch/ticket_closer`, with budgets and profiles (`strict/fast/smoke/yolo`).
-- **Error‑first & diff‑first.** Coder runs a diagnostic command first, then edits via minimal unified diffs with strict patch validation.
-- **Goal‑first verification.** Verifier decides if the goal is met, and can return `done_partial` when the feature works but some global tests still fail.
-- **Snitch.** If a request conflicts with SDD or the agent is stuck, Snitch writes a structured entry to `.sdd/issues.md` instead of pretending everything is fine.
+- **Brain (project understanding).**
+  - If there’s no `.sdd/` folder yet, kotef creates a tiny “spec brain” for your repo: `project.md`, `architect.md`, `best_practices.md` and an initial ticket backlog from templates (`src/agent/prompts/brain/`).
+  - That folder becomes the source of truth for goals, constraints, and coding standards.
+- **Body (tools that touch the repo).**
+  - Main flow is a small graph: `planner → researcher → coder → verifier → snitch/ticket_closer`, with budgets and execution profiles (`strict/fast/smoke/yolo`).
+  - Coder runs diagnostics first, then applies minimal unified diffs with strict validation instead of rewriting whole files.
+  - Verifier runs stack‑appropriate commands (build/tests/lint), and can say “functionally done but some global checks still red” via `done_partial`.
+  - Snitch writes structured issues into `.sdd/issues.md` when requests conflict with rules or the run is stuck, instead of silently looping.
 
 ---
 
