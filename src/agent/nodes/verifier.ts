@@ -30,21 +30,28 @@ export function verifierNode(cfg: KotefConfig) {
 
         // Heuristic: if goal mentions "build", force build
         const forceBuild = goal.toLowerCase().includes('build');
+        const hasFileChanges = Object.keys(state.fileChanges || {}).length > 0;
 
+        // Priority 1: Syntax Sanity (Ticket 27)
+        // If files changed, always try to run a cheap syntax check first.
+        if (hasFileChanges && detected.syntaxCheckCommand) {
+            commandsToRun.push(detected.syntaxCheckCommand);
+        }
+
+        // Priority 2: Profile-based tests
         if (executionProfile === 'strict') {
-            if (detected?.primaryTest) commandsToRun.push(detected.primaryTest);
-            if (detected?.buildCommand) commandsToRun.push(detected.buildCommand);
-            if (detected?.lintCommand) commandsToRun.push(detected.lintCommand);
+            if (detected.primaryTest) commandsToRun.push(detected.primaryTest);
+            if (detected.buildCommand) commandsToRun.push(detected.buildCommand);
+            if (detected.lintCommand && detected.lintCommand !== detected.syntaxCheckCommand) commandsToRun.push(detected.lintCommand);
         } else if (executionProfile === 'fast') {
             // Align with error-first strategy: prefer the same diagnostic command coder used.
-            if (detected?.diagnosticCommand) {
+            if (detected.diagnosticCommand) {
                 commandsToRun.push(detected.diagnosticCommand);
-            } else if (forceBuild && detected?.buildCommand) {
+            } else if (forceBuild && detected.buildCommand) {
                 commandsToRun.push(detected.buildCommand);
-            }
-            if (detected?.primaryTest) {
+            } else if (detected.primaryTest) {
                 commandsToRun.push(detected.primaryTest);
-            } else if (detected?.smokeTest) {
+            } else if (detected.smokeTest) {
                 commandsToRun.push(detected.smokeTest);
             }
         } else {

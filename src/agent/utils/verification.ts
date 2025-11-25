@@ -12,6 +12,7 @@ export interface DetectedCommands {
     buildCommand?: string;  // e.g. "npm run build"
     lintCommand?: string;   // e.g. "npm run lint", "pylint"
     diagnosticCommand?: string; // best single command for "error-first" diagnostics
+    syntaxCheckCommand?: string; // NEW: Lightweight syntax check
 }
 
 /**
@@ -20,6 +21,8 @@ export interface DetectedCommands {
  */
 export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands> {
     const rootDir = cfg.rootDir || process.cwd();
+
+    let syntaxCheckCommand: string | undefined;
 
     // 1. Check for Node.js / Vite
     try {
@@ -38,6 +41,12 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
         const buildCommand = scripts.build ? 'npm run build' : undefined;
         const lintCommand = scripts.lint ? 'npm run lint' : undefined;
 
+        if (scripts.lint) {
+            syntaxCheckCommand = 'npm run lint';
+        } else if (await fileExists(rootDir, 'tsconfig.json')) {
+            syntaxCheckCommand = 'npx tsc --noEmit';
+        }
+
         // Error-first diagnostic preference:
         // 1) build (compilation errors)
         // 2) primary test
@@ -54,7 +63,8 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
             smokeTest,
             buildCommand,
             lintCommand,
-            diagnosticCommand
+            diagnosticCommand,
+            syntaxCheckCommand
         };
     } catch (e) {
         // Not a Node project or invalid package.json
@@ -73,6 +83,9 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
         const smokeTest = mainApp ? `python ${mainApp}` : undefined;
         const lintCommand = 'pylint';
 
+        // Simple heuristic: compile all files in current directory
+        syntaxCheckCommand = 'python3 -m compileall . -q';
+
         // Diagnostics: prefer tests, then a generic compile step if tests are missing.
         const diagnosticCommand = primaryTest || 'python -m compileall .';
 
@@ -81,7 +94,8 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
             primaryTest,
             smokeTest,
             lintCommand,
-            diagnosticCommand
+            diagnosticCommand,
+            syntaxCheckCommand
         };
     }
 

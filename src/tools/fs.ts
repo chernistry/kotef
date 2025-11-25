@@ -35,6 +35,66 @@ export async function readFile(ctx: FsContext, relativePath: string): Promise<st
     return fs.readFile(fullPath, 'utf8');
 }
 
+export async function writePatch(filePath: string, diffContent: string): Promise<void> {
+    // 1. Validation (Ticket 26)
+    const forbiddenPatterns = [/```/, /<tool_call>/i, /<\/?code>/i];
+    for (const pat of forbiddenPatterns) {
+        if (pat.test(diffContent)) {
+            throw new Error(
+                'Patch rejected: contains non-diff markup (e.g. markdown fences or tool_call tags). ' +
+                'Provide a clean unified diff with no markdown or XML/HTML tags.'
+            );
+        }
+    }
+
+    const hasHunkHeader = diffContent.includes('@@');
+    const hasPlusMinus = /^[+-].+/m.test(diffContent);
+    if (!hasHunkHeader && !hasPlusMinus) {
+        throw new Error(
+            'Patch rejected: content does not look like a unified diff. ' +
+            'Use @@ hunk headers and +/- lines as in standard unified diff format.'
+        );
+    }
+
+    const absolutePath = path.resolve(filePath);
+    const content = await fs.readFile(absolutePath, 'utf-8');
+
+    // Apply patch
+    const result = Diff.applyPatch(content, diffContent);
+
+    if (result === false) {
+        throw new Error(
+            `Failed to apply patch to ${filePath}. The patch might be malformed or the file content has changed.`
+        );
+    }
+
+    await fs.writeFile(absolutePath, result, 'utf-8');
+}
+
+export interface TextEdit {
+    range: { start: number; end: number }; // 0-based character indices
+    newText: string;
+}
+
+export async function applyEdits(filePath: string, edits: TextEdit[]): Promise<void> {
+    const absolutePath = path.resolve(filePath);
+    const content = await fs.readFile(absolutePath, 'utf-8');
+
+    // Sort edits descending by start index to avoid shifting offsets
+    const sortedEdits = [...edits].sort((a, b) => b.range.start - a.range.start);
+
+    let newContent = content;
+    for (const edit of sortedEdits) {
+        // Basic bounds check
+        if (edit.range.start < 0 || edit.range.end > newContent.length || edit.range.start > edit.range.end) {
+            throw new Error(`Invalid edit range: ${JSON.stringify(edit.range)}`);
+        }
+        newContent = newContent.slice(0, edit.range.start) + edit.newText + newContent.slice(edit.range.end);
+    }
+
+    await fs.writeFile(absolutePath, newContent, 'utf-8');
+}
+
 /**
  * Writes content to a file, creating directories as needed.
  */
@@ -69,26 +129,4 @@ export async function listFiles(ctx: FsContext, pattern: string | string[]): Pro
  * Applies a unified diff to a file.
  * The diff must target a single file.
  */
-export async function writePatch(ctx: FsContext, relativePath: string, diffContent: string): Promise<void> {
-    const fullPath = resolvePath(ctx, relativePath);
 
-    let originalContent = '';
-    try {
-        originalContent = await fs.readFile(fullPath, 'utf8');
-    } catch (error) {
-        const err = error as NodeJS.ErrnoException;
-        if (err.code !== 'ENOENT') {
-            throw error;
-        }
-    }
-
-    const patchedContent = Diff.applyPatch(originalContent, diffContent);
-
-    if (patchedContent === false) {
-        throw new Error(`Failed to apply patch to ${relativePath}. Hunk mismatch or invalid diff.`);
-    }
-
-    const tempPath = `${fullPath}.kotef.tmp`;
-    await fs.writeFile(tempPath, patchedContent as string, 'utf8');
-    await fs.rename(tempPath, fullPath);
-}

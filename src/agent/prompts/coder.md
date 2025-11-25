@@ -38,7 +38,23 @@ The SDD specs live on disk (e.g. `.sdd/project.md`, `.sdd/architect.md`, `.sdd/b
 - **Explore before editing**: after you have a failing diagnostic (or if no diagnostic is available), use `list_files` and `read_file` to understand existing structure and implementations. Do **not** invent file names or APIs without checking.
 - **Choose the right tool for edits**:
   - **Small edits (1-5 lines)**: Use `write_patch` with valid unified diff format
-  - **Large edits or refactors**: Use `write_file` to replace the entire file
+  - **Large edits or refact## Patch Rules
+- When using `write_patch`, output a **plain unified diff**.
+- **NO** markdown fences (```).
+- **NO** `<tool_call>` blocks or XML tags inside the diff.
+- **NO** natural language commentary inside the diff string.
+
+Example of valid patch:
+@@ -1,3 +1,4 @@
+ import React from "react";
+ 
+ function App() {
++  console.log("Hello");
+   return <div>Hello</div>;
+ }
+
+## Tool Usage
+- Use `list_files` to explore the codebase.ntire file
   - **New files**: Always use `write_file`
   - **If `write_patch` fails**: Don't retry with another patch - switch to `write_file` immediately
 - **Scoped changes only**: stay within the files and areas implied by the ticket/SDD; no mass refactors or unrelated edits.

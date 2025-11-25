@@ -283,7 +283,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                     ...workingMessages,
                     {
                         role: 'user',
-                        content: 'Previous reply was empty. Respond with a valid JSON object as per schema.'
+                        content: 'Previous reply was empty.## Verification\n- If `syntax_check` fails, this is a CRITICAL issue. Fix syntax errors (e.g. duplicate imports, unclosed brackets) immediately.\n- If tests fail, analyze the output.\n- If tests pass, verify against the goal.'
                     }
                 ];
                 continue;

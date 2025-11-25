@@ -2,9 +2,9 @@ import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { createLogger } from '../../core/logger.js';
 
-import { loadRuntimePrompt } from '../../core/prompts.js';
+import { loadRuntimePrompt } from '../prompts.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
-import { readFile, writeFile, writePatch } from '../../tools/fs.js';
+import { readFile, writeFile, writePatch, applyEdits } from '../../tools/fs.js';
 import { runCommand } from '../../tools/test_runner.js';
 import { resolveExecutionProfile, PROFILE_POLICIES, looksLikeInstall, ExecutionProfile } from '../profiles.js';
 import { detectCommands } from '../utils/verification.js';
@@ -237,6 +237,38 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                         required: []
                     }
                 }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'apply_edits',
+                    description: 'Apply a JSON-described set of text edits to a file.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string' },
+                            edits: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        range: {
+                                            type: 'object',
+                                            properties: {
+                                                start: { type: 'number' },
+                                                end: { type: 'number' }
+                                            },
+                                            required: ['start', 'end']
+                                        },
+                                        newText: { type: 'string' }
+                                    },
+                                    required: ['range', 'newText']
+                                }
+                            }
+                        },
+                        required: ['path', 'edits']
+                    }
+                }
             }
         ];
 
@@ -448,6 +480,10 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                                 });
                             }
                         }
+                    } else if (toolCall.function.name === 'apply_edits') {
+                        await applyEdits(args.path, args.edits);
+                        result = `Successfully applied ${args.edits.length} edits to ${args.path}`;
+                        fileChanges[args.path] = (fileChanges[args.path] || 0) + 1;
                     } else {
                         result = "Unknown tool";
                         log.warn('Unknown tool called', { tool: toolCall.function.name });
