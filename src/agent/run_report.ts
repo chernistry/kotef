@@ -18,6 +18,11 @@ export interface RunSummary {
     };
     terminalStatus?: string;
     stopReason?: string;
+    // Ticket lifecycle
+    ticketId?: string;
+    ticketPath?: string;
+    ticketStatus?: 'open' | 'closed';
+    followUpTickets?: string[];
 }
 
 export async function writeRunReport(
@@ -56,6 +61,24 @@ export async function writeRunReport(
     }
     if (summary.error) {
         report += `**Error:** ${summary.error}\n`;
+    }
+
+    // Ticket information
+    if (summary.ticketId || summary.ticketPath) {
+        report += `\n## Ticket\n`;
+        if (summary.ticketId) {
+            report += `**Ticket ID:** ${summary.ticketId}\n`;
+        }
+        if (summary.ticketPath) {
+            report += `**Ticket Path:** ${summary.ticketPath}\n`;
+        }
+        if (summary.ticketStatus) {
+            report += `**Ticket Status:** ${summary.ticketStatus}\n`;
+        }
+        if (summary.followUpTickets && summary.followUpTickets.length > 0) {
+            report += `**Follow-Up Tickets Created:**\n`;
+            summary.followUpTickets.forEach(t => report += `- ${t}\n`);
+        }
     }
 
     if (summary.metrics) {

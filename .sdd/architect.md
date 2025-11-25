@@ -598,7 +598,93 @@ See `.sdd/backlog/tickets/open/` for detailed tickets.
 -   **Decision**: Agent must generate unified diffs.
 -   **Rationale**: Diffs are human-readable, reversible, and standard for code changes.
 
-## 10. Verification Strategy & Command Selection
+## 9. Brain, Body & Ticket Lifecycle
+
+### 9.1. Brain vs Body Architecture
+
+Kotef separates concerns into two layers:
+
+#### Brain (Immutable Templates)
+-   **Location**: `brain/templates/`
+-   **Purpose**: Reusable, immutable SDDRush template prompts for generating SDD artifacts.
+-   **Files**:
+    -   `01_research.md`: Research prompt template
+    -   `02_architect.md`: Architect prompt template
+    -   `03_agent.md`: Agent prompt template
+    -   `04_ticket.md`: Ticket template
+-   **Responsibility**: Provide consistent, best-practice-based starting points for any project.
+
+#### Body (Runtime Agent)
+-   **Location**: `src/agent/`
+-   **Purpose**: Execute tasks based on SDD specifications.
+-   **Components**:
+    -   `graphs/sdd_orchestrator.ts`: Orchestrates SDD bootstrap (Research → Architect → Tickets)
+    -   `nodes/`: Planner, Coder, Verifier, Researcher nodes
+    -   `tools/`: File I/O, web search, test runner
+
+#### Project SDD (Mutable, Project-Specific)
+-   **Location**: `.sdd/` in each target project
+-   **Files**:
+    -   `project.md`: Project description, DoD
+    -   `best_practices.md`: Research-backed patterns
+    -   `architect.md`: Architecture specification
+    -   `backlog/tickets/open/*.md`: Open tickets
+    -   `backlog/tickets/closed/*.md`: Closed tickets
+    -   `issues.md`: Snitch-reported issues
+-   **Responsibility**: Serve as authoritative spec for the target project.
+
+### 9.2. Orchestrator Behavior
+
+**When `.sdd/` is missing (bootstrap mode)**:
+1.  Run SDD bootstrap flow: Research → Best Practices → Architect → Tickets
+2.  Use `brain/templates/` to generate initial SDD artifacts
+3.  Write `.sdd/project.md`, `.sdd/best_practices.md`, `.sdd/architect.md`, and initial `.sdd/backlog/tickets/open/*.md`
+
+**When `.sdd/` exists (normal mode)**:
+1.  Load existing `.sdd/project.md`, `.sdd/architect.md`, `.sdd/best_practices.md`
+2.  Summarize for agent context (via `state.sddSummaries`)
+3.  **Never overwrite** existing SDD files
+4.  Only append to `.sdd/issues.md` or create new tickets in `.sdd/backlog/tickets/open/`
+
+**Reseed option**:
+-   CLI flag `--reseed-sdd` allows full regeneration when user explicitly requests a reset
+
+### 9.3. Ticket Lifecycle
+
+**Ticket States**:
+-   `open`: Ticket is planned or in progress → `backlog/tickets/open/*.md`
+-   `closed`: Ticket is complete → `backlog/tickets/closed/*.md`
+
+**Ticket Flow**:
+1.  **Creation**:
+    -   Bootstrap: `sdd_orchestrator.ts` generates initial tickets in `open/`
+    -   Follow-up: Planner or Snitch creates new tickets in `open/` when discovering out-of-scope work
+2.  **In Progress**:
+    -   Planner sets `state.sdd.ticketPath` and `state.sdd.ticketId` when starting work on a ticket
+    -   Coder, Verifier reference ticket via `state.sdd.ticket` (markdown content) and `ticketPath`
+3.  **Completion**:
+    -   When Planner decides `done=true`, `ticket_closer.ts` moves ticket from `open/` to `closed/`
+    -   Ticket file is moved (not deleted), preserving history
+
+**Follow-Up Ticket Creation**:
+-   **When**: Planner or Verifier identifies work beyond current ticket scope (e.g., global test failures, tech debt)
+-   **How**:
+    -   Create new ticket file in `open/` with format `NN-kebab-slug.md`
+    -   Populate with ticket template (Objective, DoD, Steps, Affected Files, Tests, Risks, Dependencies)
+    -   Link to relevant SDD sections (architect, best_practices)
+-   **Notes**: Prevents unbounded scope creep by deferring out-of-scope work to explicit tickets
+
+### 9.4. Run Report ↔ Ticket Linkage
+
+Run reports (`.sdd/runs/*.md`) include:
+-   `ticketId`: Identifier of the ticket worked on (e.g., `17-goal-aware-verification`)
+-   `ticketPath`: Absolute path to ticket file (open or closed)
+-   `ticketStatus`: Whether ticket was closed or still open after this run
+-   `followUpTickets`: List of any new tickets created during this run
+
+This enables traceability: which runs worked on which tickets, and which runs spawned new work.
+
+
 
 ### 10.1. Stack Detection & Default Commands
 The agent automatically detects the project stack and infers preferred verification commands. This logic is implemented in `src/agent/utils/verification.ts`.

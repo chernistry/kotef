@@ -12,6 +12,7 @@ export interface SddContext {
     bestPractices?: string;
     ticket?: string;       // current ticket markdown
     ticketPath?: string;   // absolute path to current ticket file (in backlog/tickets/open)
+    ticketId?: string;     // simple identifier like "17-goal-aware-verification"
     issues?: string;       // issues encountered
 }
 
