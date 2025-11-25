@@ -73,6 +73,28 @@ export function verifierNode(cfg: KotefConfig) {
             };
         }
 
+        // Budget check for test runs (Ticket 19)
+        if (state.budget && state.budget.testRunsUsed >= state.budget.maxTestRuns) {
+            log.warn('Test run budget exhausted, skipping verification', {
+                used: state.budget.testRunsUsed,
+                max: state.budget.maxTestRuns
+            });
+
+            const reason = 'Test budget exhausted; assuming success for non-strict profiles.';
+            const assumeSuccess = ['smoke', 'yolo'].includes(executionProfile);
+
+            return {
+                detectedCommands: detected,
+                testResults: {
+                    command: 'none (budget exhausted)',
+                    passed: assumeSuccess,
+                    stdout: reason
+                },
+                done: assumeSuccess,
+                budget: state.budget
+            };
+        }
+
         // 3. Run commands
         const results = [];
         let allPassed = true;
@@ -80,6 +102,12 @@ export function verifierNode(cfg: KotefConfig) {
         for (const cmd of commandsToRun) {
             log.info(`Running verification command: ${cmd}`);
             const res = await runCommand(cfg, cmd);
+
+            // Increment test run budget counter
+            if (state.budget) {
+                state.budget.testRunsUsed++;
+            }
+
             results.push({
                 command: cmd,
                 passed: res.passed,

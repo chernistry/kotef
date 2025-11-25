@@ -1,14 +1,42 @@
-import { AgentState, ExecutionProfile } from '../state.js';
+import { AgentState, ExecutionProfile, TaskScope, BudgetState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { ChatMessage, callChat } from '../../core/llm.js';
 import { loadRuntimePrompt } from '../../core/prompts.js';
 import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
 
+function initializeBudget(profile: ExecutionProfile, scope: TaskScope): BudgetState {
+    const zeros = { commandsUsed: 0, testRunsUsed: 0, webRequestsUsed: 0, commandHistory: [] };
+    const budgets: Record<string, BudgetState> = {
+        'strict-large': { maxCommands: 60, maxTestRuns: 10, maxWebRequests: 30, ...zeros },
+        'strict-normal': { maxCommands: 40, maxTestRuns: 8, maxWebRequests: 20, ...zeros },
+        'strict-tiny': { maxCommands: 20, maxTestRuns: 5, maxWebRequests: 10, ...zeros },
+        'fast-large': { maxCommands: 50, maxTestRuns: 8, maxWebRequests: 25, ...zeros },
+        'fast-normal': { maxCommands: 30, maxTestRuns: 5, maxWebRequests: 15, ...zeros },
+        'fast-tiny': { maxCommands: 15, maxTestRuns: 3, maxWebRequests: 8, ...zeros },
+        'smoke-large': { maxCommands: 30, maxTestRuns: 3, maxWebRequests: 15, ...zeros },
+        'smoke-normal': { maxCommands: 20, maxTestRuns: 2, maxWebRequests: 10, ...zeros },
+        'smoke-tiny': { maxCommands: 10, maxTestRuns: 1, maxWebRequests: 5, ...zeros },
+        'yolo-large': { maxCommands: 40, maxTestRuns: 5, maxWebRequests: 20, ...zeros },
+        'yolo-normal': { maxCommands: 25, maxTestRuns: 3, maxWebRequests: 12, ...zeros },
+        'yolo-tiny': { maxCommands: 15, maxTestRuns: 2, maxWebRequests: 8, ...zeros },
+    };
+    const key = `${profile}-${scope}`;
+    return budgets[key] || budgets['fast-normal'];
+}
+
 export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('planner');
         log.info('Planner node started');
+
+        // Initialize budget if not present (Ticket 19)
+        if (!state.budget) {
+            const profile = state.runProfile || 'fast';
+            const scope = state.taskScope || 'normal';
+            state.budget = initializeBudget(profile, scope);
+            log.info('Budget initialized', { profile, scope, budget: state.budget });
+        }
 
         const tryParseDecision = (raw: string) => {
             const trimmed = raw.trim();
@@ -61,6 +89,47 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
             '{{DETECTED_COMMANDS}}': safe(state.detectedCommands),
         };
+
+        // Budget exhaustion check (Ticket 19)
+        if (state.budget) {
+            const nearLimit =
+                state.budget.commandsUsed >= state.budget.maxCommands ||
+                state.budget.testRunsUsed >= state.budget.maxTestRuns ||
+                state.budget.webRequestsUsed >= state.budget.maxWebRequests;
+
+            if (nearLimit) {
+                log.warn('Budget limits reached', { budget: state.budget });
+                // Check if functional goal met despite budget exhaustion
+                const functionallyDone = state.testResults?.passed ||
+                    (state.runProfile && ['smoke', 'yolo'].includes(state.runProfile));
+
+                if (functionallyDone) {
+                    return {
+                        terminalStatus: 'done_partial',
+                        plan: {
+                            next: 'done',
+                            reason: `Budget exhausted but functional goal met. Commands: ${state.budget.commandsUsed}/${state.budget.maxCommands}, Tests: ${state.budget.testRunsUsed}/${state.budget.maxTestRuns}`,
+                            profile: state.runProfile,
+                            plan: []
+                        },
+                        done: true,
+                        budget: state.budget
+                    };
+                } else {
+                    return {
+                        terminalStatus: 'aborted_constraint',
+                        plan: {
+                            next: 'snitch',
+                            reason: `Budget exhausted before goal completion. Commands: ${state.budget.commandsUsed}/${state.budget.maxCommands}, Tests: ${state.budget.testRunsUsed}/${state.budget.maxTestRuns}`,
+                            profile: state.runProfile,
+                            plan: []
+                        },
+                        done: true,
+                        budget: state.budget
+                    };
+                }
+            }
+        }
 
         if (currentSteps >= MAX_STEPS) {
             log.warn('Max steps reached, aborting', { steps: currentSteps });

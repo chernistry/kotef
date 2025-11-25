@@ -48,6 +48,8 @@ export interface AgentState {
     };
     researchQuality?: ResearchQuality;
     metrics?: RunMetrics;
+    budget?: BudgetState;
+    patchFingerprints?: Map<string, number>;
 
     // Flow control
     terminalStatus?: TerminalStatus;
@@ -83,4 +85,14 @@ export interface RunMetrics {
     totalTokens: number;
     startTime: number;
     endTime?: number;
+}
+
+export interface BudgetState {
+    maxCommands: number;
+    maxTestRuns: number;
+    maxWebRequests: number;
+    commandsUsed: number;
+    testRunsUsed: number;
+    webRequestsUsed: number;
+    commandHistory: Array<{ command: string; timestamp: number }>;
 }

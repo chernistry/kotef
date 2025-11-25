@@ -130,6 +130,33 @@ ${state.testResults.stderr ? `\n**Stderr**:\n\`\`\`\n${state.testResults.stderr.
 
         report += verificationSection;
         report += testSection;
+
+        // Budget usage section (Ticket 19)
+        if (state.budget) {
+            report += `\n## Budget Usage\n`;
+            report += `- **Commands**: ${state.budget.commandsUsed} / ${state.budget.maxCommands}\n`;
+            report += `- **Test Runs**: ${state.budget.testRunsUsed} / ${state.budget.maxTestRuns}\n`;
+            report += `- **Web Requests**: ${state.budget.webRequestsUsed} / ${state.budget.maxWebRequests}\n`;
+
+            // Repeated commands analysis
+            const commandCounts = new Map<string, number>();
+            (state.budget.commandHistory || []).forEach(({ command }) => {
+                commandCounts.set(command, (commandCounts.get(command) || 0) + 1);
+            });
+
+            const repeated = Array.from(commandCounts.entries())
+                .filter(([_, count]) => count > 1)
+                .sort(([_, a], [__, b]) => b - a)
+                .slice(0, 5);
+
+            if (repeated.length > 0) {
+                report += `\n### Repeated Commands\n`;
+                repeated.forEach(([cmd, count]) => {
+                    report += `- \`${cmd}\`: ${count} times\n`;
+                });
+            }
+        }
+
         // The statusSection is already partially covered by summary.terminalStatus,
         // and the overall status is at the top. I'll add the steps if state is present.
         if (state.totalSteps !== undefined) {

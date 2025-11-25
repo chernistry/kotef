@@ -7,6 +7,7 @@ import { callChat, ChatMessage } from '../../core/llm.js';
 import { readFile, writeFile, writePatch } from '../../tools/fs.js';
 import { runCommand } from '../../tools/test_runner.js';
 import { resolveExecutionProfile, PROFILE_POLICIES, looksLikeInstall, ExecutionProfile } from '../profiles.js';
+import crypto from 'node:crypto';
 
 export function coderNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
@@ -211,6 +212,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         let commandCount = 0;
         let testCount = 0;
         let fileChanges = state.fileChanges || {};
+        let patchFingerprints = state.patchFingerprints || new Map<string, number>();
 
         log.info('Starting coder tool execution loop', { maxTurns, profile: executionProfile });
 
@@ -271,10 +273,28 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                             log.info('File written', { path: args.path, size: args.content.length });
                         }
                     } else if (toolCall.function.name === 'write_patch') {
-                        await writePatch({ rootDir: cfg.rootDir! }, args.path, args.diff);
-                        result = "Patch applied successfully.";
-                        fileChanges = { ...(fileChanges || {}), [args.path]: 'patched' };
-                        log.info('Patch applied', { path: args.path });
+                        // Patch deduplication (Ticket 19)
+                        const fingerprint = crypto.createHash('sha256')
+                            .update(`${args.path}:${args.diff}`)
+                            .digest('hex')
+                            .slice(0, 16);
+
+                        const repeatCount = patchFingerprints.get(fingerprint) || 0;
+
+                        if (repeatCount >= 2) {
+                            result = `ERROR: Repeated identical patch on "${args.path}" (${repeatCount} times). This indicates no progress. Aborting patch application. Consider a different approach or escalate to planner.`;
+                            log.warn('Repeated patch detected, aborting', {
+                                path: args.path,
+                                fingerprint,
+                                count: repeatCount
+                            });
+                        } else {
+                            patchFingerprints.set(fingerprint, repeatCount + 1);
+                            await writePatch({ rootDir: cfg.rootDir! }, args.path, args.diff);
+                            result = "Patch applied successfully.";
+                            fileChanges = { ...(fileChanges || {}), [args.path]: 'patched' };
+                            log.info('Patch applied', { path: args.path, fingerprint, repeatCount: repeatCount + 1 });
+                        }
                     } else if (toolCall.function.name === 'run_command') {
                         const commandStr = typeof args.command === 'string' ? args.command : '';
                         const tinySkip = isTinyTask && executionProfile !== 'strict' && looksHeavyCommand(commandStr);
@@ -370,7 +390,8 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         return {
             fileChanges,
             messages: currentMessages.slice(messages.length),
-            consecutiveNoOps
+            consecutiveNoOps,
+            patchFingerprints
         };
     };
 }
