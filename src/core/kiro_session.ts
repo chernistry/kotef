@@ -59,34 +59,74 @@ export async function runKiroAgentSession(
     args.push(options.prompt);
 
     try {
-        // Execute kiro-cli in the project root
+        const log = (await import('./logger.js')).createLogger('kiro-session');
+
+        log.info('Starting Kiro CLI session', {
+            kiroPath,
+            model: options.model || config.kiroModel,
+            timeout,
+            trustAllTools: options.trustAllTools,
+            rootDir: options.rootDir,
+        });
+
+        // Log the prompt being sent (first 500 chars)
+        log.info('Kiro prompt', {
+            promptPreview: options.prompt.substring(0, 500) + (options.prompt.length > 500 ? '...' : '')
+        });
+
+        console.log('\n🤖 Kiro CLI is now working on the task...');
+        console.log('📝 Command:', kiroPath, args.join(' '));
+        console.log('📂 Working directory:', options.rootDir);
+        console.log('⏱️  Timeout:', `${timeout}ms (${Math.round(timeout / 1000 / 60)} minutes)`);
+        console.log('─'.repeat(80));
+
+        // Execute kiro-cli in the project root with real-time output
         const result = await execa(kiroPath, args, {
             cwd: options.rootDir,
             timeout,
             reject: false,
-            stdio: ['ignore', 'pipe', 'pipe'],
+            // Use 'inherit' to stream output in real-time for better debugging
+            stdio: ['ignore', 'inherit', 'inherit'],
+        });
+
+        console.log('─'.repeat(80));
+        log.info('Kiro CLI session completed', {
+            exitCode: result.exitCode,
+            timedOut: result.timedOut,
         });
 
         // Snapshot directory after Kiro runs
         const after = await snapshotDirectory(options.rootDir);
         const changedFiles = await detectChanges(before, after);
 
+        log.info('File changes detected', {
+            changedFiles: changedFiles.length,
+            files: changedFiles,
+        });
+
         // Check for errors
         if (result.exitCode !== 0) {
+            log.error('Kiro session failed', {
+                exitCode: result.exitCode,
+                timedOut: result.timedOut,
+            });
+
             return {
                 success: false,
-                changedFiles: [],
-                stdout: result.stdout,
-                stderr: result.stderr,
+                changedFiles,
+                stdout: '',
+                stderr: '',
                 error: `Kiro session failed with exit code ${result.exitCode}`,
             };
         }
 
+        console.log(`✅ Kiro session completed successfully! Modified ${changedFiles.length} file(s).`);
+
         return {
             success: true,
             changedFiles,
-            stdout: result.stdout,
-            stderr: result.stderr,
+            stdout: '',
+            stderr: '',
         };
 
     } catch (error) {
@@ -104,15 +144,20 @@ export async function runKiroAgentSession(
         }
 
         if ((error as any).timedOut) {
+            const log = (await import('./logger.js')).createLogger('kiro-session');
+            log.warn('Kiro session timed out', { timeout });
+
             // Return partial results on timeout
             const after = await snapshotDirectory(options.rootDir);
             const changedFiles = await detectChanges(before, after);
 
+            console.log(`⚠️  Kiro session timed out after ${timeout}ms. Detected ${changedFiles.length} file changes.`);
+
             return {
                 success: false,
                 changedFiles,
-                stdout: (error as any).stdout || '',
-                stderr: (error as any).stderr || '',
+                stdout: '',
+                stderr: '',
                 error: `Kiro session timed out after ${timeout}ms`,
             };
         }

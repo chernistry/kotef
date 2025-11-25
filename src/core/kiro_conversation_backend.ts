@@ -43,13 +43,44 @@ export class KiroConversationBackend implements LlmBackend {
             // Ensure session directory exists
             await fs.mkdir(this.sessionDir, { recursive: true });
 
-            // Get the last user message
-            const lastMessage = messages[messages.length - 1];
-            if (lastMessage.role !== 'user') {
-                throw new KotefLlmError('Last message must be from user');
+            // Kiro CLI works with user messages. We need to consolidate the message history
+            // into a single user prompt, handling system messages and conversation context.
+            let userPrompt = '';
+
+            // Find system message (if any) and user messages
+            const systemMessages = messages.filter(m => m.role === 'system');
+            const nonSystemMessages = messages.filter(m => m.role !== 'system');
+
+            // If we have system messages, include them as context
+            if (systemMessages.length > 0) {
+                const systemContent = systemMessages.map(m => m.content).join('\n\n');
+                userPrompt = systemContent;
             }
 
-            const userPrompt = lastMessage.content || '';
+            // Get the last user message (or convert assistant messages to context)
+            if (nonSystemMessages.length > 0) {
+                const lastMsg = nonSystemMessages[nonSystemMessages.length - 1];
+
+                if (lastMsg.role === 'user') {
+                    // Append user message
+                    if (userPrompt) userPrompt += '\n\n';
+                    userPrompt += lastMsg.content || '';
+                } else {
+                    // If last message is assistant (shouldn't happen in typical flow),
+                    // just use it as context
+                    if (userPrompt) userPrompt += '\n\n';
+                    userPrompt += lastMsg.content || '';
+                }
+            } else if (!userPrompt) {
+                throw new KotefLlmError('No messages to send to Kiro CLI');
+            }
+
+            // Handle JSON mode: Kiro CLI doesn't support OpenAI's response_format parameter,
+            // so we inject explicit JSON instructions into the prompt when JSON mode is requested
+            if (options.response_format?.type === 'json_object') {
+                userPrompt += '\n\nIMPORTANT: You MUST respond with ONLY valid JSON. Do not include markdown code fences, explanations, or any text outside the JSON object.';
+            }
+
 
             // Build command arguments
             const args = [
