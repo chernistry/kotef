@@ -8,7 +8,7 @@ dotenv.config();
 export const KotefConfigSchema = z.object({
     rootDir: z.string().default(process.cwd()),
     /** Generic OpenAI-compatible API key (OpenAI, Anthropic via proxy, etc.) */
-    apiKey: z.string().min(1, "API Key is required (OPENAI_API_KEY or KOTEF_API_KEY)"),
+    apiKey: z.string().min(1, "API Key is required (OPENAI_API_KEY or KOTEF_API_KEY)").optional(),
     /** Base URL for the LLM provider (OpenAI, OpenRouter, custom gateway, etc.). */
     baseUrl: z.string().default("https://api.openai.com/v1"),
     /** Default cheaper/faster model for planning, research, and non-critical calls. */
@@ -111,5 +111,16 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         kiroSessionTimeout: parseInt(env.KIRO_SESSION_TIMEOUT || '300000', 10),
     };
 
-    return KotefConfigSchema.parse(config);
+    const parsed = KotefConfigSchema.parse(config);
+
+    // Validate: if using OpenAI provider, apiKey is required
+    if (parsed.llmProvider === 'openai' && !parsed.apiKey) {
+        throw new Error(
+            'API Key is required when using OpenAI provider.\n' +
+            'Set CHAT_LLM_API_KEY or OPENAI_API_KEY environment variable,\n' +
+            'or switch to Kiro provider: CHAT_LLM_PROVIDER=kiro'
+        );
+    }
+
+    return parsed;
 }

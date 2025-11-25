@@ -20,9 +20,9 @@ export async function createLlmBackend(config: KotefConfig): Promise<LlmBackend>
     const provider = config.llmProvider || 'openai';
 
     if (provider === 'kiro') {
-        // Lazy load to avoid circular dependencies and only load when needed
-        const { KiroCliLlmBackend } = await import('./kiro_backend.js');
-        return new KiroCliLlmBackend();
+        // Use conversation-based Kiro backend
+        const { KiroConversationBackend } = await import('./kiro_conversation_backend.js');
+        return new KiroConversationBackend();
     }
 
     // Default to OpenAI
