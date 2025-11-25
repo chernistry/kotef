@@ -163,8 +163,8 @@ async function refineResearchQuery(
 
     const qualitySummary = quality
         ? `Relevance: ${quality.relevance.toFixed(2)}, Confidence: ${quality.confidence.toFixed(
-              2,
-          )}, Coverage: ${quality.coverage.toFixed(2)}. Reasons: ${quality.reasons}`
+            2,
+        )}, Coverage: ${quality.coverage.toFixed(2)}. Reasons: ${quality.reasons}`
         : 'No quality scores available.';
 
     const filled = promptTemplate
@@ -214,14 +214,27 @@ export async function deepResearch(
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         log.info('Performing web search...', { attempt: attempt + 1, query: currentQuery });
-        const searchResults = await webSearch(cfg, currentQuery, { maxResults: 5 });
-        log.info('Web search completed', {
-            attempt: attempt + 1,
-            resultsCount: searchResults.length,
-        });
+
+        let searchResults: any[] = [];
+        try {
+            searchResults = await webSearch(cfg, currentQuery, { maxResults: 5 });
+            log.info('Web search completed', {
+                attempt: attempt + 1,
+                resultsCount: searchResults.length,
+            });
+        } catch (e) {
+            log.warn('Web search failed', {
+                attempt: attempt + 1,
+                query: currentQuery,
+                error: (e as Error).message,
+            });
+            // Treat as 0 results to trigger graceful exit or potential retry logic if we change it later.
+            // Currently 0 results -> break loop.
+            searchResults = [];
+        }
 
         if (searchResults.length === 0) {
-            log.warn('No search results found for query', {
+            log.warn('No search results found (or search failed)', {
                 attempt: attempt + 1,
                 query: currentQuery,
             });
@@ -230,6 +243,8 @@ export async function deepResearch(
                 findings: [],
                 quality: null,
             });
+            // If we have no results, we can't really score or refine based on results.
+            // We could try to refine based on "I found nothing", but for now we stop.
             break;
         }
 
@@ -284,7 +299,10 @@ export async function deepResearch(
                 confidence: quality.confidence,
                 coverage: quality.coverage,
                 shouldRetry: quality.shouldRetry,
+                reasons: quality.reasons,
             });
+        } else {
+            log.warn('Research quality scoring failed or returned null', { attempt: attempt + 1 });
         }
 
         attempts.push({ query: currentQuery, findings, quality });
@@ -295,13 +313,24 @@ export async function deepResearch(
             quality.coverage >= 0.6 &&
             quality.confidence >= 0.6;
 
-        if (goodEnough || attempt === maxAttempts - 1) {
+        if (goodEnough) {
+            log.info('Research quality met thresholds; stopping early.', {
+                attempt: attempt + 1,
+                relevance: quality.relevance,
+                coverage: quality.coverage,
+            });
+            break;
+        }
+
+        if (attempt === maxAttempts - 1) {
+            log.info('Max attempts reached; stopping.', { attempt: attempt + 1 });
             break;
         }
 
         if (!quality || !quality.shouldRetry) {
             log.info('Quality scoring suggests no retry; stopping after current attempt.', {
                 attempt: attempt + 1,
+                shouldRetry: quality?.shouldRetry,
             });
             break;
         }
@@ -348,6 +377,7 @@ export async function deepResearch(
         }
     }
 
+    // If no quality scores, fallback to findings count
     if (bestScore < 0) {
         best = attempts.reduce((acc, cur) =>
             cur.findings.length > acc.findings.length ? cur : acc,
@@ -356,12 +386,14 @@ export async function deepResearch(
 
     const chosenQuality = best.quality;
     log.info('Deep research completed', {
-        attempts: attempts.length,
+        totalAttempts: attempts.length,
         chosenQuery: best.query,
         findingsCount: best.findings.length,
-        relevance: chosenQuality?.relevance,
-        confidence: chosenQuality?.confidence,
-        coverage: chosenQuality?.coverage,
+        quality: chosenQuality ? {
+            relevance: chosenQuality.relevance,
+            confidence: chosenQuality.confidence,
+            coverage: chosenQuality.coverage,
+        } : 'N/A',
     });
 
     return best.findings;
