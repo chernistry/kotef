@@ -58,7 +58,10 @@ export function researcherNode(cfg: KotefConfig) {
         }
 
         try {
-            const findings = await deepResearch(cfg, query);
+            const findings = await deepResearch(cfg, query, {
+                originalGoal: baseGoal,
+                maxAttempts: 3,
+            });
             log.info('Research completed', { findingsCount: findings ? findings.length : 0 });
             return {
                 researchResults: findings

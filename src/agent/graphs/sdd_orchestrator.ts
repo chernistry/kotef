@@ -121,7 +121,10 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
     console.log(`Web research query: "${researchQuery}"`);
     let findings: DeepResearchFinding[] = [];
     try {
-        findings = await deepResearch(config, researchQuery);
+        findings = await deepResearch(config, researchQuery, {
+            originalGoal: goal,
+            maxAttempts: 3,
+        });
         console.log(`Deep research completed. Found ${findings.length} findings.`);
     } catch (e) {
         console.warn('Deep research failed, falling back to model-only research:', e);
