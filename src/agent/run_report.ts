@@ -74,7 +74,48 @@ export async function writeRunReport(
         report += `No files changed.\n`;
     }
 
-    report += `\n## Verification\n${summary.tests || 'No verification results.'}\n`;
+    if (state) {
+        const verificationSection = state.detectedCommands ? `
+## Verification Strategy
+- **Stack**: ${state.detectedCommands.stack}
+- **Profile**: ${state.runProfile || 'fast'}
+- **Detected**:
+  - Primary: \`${state.detectedCommands.primaryTest || 'none'}\`
+  - Smoke: \`${state.detectedCommands.smokeTest || 'none'}\`
+  - Build: \`${state.detectedCommands.buildCommand || 'none'}\`
+` : '';
+
+        const testSection = state.testResults ? `
+## Verification Results
+- **Command**: \`${state.testResults.command}\`
+- **Passed**: ${state.testResults.passed ? '✅' : '❌'}
+- **Exit Code**: ${state.testResults.exitCode}
+${state.testResults.stdout ? `\n\`\`\`\n${state.testResults.stdout.slice(0, 1000)}\n\`\`\`` : ''}
+${state.testResults.stderr ? `\n**Stderr**:\n\`\`\`\n${state.testResults.stderr.slice(0, 1000)}\n\`\`\`` : ''}
+` : '';
+
+        const statusSection = `
+## Status
+- **Outcome**: ${state.terminalStatus || (state.done ? 'done_success' : 'in_progress')}
+- **Steps**: ${state.totalSteps}
+`;
+        // The provided edit seems to be a template for a new report structure,
+        // but the instruction is to "add Verification Strategy section".
+        // I will integrate the new sections into the existing report generation flow.
+        // The original `report += `\n## Verification\n${summary.tests || 'No verification results.'}\n`;`
+        // will be replaced by the more detailed `verificationSection` and `testSection` if `state` is available.
+
+        report += verificationSection;
+        report += testSection;
+        // The statusSection is already partially covered by summary.terminalStatus,
+        // and the overall status is at the top. I'll add the steps if state is present.
+        if (state.totalSteps !== undefined) {
+            report += `\n- **Total Steps**: ${state.totalSteps}\n`;
+        }
+    } else {
+        report += `\n## Verification\n${summary.tests || 'No verification results.'}\n`;
+    }
+
 
     if (summary.issues) {
         report += `\n## Issues Encountered\n${summary.issues}\n`;

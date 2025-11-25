@@ -49,6 +49,10 @@ describe('Deep Research Hardening', () => {
         const callChatSpy = vi.spyOn(llmModule, 'callChat');
 
         callChatSpy
+            // Optimizer (Attempt 0)
+            .mockResolvedValueOnce({
+                messages: [{ role: 'assistant', content: JSON.stringify({ query: 'initial query', reason: 'optimization' }) }]
+            } as any)
             // Attempt 1: Summarize
             .mockResolvedValueOnce({
                 messages: [{ role: 'assistant', content: JSON.stringify([{ statement: 'Fact 1', citations: [] }]) }]
@@ -59,7 +63,7 @@ describe('Deep Research Hardening', () => {
             } as any)
             // Attempt 1: Refine
             .mockResolvedValueOnce({
-                messages: [{ role: 'assistant', content: 'refined query' }]
+                messages: [{ role: 'assistant', content: JSON.stringify({ should_retry: true, query: 'refined query' }) }]
             } as any)
             // Attempt 2: Summarize
             .mockResolvedValueOnce({

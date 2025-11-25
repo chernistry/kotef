@@ -1,5 +1,8 @@
 import type { ChatMessage } from '../core/llm.js';
-import type { TaskScope } from './task_scope.js';
+import { FetchedPage } from '../tools/fetch_page.js';
+import { DetectedCommands } from './utils/verification.js';
+
+export type TaskScope = 'tiny' | 'normal' | 'large';
 
 export interface SddContext {
     /** Optional natural-language goal that triggered this run. */
@@ -20,6 +23,8 @@ export interface AgentState {
     plan?: any;
     researchResults?: any;
     fileChanges?: Record<string, string>;
+    // Verification
+    detectedCommands?: DetectedCommands;
     testResults?: any;
     /** History of failures encountered during this run, for loop detection. */
     failureHistory?: Array<{

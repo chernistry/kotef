@@ -598,10 +598,41 @@ See `.sdd/backlog/tickets/open/` for detailed tickets.
 -   **Decision**: Agent must generate unified diffs.
 -   **Rationale**: Diffs are human-readable, reversible, and standard for code changes.
 
-## 10. Verification Strategy
--   **Automated Tests**: Unit tests for all tools. Integration tests for agent graph (mocked LLM).
--   **E2E Scenarios**: Run agent on "hello-world" and "fix-bug" dummy projects.
--   **Manual Review**: User reviews Run Reports and Diffs before application (interactive mode).
+## 10. Verification Strategy & Command Selection
+
+### 10.1. Stack Detection & Default Commands
+The agent automatically detects the project stack and infers preferred verification commands. This logic is implemented in `src/agent/utils/verification.ts`.
+
+| Stack | Detection Signals | Primary Test | Smoke Test | Build Command |
+|-------|-------------------|--------------|------------|---------------|
+| **Node/TS** | `package.json` | `npm test` | `npm run dev` (if present) | `npm run build` |
+| **Vite** | `vite.config.*` | `npm test` | `npm run dev` | `npm run build` |
+| **Python** | `pyproject.toml`, `requirements.txt`, `*.py` | `pytest` | `python app.py` | N/A |
+| **Go** | `go.mod`, `*.go` | `go test ./...` | `go run .` | `go build` |
+
+### 10.2. Goal-Aware Command Selection
+The `verifierNode` selects commands based on the **User Goal** and **Execution Profile**:
+
+1.  **Goal Relevance**:
+    *   If goal mentions specific files (e.g., "fix `utils.ts`"), prefer tests targeting those files.
+    *   If goal is "fix build", prioritize `build` command.
+    *   If goal is "fix import error", prioritize `smoke` or `build`.
+
+2.  **Profile-Based Selection**:
+    *   **`strict`**: Run **Primary Test** + **Build** + **Linters**. All must pass.
+    *   **`fast`**: Run **Primary Test** (or targeted subset).
+    *   **`smoke`**: Run **Smoke Test** only (or manual verification).
+    *   **`yolo`**: Run **Smoke Test** only. If it runs, it's good.
+
+### 10.3. Failure Classification
+Failures are classified to avoid blocking on out-of-scope issues:
+*   **Blocking**: Failure in modified files or directly related to the goal.
+*   **Out-of-Scope**: Pre-existing failure in unrelated files (verified by checking baseline or logs).
+*   **Partial Success**: Goal is met (functional verification passes), but global suite has unrelated failures.
+
+### 10.4. Verification Artifacts
+*   **Run Report**: Records detected stack, selected commands, and pass/fail status.
+*   **Issues Log**: Out-of-scope failures are logged to `.sdd/issues.md` for future tickets.
 
 ## 11. Goal-First DoD & Execution Profiles
 

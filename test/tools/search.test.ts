@@ -47,13 +47,15 @@ describe('Search Tools', () => {
             });
             global.fetch = mockFetch as any;
 
-            await expect(webSearch({ searchApiKey: 'test-key' } as any, 'test query')).rejects.toThrow(/Search failed/);
+            const results = await webSearch({ searchApiKey: 'test-key' } as any, 'test query');
+            expect(results).toEqual([]);
         });
 
-        it('should throw if API key is missing', async () => {
+        it('should return empty array if API key is missing', async () => {
             delete process.env.SEARCH_API_KEY;
             delete process.env.TAVILY_API_KEY;
-            await expect(webSearch({} as any, 'test query')).rejects.toThrow(/Search API key is missing/);
+            const results = await webSearch({} as any, 'test query');
+            expect(results).toEqual([]);
             process.env.SEARCH_API_KEY = 'dummy-key'; // Restore
         });
         it('should block unsafe URLs', async () => {

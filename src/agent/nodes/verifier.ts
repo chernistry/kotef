@@ -4,92 +4,105 @@ import { createLogger } from '../../core/logger.js';
 
 import { runCommand } from '../../tools/test_runner.js';
 import { resolveExecutionProfile, PROFILE_POLICIES } from '../profiles.js';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { detectCommands, DetectedCommands } from '../utils/verification.js';
 
 export function verifierNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('verifier');
         log.info('Verifier node started');
 
-        async function detectTestCommand(projectContext: string = '', rootDir: string = '.'): Promise<string> {
-            // Check for package.json test script
-            try {
-                const pkgJsonPath = path.join(rootDir, 'package.json');
-                const pkgJson = JSON.parse(await fs.readFile(pkgJsonPath, 'utf-8'));
-                if (pkgJson.scripts && pkgJson.scripts.test) {
-                    return 'npm test';
-                }
-            } catch (e) {
-                // No package.json
-            }
-
-            // Detect test framework from project context
-            if (projectContext.includes('Python') || projectContext.includes('pytest')) {
-                return 'pytest';
-            }
-            if (projectContext.includes('Go')) {
-                return 'go test ./...';
-            }
-
-            return 'npm test';
+        // 1. Detect commands if not already in state
+        let detected = state.detectedCommands;
+        if (!detected) {
+            detected = await detectCommands(cfg);
+            log.info('Detected verification commands', { detected });
         }
+
         const executionProfile = resolveExecutionProfile(state);
         const policy = PROFILE_POLICIES[executionProfile];
         const isTinyTask = state.taskScope === 'tiny';
 
-        log.info('Verifier starting', { executionProfile, policy, taskScope: state.taskScope });
+        log.info('Verifier starting', { executionProfile, policy, taskScope: state.taskScope, stack: detected?.stack });
 
-        if ((executionProfile as string) === 'smoke' || (isTinyTask && executionProfile !== 'strict')) {
-            const reason = executionProfile === 'smoke'
-                ? 'SKIPPED (smoke profile)'
-                : 'SKIPPED (tiny task scope)';
-            log.info('Skipping automated tests due to profile/task scope.', { reason });
-            return {
-                testResults: {
-                    command: reason,
-                    exitCode: 0,
-                    stdout: 'Automated tests skipped; run the primary command manually if desired.',
-                    stderr: '',
-                    passed: true
-                },
-                done: true
-            };
-        }
+        // 2. Select commands based on profile & goal
+        let commandsToRun: string[] = [];
+        const goal = state.sdd.goal || '';
 
-        // Detect test command
-        const testCommand = await detectTestCommand(state.sdd.project, cfg.rootDir!);
-        log.info('Detected test command', { testCommand });
+        // Heuristic: if goal mentions "build", force build
+        const forceBuild = goal.toLowerCase().includes('build');
 
-        let result: any;
-        let skipped = false;
-
-        if ((executionProfile as string) === 'smoke' || (isTinyTask && executionProfile !== 'strict')) {
-            const reason = executionProfile === 'smoke'
-                ? 'SKIPPED (smoke profile)'
-                : 'SKIPPED (tiny task scope)';
-            log.info('Skipping automated tests due to profile/task scope.', { reason });
-            result = {
-                command: reason,
-                exitCode: 0,
-                stdout: 'Automated tests skipped; run the primary command manually if desired.',
-                stderr: '',
-                passed: true
-            };
-            skipped = true;
+        if (executionProfile === 'strict') {
+            if (detected?.primaryTest) commandsToRun.push(detected.primaryTest);
+            if (detected?.buildCommand) commandsToRun.push(detected.buildCommand);
+            if (detected?.lintCommand) commandsToRun.push(detected.lintCommand);
+        } else if (executionProfile === 'fast') {
+            if (forceBuild && detected?.buildCommand) {
+                commandsToRun.push(detected.buildCommand);
+            }
+            if (detected?.primaryTest) {
+                commandsToRun.push(detected.primaryTest);
+            } else if (detected?.smokeTest) {
+                commandsToRun.push(detected.smokeTest);
+            }
         } else {
-            result = await runCommand(cfg, testCommand);
-            log.info('Tests completed', { passed: result.passed });
+            // smoke / yolo
+            if (forceBuild && detected?.buildCommand) {
+                commandsToRun.push(detected.buildCommand);
+            } else if (detected?.smokeTest) {
+                commandsToRun.push(detected.smokeTest);
+            } else if (detected?.primaryTest && !isTinyTask) {
+                // Fallback to primary if no smoke test, but skip for tiny tasks if it looks heavy
+                commandsToRun.push(detected.primaryTest);
+            }
         }
 
+        // Deduplicate
+        commandsToRun = [...new Set(commandsToRun)];
+
+        if (commandsToRun.length === 0) {
+            const reason = 'No suitable verification commands found for this stack/profile.';
+            log.info(reason);
+            return {
+                detectedCommands: detected,
+                testResults: {
+                    command: 'none',
+                    passed: true,
+                    stdout: reason
+                },
+                done: true // If we can't verify, we assume done? Or maybe ask human? For now, assume done if no tests found.
+            };
+        }
+
+        // 3. Run commands
+        const results = [];
+        let allPassed = true;
+
+        for (const cmd of commandsToRun) {
+            log.info(`Running verification command: ${cmd}`);
+            const res = await runCommand(cfg, cmd);
+            results.push({
+                command: cmd,
+                passed: res.passed,
+                exitCode: res.exitCode,
+                stdout: res.stdout,
+                stderr: res.stderr
+            });
+            if (!res.passed) {
+                allPassed = false;
+                // In strict mode, fail fast? Or run all to get full picture?
+                // Let's run all to give full context to planner.
+            }
+        }
+
+        // 4. Update failure history
         let failureHistory = state.failureHistory || [];
         let lastTestSignature = state.lastTestSignature;
         let sameErrorCount = state.sameErrorCount || 0;
 
-        if (!result.passed && !skipped) {
-            const errorText = result.failureSummary || result.stderr || 'Unknown error';
-            // Simple signature: command + first 200 chars of error
-            const currentSignature = `${testCommand}:${errorText.slice(0, 200)}`;
+        if (!allPassed) {
+            const firstFail = results.find(r => !r.passed)!;
+            const errorText = firstFail.stderr || firstFail.stdout || 'Unknown error';
+            const currentSignature = `${firstFail.command}:${errorText.slice(0, 200)}`;
 
             if (currentSignature === lastTestSignature) {
                 sameErrorCount++;
@@ -102,17 +115,16 @@ export function verifierNode(cfg: KotefConfig) {
                 ...failureHistory,
                 {
                     step: 'verifier',
-                    error: `Test failed: ${errorText}`,
+                    error: `Command failed: ${firstFail.command} -> ${errorText.slice(0, 500)}`,
                     timestamp: Date.now()
                 }
             ];
-        } else if (result.passed) {
-            // Reset on success
+        } else {
             sameErrorCount = 0;
             lastTestSignature = undefined;
         }
 
-        // Load prompt for LLM-based verification
+        // 5. LLM Evaluation (Partial Success Logic)
         const promptTemplate = await import('../../core/prompts.js').then(m => m.loadRuntimePrompt('verifier'));
 
         const safe = (value: unknown) => {
@@ -131,18 +143,11 @@ export function verifierNode(cfg: KotefConfig) {
             '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),
             '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),
             '{{FILE_CHANGES}}': safe(state.fileChanges),
-            '{{TEST_COMMANDS}}': testCommand,
+            '{{TEST_COMMANDS}}': commandsToRun.join(', '),
             '{{EXECUTION_PROFILE}}': executionProfile,
             '{{TASK_SCOPE}}': state.taskScope || 'normal',
-            '{{TEST_RESULTS}}': safe(result) // Note: Prompt might not have {{TEST_RESULTS}} explicitly in Inputs section but it's useful to add or rely on context
+            '{{TEST_RESULTS}}': safe(results)
         };
-
-        // Inject test results into prompt if not already there (the prompt I wrote didn't have {{TEST_RESULTS}} in Inputs, but it had "Suggested test commands").
-        // Wait, the prompt I wrote has:
-        // - Planned/changed files: `{{FILE_CHANGES}}`
-        // - Suggested test commands: `{{TEST_COMMANDS}}`
-        // It DOES NOT have `{{TEST_RESULTS}}`. I should add it to the prompt or append it.
-        // I will append it to the user message.
 
         let systemPrompt = promptTemplate;
         for (const [token, value] of Object.entries(replacements)) {
@@ -154,7 +159,7 @@ export function verifierNode(cfg: KotefConfig) {
             ...state.messages,
             {
                 role: 'user',
-                content: `Test Results:\n${safe(result)}\n\nEvaluate the results and decide status.`
+                content: `Verification Results:\n${safe(results)}\n\nEvaluate if the goal is met. If global tests fail but the goal is achieved, consider partial success.`
             }
         ];
 
@@ -168,23 +173,22 @@ export function verifierNode(cfg: KotefConfig) {
             decision = JSON.parse(content);
         } catch (e) {
             log.error('Verifier LLM failed', { error: e });
-            // Fallback logic
             decision = {
-                status: result.passed ? 'passed' : 'failed',
-                summary: result.passed ? 'Tests passed' : 'Tests failed',
-                next: result.passed ? 'done' : 'planner',
+                status: allPassed ? 'passed' : 'failed',
+                summary: allPassed ? 'All checks passed' : 'Checks failed',
+                next: allPassed ? 'done' : 'planner',
                 notes: 'Fallback due to LLM error'
             };
         }
 
         return {
-            testResults: result,
+            detectedCommands: detected,
+            testResults: results,
             failureHistory,
             lastTestSignature,
             sameErrorCount,
             done: decision.next === 'done',
-            // If planner is next, we might want to add a note to the plan?
-            // But verifier just updates state. Planner reads testResults.
+            terminalStatus: decision.terminalStatus // e.g. 'done_partial'
         };
     };
 }

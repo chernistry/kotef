@@ -59,6 +59,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{TOTAL_STEPS}}': safe(currentSteps),
             '{{TASK_SCOPE}}': state.taskScope || 'normal',
             '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
+            '{{DETECTED_COMMANDS}}': safe(state.detectedCommands),
         };
 
         if (currentSteps >= MAX_STEPS) {
@@ -297,7 +298,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             loopCounters,
             totalSteps: currentSteps,
             // Set terminal status if done
-            ...(decision.next === 'done' ? { terminalStatus: 'done_success' } : {})
+            ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success' } : {})
         };
     };
 }

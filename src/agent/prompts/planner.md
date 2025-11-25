@@ -60,6 +60,11 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
       "type": "string",
       "enum": ["researcher", "coder", "verifier", "done", "snitch", "ask_human"]
     },
+    "terminalStatus": {
+      "type": "string",
+      "enum": ["done_success", "done_partial", "aborted_stuck", "aborted_constraint"],
+      "description": "Required if next='done' or 'snitch'. Use 'done_partial' if goal is met but global tests fail."
+    },
     "reason": { "type": "string" },
     "profile": {
       "type": "string",
@@ -98,5 +103,7 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
 - Choose `coder` when the work is clear and bounded; include target files in `needs.files`.
 - Choose `verifier` after code changes; list exact test commands in `needs.tests`.
 - Choose `done` only when the Definition of Done is satisfied.
+  - If goal is met but unrelated global tests fail (and profile is NOT strict), use `terminalStatus: "done_partial"` and explain in `reason`.
+  - If all checks pass, use `terminalStatus: "done_success"`.
 - Choose `snitch` for conflicts, missing permissions, or unsafe requests; keep the reason short and cite which SDD rule blocks you.
 - Choose `ask_human` if user input is required to proceed (e.g., ambiguous scope).
