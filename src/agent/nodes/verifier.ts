@@ -65,15 +65,33 @@ export function verifierNode(cfg: KotefConfig) {
         log.info('Tests completed', { passed: result.passed });
 
         let failureHistory = state.failureHistory || [];
+        let lastTestSignature = state.lastTestSignature;
+        let sameErrorCount = state.sameErrorCount || 0;
+
         if (!result.passed) {
+            const errorText = result.failureSummary || result.stderr || 'Unknown error';
+            // Simple signature: command + first 200 chars of error
+            const currentSignature = `${testCommand}:${errorText.slice(0, 200)}`;
+
+            if (currentSignature === lastTestSignature) {
+                sameErrorCount++;
+            } else {
+                sameErrorCount = 1;
+                lastTestSignature = currentSignature;
+            }
+
             failureHistory = [
                 ...failureHistory,
                 {
                     step: 'verifier',
-                    error: `Test failed: ${result.failureSummary || result.stderr || 'Unknown error'}`,
+                    error: `Test failed: ${errorText}`,
                     timestamp: Date.now()
                 }
             ];
+        } else {
+            // Reset on success
+            sameErrorCount = 0;
+            lastTestSignature = undefined;
         }
 
         // Goal-First DoD logic (Ticket 13)
@@ -111,6 +129,8 @@ export function verifierNode(cfg: KotefConfig) {
         return {
             testResults: result,
             failureHistory,
+            lastTestSignature,
+            sameErrorCount,
             done,
             ...(completionReason && {
                 plan: {

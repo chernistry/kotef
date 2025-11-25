@@ -50,7 +50,28 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{FILE_CHANGES}}': safe(state.fileChanges),
             '{{TEST_RESULTS}}': safe(state.testResults),
             '{{FAILURE_HISTORY}}': safe(state.failureHistory),
+            '{{LOOP_COUNTERS}}': safe(state.loopCounters),
+            '{{TOTAL_STEPS}}': safe(currentSteps),
         };
+
+        // Flow Control & Stop Rules (Ticket 14)
+        const MAX_STEPS = 50;
+        const MAX_LOOP_EDGE = 5;
+        const currentSteps = (state.totalSteps || 0) + 1;
+
+        if (currentSteps >= MAX_STEPS) {
+            log.warn('Max steps reached, aborting', { steps: currentSteps });
+            return {
+                terminalStatus: 'aborted_stuck',
+                plan: {
+                    next: 'snitch',
+                    reason: `Max steps limit reached (${MAX_STEPS}). The agent is stuck or looping indefinitely.`,
+                    profile: state.runProfile,
+                    plan: []
+                },
+                done: true // Snitch will handle logging
+            };
+        }
 
         // Check for bounded loops (Ticket 11)
         const MAX_FAILURES = 3;
@@ -58,13 +79,14 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             const lastFailure = state.failureHistory[state.failureHistory.length - 1];
             log.warn('Max failures reached, forcing snitch', { failures: state.failureHistory.length });
             return {
+                terminalStatus: 'aborted_stuck',
                 plan: {
                     next: 'snitch',
                     reason: `Max failures reached (${state.failureHistory.length}). Last error: ${lastFailure.error}`,
                     profile: state.runProfile,
                     plan: []
                 },
-                done: true // Snitch will handle logging
+                done: true
             };
         }
 
@@ -210,11 +232,49 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             (isValidProfile(decision.profile) ? decision.profile : undefined) ||
             defaultProfile;
 
+        // Update loop counters based on decision
+        const nextNode = decision.next;
+        const loopCounters = { ...state.loopCounters };
+
+        if (nextNode === 'researcher') loopCounters.planner_to_researcher = (loopCounters.planner_to_researcher || 0) + 1;
+        if (nextNode === 'verifier') loopCounters.planner_to_verifier = (loopCounters.planner_to_verifier || 0) + 1;
+        if (nextNode === 'coder') loopCounters.planner_to_coder = (loopCounters.planner_to_coder || 0) + 1;
+
+        // Enforce loop limits
+        if (nextNode === 'researcher' && loopCounters.planner_to_researcher > MAX_LOOP_EDGE) {
+            decision.next = 'snitch';
+            decision.reason = `Aborted: Planner->Researcher loop limit exceeded (${MAX_LOOP_EDGE}).`;
+            return {
+                terminalStatus: 'aborted_stuck',
+                plan: decision,
+                messages: [assistantMsg],
+                runProfile: resolvedProfile,
+                loopCounters,
+                totalSteps: currentSteps
+            };
+        }
+        if (nextNode === 'verifier' && loopCounters.planner_to_verifier > MAX_LOOP_EDGE) {
+            decision.next = 'snitch';
+            decision.reason = `Aborted: Planner->Verifier loop limit exceeded (${MAX_LOOP_EDGE}).`;
+            return {
+                terminalStatus: 'aborted_stuck',
+                plan: decision,
+                messages: [assistantMsg],
+                runProfile: resolvedProfile,
+                loopCounters,
+                totalSteps: currentSteps
+            };
+        }
+
         // Update state with the new plan/decision
         return {
             plan: decision,
             messages: [assistantMsg], // Append assistant's thought process
-            runProfile: resolvedProfile
+            runProfile: resolvedProfile,
+            loopCounters,
+            totalSteps: currentSteps,
+            // Set terminal status if done
+            ...(decision.next === 'done' ? { terminalStatus: 'done_success' } : {})
         };
     };
 }

@@ -59,6 +59,34 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             taskScope: {
                 reducer: (a, b) => b ?? a,
                 default: () => undefined,
+            },
+            terminalStatus: {
+                reducer: (a, b) => b ?? a,
+                default: () => undefined,
+            },
+            loopCounters: {
+                reducer: (a, b) => b ?? a,
+                default: () => ({ planner_to_researcher: 0, planner_to_verifier: 0, planner_to_coder: 0 }),
+            },
+            totalSteps: {
+                reducer: (a, b) => b ?? a,
+                default: () => 0,
+            },
+            lastProgressStep: {
+                reducer: (a, b) => b ?? a,
+                default: () => undefined,
+            },
+            consecutiveNoOps: {
+                reducer: (a, b) => b ?? a,
+                default: () => 0,
+            },
+            lastTestSignature: {
+                reducer: (a, b) => b ?? a,
+                default: () => undefined,
+            },
+            sameErrorCount: {
+                reducer: (a, b) => b ?? a,
+                default: () => 0,
             }
         }
     });

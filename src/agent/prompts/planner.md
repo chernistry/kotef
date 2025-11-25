@@ -15,6 +15,8 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Test results so far: `{{TEST_RESULTS}}`
 - Failure History: `{{FAILURE_HISTORY}}`
 - Execution Profile: `{{EXECUTION_PROFILE}}`
+- Loop Counters: `{{LOOP_COUNTERS}}`
+- Total Steps: `{{TOTAL_STEPS}}`
 
 # Policies & Guardrails
 - **SDD is law**: follow `.sdd/project.md`, `.sdd/architect.md`, and tickets. If a request conflicts, set `next="snitch"` with a short reason.

@@ -42,6 +42,23 @@ export interface AgentState {
     };
     researchQuality?: ResearchQuality;
     metrics?: RunMetrics;
+
+    // Flow control
+    terminalStatus?: TerminalStatus;
+    loopCounters: LoopCounters;
+    totalSteps: number;
+    lastProgressStep?: number;
+    consecutiveNoOps: number; // For coder
+    lastTestSignature?: string; // For verifier
+    sameErrorCount: number; // For verifier
+}
+
+export type TerminalStatus = 'done_success' | 'done_partial' | 'aborted_stuck' | 'aborted_constraint';
+
+export interface LoopCounters {
+    planner_to_researcher: number;
+    planner_to_verifier: number;
+    planner_to_coder: number;
 }
 
 export interface ResearchQuality {
