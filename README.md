@@ -2,6 +2,8 @@
 
 > “Give me a repo and a goal. I’ll figure out the rest.”
 
+![kotef in action](assets/screenshot.png)
+
 kotef is a LangGraph‑based coding agent that is **shamelessly meticulous** about three things:
 
 - reading and updating a **real project spec** (its “brain”),  
