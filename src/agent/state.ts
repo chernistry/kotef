@@ -8,6 +8,7 @@ export interface SddContext {
     architect: string;     // raw text from .sdd/architect.md
     bestPractices?: string;
     ticket?: string;       // current ticket markdown
+    ticketPath?: string;   // absolute path to current ticket file (in backlog/tickets/open)
     issues?: string;       // issues encountered
 }
 

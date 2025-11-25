@@ -6,6 +6,7 @@ import { researcherNode } from './nodes/researcher.js';
 import { coderNode } from './nodes/coder.js';
 import { verifierNode } from './nodes/verifier.js';
 import { snitchNode } from './nodes/snitch.js';
+import { ticketCloserNode } from './nodes/ticket_closer.js';
 
 import { callChat } from '../core/llm.js';
 
@@ -92,6 +93,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
     graph.addNode("coder" as any, coderNode(cfg, chatFn));
     graph.addNode("verifier" as any, verifierNode(cfg));
     graph.addNode("snitch" as any, snitchNode(cfg));
+    graph.addNode("ticket_closer" as any, ticketCloserNode(cfg));
 
     // Add edges
     graph.addEdge(START, "planner" as any);
@@ -139,15 +141,25 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
     // Coder goes to Verifier
     graph.addEdge("coder" as any, "verifier" as any);
 
-    // Verifier goes to Planner (if failed) or End (if passed)
+    // Verifier goes to Planner (if failed) or TicketCloser/End (if passed)
     graph.addConditionalEdges(
         "verifier" as any,
-        (state) => state.done ? "end" : "planner",
+        (state) => {
+            if (!state.done) {
+                return 'planner';
+            }
+            const ticketPath = (state.sdd as any)?.ticketPath;
+            return ticketPath ? 'ticket_closer' : 'end';
+        },
         {
             end: END,
-            planner: "planner" as any
+            planner: "planner" as any,
+            ticket_closer: "ticket_closer" as any
         }
     );
+
+    // Ticket closer (if any) then terminates the run
+    graph.addEdge("ticket_closer" as any, END);
 
     // Snitch terminates the run after logging an issue
     graph.addEdge("snitch" as any, END);

@@ -154,6 +154,7 @@ program
 
             let ticketContent = '';
             let ticketFileName: string | undefined;
+            let ticketPath: string | undefined;
             if (options.ticket) {
                 // Try to find ticket file
                 // This is a simplification, ideally we search for matching ID
@@ -162,7 +163,8 @@ program
                 const ticketFile = files.find(f => f.startsWith(options.ticket));
                 if (ticketFile) {
                     ticketFileName = ticketFile;
-                    ticketContent = await fs.readFile(path.join(ticketsDir, ticketFile), 'utf-8');
+                    ticketPath = path.join(ticketsDir, ticketFile);
+                    ticketContent = await fs.readFile(ticketPath, 'utf-8');
                 } else {
                     log.warn(`Ticket ${options.ticket} not found.`);
                 }
@@ -181,7 +183,8 @@ program
                     project: projectMd,
                     architect: architectMd,
                     bestPractices: bestPracticesMd,
-                    ticket: ticketContent
+                    ticket: ticketContent,
+                    ticketPath
                 },
                 hasSdd: true,
                 // In YOLO mode we bias the planner/coder towards the most aggressive profile.
@@ -199,25 +202,6 @@ program
             const result = await graph.invoke(initialState);
 
             log.info('Run completed.', { done: result.done });
-
-            // If a specific ticket was executed and run completed successfully,
-            // move it from backlog/tickets/open → backlog/tickets/closed.
-            if (result.done && ticketFileName) {
-                try {
-                    const openDir = path.join(sddDir, 'backlog/tickets/open');
-                    const closedDir = path.join(sddDir, 'backlog/tickets/closed');
-                    await fs.mkdir(closedDir, { recursive: true });
-                    const src = path.join(openDir, ticketFileName);
-                    const dest = path.join(closedDir, ticketFileName);
-                    await fs.rename(src, dest);
-                    log.info('Ticket moved to closed backlog', { ticket: ticketFileName });
-                } catch (e: any) {
-                    log.warn('Failed to move ticket to closed backlog', {
-                        ticket: ticketFileName,
-                        error: e?.message
-                    });
-                }
-            }
 
             // Generate Report
             const endTime = Date.now();
@@ -388,7 +372,8 @@ program
                     const projectMd = await fs.readFile(path.join(sddDir, 'project.md'), 'utf-8').catch(() => '');
                     const architectMd = await fs.readFile(path.join(sddDir, 'architect.md'), 'utf-8').catch(() => '');
                     const bestPracticesMd = await fs.readFile(path.join(sddDir, 'best_practices.md'), 'utf-8').catch(() => '');
-                    const ticketContent = await fs.readFile(path.join(ticketsDir, ticket), 'utf-8');
+                    const ticketPath = path.join(ticketsDir, ticket);
+                    const ticketContent = await fs.readFile(ticketPath, 'utf-8');
 
                     const taskScope = estimateTaskScope(`Execute ticket: ${ticket}`, ticketContent, architectMd);
                     const initialState: Partial<AgentState> = {
@@ -397,7 +382,8 @@ program
                             project: projectMd,
                             architect: architectMd,
                             bestPractices: bestPracticesMd,
-                            ticket: ticketContent
+                            ticket: ticketContent,
+                            ticketPath
                         },
                         hasSdd: true,
                         runProfile: options.yolo ? 'yolo' : undefined,
@@ -443,21 +429,7 @@ program
 
                     if (result.done) {
                         console.log(chalk.green(`✅ Ticket ${ticket} completed.`));
-                        // Move ticket to closed backlog
-                        try {
-                            const closedDir = path.join(sddDir, 'backlog/tickets/closed');
-                            await fs.mkdir(closedDir, { recursive: true });
-                            const src = path.join(ticketsDir, ticket);
-                            const dest = path.join(closedDir, ticket);
-                            await fs.rename(src, dest);
-                            console.log(chalk.gray(`📁 Moved ${ticket} → backlog/tickets/closed`));
-                        } catch (moveErr: any) {
-                            console.warn(
-                                chalk.yellow(
-                                    `⚠️  Failed to move ${ticket} to closed backlog: ${moveErr?.message}`
-                                )
-                            );
-                        }
+                        // Ticket closing (move open → closed) is handled by the agent's ticket_closer node.
                     } else {
                         console.log(chalk.yellow(`⚠️  Ticket ${ticket} finished with partial/blocked status.`));
                     }
