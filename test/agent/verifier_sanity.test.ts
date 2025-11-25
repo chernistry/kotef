@@ -27,7 +27,7 @@ describe('Verifier Integration - Syntax Sanity', () => {
     it('should run syntax check first when files changed (TS)', async () => {
         const state: Partial<AgentState> = {
             fileChanges: { 'src/index.ts': 1 },
-            executionProfile: 'fast',
+            runProfile: 'fast',
             sdd: {} as any,
             messages: []
         };
@@ -64,7 +64,7 @@ describe('Verifier Integration - Syntax Sanity', () => {
     it('should NOT run syntax check if no files changed', async () => {
         const state: Partial<AgentState> = {
             fileChanges: {}, // Empty
-            executionProfile: 'fast',
+            runProfile: 'fast',
             sdd: {} as any,
             messages: []
         };
@@ -95,7 +95,7 @@ describe('Verifier Integration - Syntax Sanity', () => {
     it('should run python syntax check when files changed', async () => {
         const state: Partial<AgentState> = {
             fileChanges: { 'main.py': 1 },
-            executionProfile: 'fast',
+            runProfile: 'fast',
             sdd: {} as any,
             messages: []
         };

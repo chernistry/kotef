@@ -35,7 +35,31 @@ export async function readFile(ctx: FsContext, relativePath: string): Promise<st
     return fs.readFile(fullPath, 'utf8');
 }
 
-export async function writePatch(filePath: string, diffContent: string): Promise<void> {
+export async function writePatch(ctx: FsContext, relativePath: string, diffContent: string): Promise<void>;
+export async function writePatch(filePath: string, diffContent: string): Promise<void>;
+export async function writePatch(
+    ctxOrPath: FsContext | string,
+    relativePathOrDiff: string,
+    maybeDiff?: string
+): Promise<void> {
+    let absolutePath: string;
+    let diffContent: string;
+
+    if (typeof ctxOrPath === 'string') {
+        // Overload: writePatch(filePath, diffContent)
+        absolutePath = path.resolve(ctxOrPath);
+        diffContent = relativePathOrDiff;
+    } else {
+        // Overload: writePatch(ctx, relativePath, diffContent)
+        const ctx = ctxOrPath;
+        const relativePath = relativePathOrDiff;
+        if (maybeDiff === undefined) {
+            throw new Error('writePatch: diff content is required');
+        }
+        diffContent = maybeDiff;
+        absolutePath = resolvePath(ctx, relativePath);
+    }
+
     // 1. Validation (Ticket 26)
     const forbiddenPatterns = [/```/, /<tool_call>/i, /<\/?code>/i];
     for (const pat of forbiddenPatterns) {
@@ -56,7 +80,6 @@ export async function writePatch(filePath: string, diffContent: string): Promise
         );
     }
 
-    const absolutePath = path.resolve(filePath);
     const content = await fs.readFile(absolutePath, 'utf-8');
 
     // Stage 1: Try strict unified diff
@@ -65,22 +88,22 @@ export async function writePatch(filePath: string, diffContent: string): Promise
     // Stage 2: Fallback to fuzzy patching if strict failed
     if (result === false) {
         // Only attempt fuzzy fallback for code files
-        const ext = path.extname(filePath);
+        const ext = path.extname(absolutePath);
         const isCodeFile = ['.ts', '.tsx', '.js', '.jsx'].includes(ext);
 
         if (isCodeFile && shouldAttemptFuzzyPatch(diffContent)) {
             try {
                 result = await applyFuzzyPatch(content, diffContent);
-                console.log(`[fs] Applied fuzzy patch to ${filePath} (strict diff failed)`);
+                console.log(`[fs] Applied fuzzy patch to ${absolutePath} (strict diff failed)`);
             } catch (fuzzyError) {
                 throw new Error(
-                    `Failed to apply patch to ${filePath}. ` +
+                    `Failed to apply patch to ${absolutePath}. ` +
                     `Strict diff failed and fuzzy fallback also failed: ${fuzzyError instanceof Error ? fuzzyError.message : String(fuzzyError)}`
                 );
             }
         } else {
             throw new Error(
-                `Failed to apply patch to ${filePath}. The patch might be malformed or the file content has changed. ` +
+                `Failed to apply patch to ${absolutePath}. The patch might be malformed or the file content has changed. ` +
                 `File type: ${ext || 'unknown'}. Fuzzy fallback not available for this file type.`
             );
         }
@@ -333,4 +356,3 @@ export async function listFiles(ctx: FsContext, pattern: string | string[]): Pro
  * Applies a unified diff to a file.
  * The diff must target a single file.
  */
-

@@ -32,7 +32,7 @@ export interface AgentState {
     sdd: SddContext;
     plan?: any;
     researchResults?: any;
-    fileChanges?: Record<string, string>;
+    fileChanges?: Record<string, number | string>;
     // Verification
     detectedCommands?: DetectedCommands;
     testResults?: any;

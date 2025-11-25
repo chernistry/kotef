@@ -10,10 +10,13 @@ export interface CommandResult {
     stdout: string;
     stderr: string;
     timedOut: boolean;
-    killed: boolean;
+    /** Whether the process was killed (optional, may be undefined). */
+    killed?: boolean;
     startTime: number;
     endTime: number;
     durationMs: number;
+    /** Optional compatibility field; not set by runCommandSafe. */
+    passed?: boolean;
 }
 
 export interface RunCommandOptions {
@@ -72,12 +75,11 @@ export async function runCommandSafe(
 
         return {
             command,
-            args: result.command.split(' ').slice(1), // Rough approximation
-            exitCode: result.exitCode,
-            stdout: result.stdout,
-            stderr: result.stderr,
-            timedOut: result.timedOut,
-            killed: result.killed,
+            args: (result.command || '').split(' ').slice(1), // Rough approximation
+            exitCode: result.exitCode ?? -1,
+            stdout: result.stdout ?? '',
+            stderr: result.stderr ?? '',
+            timedOut: (result as any).timedOut ?? false,
             startTime,
             endTime,
             durationMs: endTime - startTime
