@@ -70,6 +70,20 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             yolo: 500
         };
 
+        // Apply config override if set (Ticket 23)
+        const profileDefault = profileTurns[executionProfile] ?? 20;
+        const configuredMax = cfg.maxCoderTurns && cfg.maxCoderTurns > 0 ? cfg.maxCoderTurns : undefined;
+        const maxTurns = configuredMax !== undefined
+            ? Math.min(configuredMax, profileDefault)  // Config is upper bound
+            : profileDefault;
+
+        log.info('Coder turn budget', {
+            executionProfile,
+            profileDefault,
+            configuredMax: cfg.maxCoderTurns || null,
+            effectiveMaxTurns: maxTurns
+        });
+
         const replacements: Record<string, string> = {
             '{{TICKET}}': safe(state.sdd.ticket),
             '{{GOAL}}': safe(state.sdd.goal),
@@ -208,7 +222,6 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         // Tool execution loop
         const currentMessages = [...messages];
         let turns = 0;
-        const maxTurns = profileTurns[executionProfile] ?? 20;
 
         let commandCount = 0;
         let testCount = 0;

@@ -1,10 +1,5 @@
 import { AgentState, ExecutionProfile } from './state.js';
 
-// Extend the type locally if needed, or update state.ts.
-// Since ExecutionProfile is imported from state.ts, we should update state.ts instead.
-// But wait, the error says "types ... have no overlap", implying state.ts defines it.
-// Let's check state.ts first.
-
 export type { ExecutionProfile };
 
 export interface CommandPolicy {

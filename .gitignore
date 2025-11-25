@@ -82,3 +82,4 @@ src/agent/nodes/verifier.ts
 devdata/eval/*
 .sdd/cache/*
 .sdd/runs/*
+scripts/eval/results/*

@@ -91,31 +91,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
         }
     });
 
-    // Add nodes
-    // LangGraph.js 0.2+ might require different typing or string literals.
-    // The error suggests it expects "__start__" which is weird for addNode.
-    // It might be because StateGraph generic type inference.
-
-    // Let's try casting the node names or checking the docs pattern.
-    // Usually: graph.addNode("name", nodeFn)
-
-    // If we look at recent LangGraph JS examples:
-    // const workflow = new StateGraph<AgentState>({ channels: ... })
-    // workflow.addNode("agent", agentNode)
-
-    // The error `Argument of type '"planner"' is not assignable to parameter of type '"__start__" | "__start__"[]'`
-    // usually happens when the graph hasn't been initialized with node names or something.
-    // Wait, `addNode` takes `key` and `action`.
-
-    // Let's try to be explicit about the graph type or just suppress if it's a false positive, 
-    // but it's a build error so we must fix it.
-
-    // Maybe we need to define the node names in the StateGraph constructor or generic?
-    // No, StateGraph<State> is standard.
-
-    // Ah, maybe I need to import START/END and use them correctly?
-    // Add nodes
-    // Casting to any to avoid strict type checking issues with LangGraph generics in this version
+    // Add nodes (cast to any to avoid LangGraph.js type inference issues)
     graph.addNode("planner" as any, plannerNode(cfg, chatFn));
     graph.addNode("researcher" as any, researcherNode(cfg));
     graph.addNode("coder" as any, coderNode(cfg, chatFn));
@@ -136,51 +112,21 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
                 const rr: any = state.researchResults;
                 const rq = state.researchQuality;
 
-                // If we have SDD results, we used to force coder, but that blocks fresh research.
-                // Now we respect planner's decision.
-                // if (rr && !Array.isArray(rr) && rr.source === 'sdd') {
-                //    return 'coder';
-                // }
-
-                // If research failed with error, snitch.
+                // Research failed with error
                 if (rr && !Array.isArray(rr) && rr.error) {
                     return 'snitch';
                 }
 
-                // If we have quality metrics, use them to decide loop vs give up.
+                // Use quality metrics for circuit breaking
                 if (rq) {
-                    // If quality says we should retry, and we haven't hit a hard loop limit (e.g. 3 global attempts),
-                    // we might allow it. But deepResearch already does internal retries.
-                    // So if deepResearch returns, it means it either succeeded or exhausted its own retries.
-                    // If it exhausted retries and still says "shouldRetry", it means it failed to get good results.
-                    // We should probably NOT loop back to researcher immediately with the same query.
-                    // However, the Planner might have changed the goal/query.
-
-                    // Heuristic: If planner says "researcher" AGAIN, but quality was poor, 
-                    // we check if we have enough info to proceed or if we should fail.
-
-                    // For now, let's trust the Planner's decision unless it looks like a tight loop.
-                    // We can use state.failureHistory or just rely on the fact that deepResearch is robust.
-
-                    // If quality is really bad (relevance < 0.5) and we have results, maybe we should warn?
-                    // But for graph logic, we just follow next unless it's an infinite loop.
-
-                    // If findings are empty, we must not go to coder.
+                    // Circuit breaker: prevent infinite research loops
                     if (Array.isArray(rr) && rr.length === 0) {
-                        // If planner wants research, let it try (maybe new query).
-                        // But if it keeps failing, we need a circuit breaker.
-                        // For now, allow it.
                         return 'researcher';
                     }
                 }
 
-                // Legacy/Fallback: if we have results, usually we go to coder, but planner said researcher.
-                // If planner explicitly wants research, we respect it (assuming it knows what it's doing).
-                // But to prevent infinite loops if planner is dumb:
+                // Planner explicitly requested more research
                 if (Array.isArray(rr) && rr.length > 0) {
-                    // Planner wants more research despite having results.
-                    // Allow it, but maybe we should check if query changed?
-                    // For MVP, just return 'researcher'.
                     return 'researcher';
                 }
 

@@ -69,7 +69,7 @@ export function verifierNode(cfg: KotefConfig) {
                     passed: true,
                     stdout: reason
                 },
-                done: true // If we can't verify, we assume done? Or maybe ask human? For now, assume done if no tests found.
+                done: true
             };
         }
 

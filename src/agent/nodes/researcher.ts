@@ -14,9 +14,6 @@ export function researcherNode(cfg: KotefConfig) {
             return JSON.stringify(value, null, 2);
         };
 
-        // If SDD already provides best practices, treat them as primary research source
-        // If SDD already provides best practices, we still might need specific research.
-        // We do NOT return early here anymore.
         const sddBest = state.sdd.bestPractices || '';
         if (sddBest.trim().length > 0) {
             log.info('Existing SDD best_practices.md detected; will use it as context but allow fresh research.');
@@ -85,12 +82,6 @@ export function researcherNode(cfg: KotefConfig) {
         // Profile enum: strict, fast, smoke, yolo.
         // Deep research is expensive. Use it for strict.
         // For fast/yolo, use shallow web search unless explicitly requested?
-        // Ticket 15 optimized deep research, so it's good.
-        // But let's respect profile.
-
-        // Actually, let's use deepResearch for the *primary* query if strict, and webSearch for others?
-        // Or just use deepResearch for the first query, as it covers a lot.
-
         const primaryQuery = queries[0];
         log.info('Executing research', { primaryQuery, count: queries.length, profile });
 

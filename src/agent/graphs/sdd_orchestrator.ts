@@ -152,14 +152,6 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
 
     const { techStack, domain, projectDescription } = await loadProjectMetadata(rootDir, goal);
 
-    // 1. Render prompt
-    // Architect template refers to .sdd/best_practices.md, so we don't need to inject it if the LLM can read files.
-    // But here we are just prompting.
-    // We should probably inject the research content into the prompt context if the LLM can't read files yet.
-    // Or we assume the LLM "knows" it via context injection.
-    // The template has `Best practices: see .sdd/best_practices.md`.
-    // We will inject it as context for better results.
-
     const prompt = renderBrainTemplate('architect', {
         projectName: path.basename(rootDir),
         domain,
@@ -167,10 +159,10 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
         projectDescription,
         year: new Date().getFullYear(),
         goal,
-        research: researchContent // Injecting research content if template supports it or we append it
+        research: researchContent
     });
 
-    // Append research content if not in template (template refers to file, but LLM needs context)
+    // Append research content for LLM context
     const fullPrompt = `${prompt}\n\n## Context from Research\n${researchContent}`;
 
     // 2. Call LLM

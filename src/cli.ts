@@ -104,6 +104,7 @@ program
     .option('--max-time <seconds>', 'Maximum run time in seconds')
     .option('--max-tokens <count>', 'Maximum tokens per run')
     .option('--profile <profile>', 'Execution profile (strict, fast, smoke, yolo)')
+    .option('--max-coder-turns <count>', 'Hard cap on coder tool-loop turns (default: profile-based)')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .option('--auto-approve', 'Skip interactive approval', false)
     .action(async (options) => {
@@ -118,6 +119,7 @@ program
             dryRun: options.dryRun || envConfig.dryRun,
             maxRunSeconds: options.maxTime ? parseInt(options.maxTime) : envConfig.maxRunSeconds,
             maxTokensPerRun: options.maxTokens ? parseInt(options.maxTokens) : envConfig.maxTokensPerRun,
+            maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns
         };
 
         const log = createLogger(runId);
@@ -267,6 +269,7 @@ program
     .description('Interactive coding session (Voyant-style, Navan-like CLI)')
     .option('--root <path>', 'Project root directory', process.cwd())
     .option('--goal <text>', 'Initial goal')
+    .option('--max-coder-turns <count>', 'Hard cap on coder tool-loop turns')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .option('--auto-approve', 'Skip interactive approval', false)
     .action(async (options) => {
@@ -274,7 +277,8 @@ program
         const envConfig = loadConfig();
         const cfg: KotefConfig = {
             ...envConfig,
-            rootDir
+            rootDir,
+            maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns
         };
 
         const rl = readline.createInterface({ input, output });
