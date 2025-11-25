@@ -186,6 +186,10 @@ export function verifierNode(cfg: KotefConfig) {
             lastTestSignature = undefined;
         }
 
+        // Compute diagnostics summary
+        const { summarizeDiagnostics } = await import('../utils/diagnostics.js');
+        const diagnosticsSummary = summarizeDiagnostics(currentDiagnostics);
+
         // 5. LLM Evaluation (Partial Success Logic)
         const promptTemplate = await import('../../core/prompts.js').then(m => m.loadRuntimePrompt('verifier'));
 
@@ -211,7 +215,8 @@ export function verifierNode(cfg: KotefConfig) {
             '{{EXECUTION_PROFILE}}': executionProfile,
             '{{TASK_SCOPE}}': state.taskScope || 'normal',
             '{{TEST_RESULTS}}': safe(results),
-            '{{FUNCTIONAL_OK}}': functionalOk ? 'true' : 'false'
+            '{{FUNCTIONAL_OK}}': functionalOk ? 'true' : 'false',
+            '{{DIAGNOSTICS}}': diagnosticsSummary
         };
 
         let systemPrompt = promptTemplate;
@@ -237,13 +242,27 @@ export function verifierNode(cfg: KotefConfig) {
             const content = response.messages[response.messages.length - 1].content || '{}';
             decision = JSON.parse(content);
         } catch (e) {
-            log.error('Verifier LLM failed', { error: e });
+            log.error('Verifier LLM failed or response invalid', { error: e });
+            // Fail-closed fallback
             decision = {
-                status: allPassed ? 'passed' : 'failed',
-                summary: allPassed ? 'All checks passed' : 'Checks failed',
-                next: allPassed ? 'done' : 'planner',
+                status: allPassed ? 'blocked' : 'failed', // Even if passed, if LLM fails, we block to be safe? Or maybe just 'blocked'.
+                summary: `Verifier internal error: ${e instanceof Error ? e.message : String(e)}. Diagnostics: ${diagnosticsSummary}`,
+                next: 'planner',
                 notes: 'Fallback due to LLM error'
             };
+        }
+
+        // Enforce fail-closed semantics (Ticket 31)
+        if (decision.next === 'done') {
+            if (executionProfile === 'strict' && !allPassed) {
+                log.warn('Enforcing fail-closed: Strict profile requires all tests to pass.', { decision });
+                decision.next = 'planner';
+                decision.status = 'failed';
+                decision.notes = (decision.notes || '') + ' [System: Strict profile requires all tests to pass]';
+                decision.terminalStatus = undefined;
+            }
+            // If there are critical diagnostics (e.g. build errors), we should probably block too.
+            // For now, relying on allPassed covers most cases, as build errors usually mean command failed.
         }
 
         return {
@@ -255,7 +274,8 @@ export function verifierNode(cfg: KotefConfig) {
             done: decision.next === 'done',
             terminalStatus: decision.terminalStatus, // e.g. 'done_partial'
             functionalChecks: state.functionalChecks,
-            diagnosticsLog: currentDiagnostics
+            diagnosticsLog: currentDiagnostics,
+            diagnosticsSummary
         };
     };
 }

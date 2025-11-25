@@ -78,6 +78,8 @@ export interface AgentState {
 
     /** History of test/lint/build failures and errors. */
     diagnosticsLog?: import('./utils/diagnostics.js').DiagnosticsEntry[];
+    /** Concise summary of top diagnostics for prompt injection. */
+    diagnosticsSummary?: string;
 }
 
 export type TerminalStatus = 'done_success' | 'done_partial' | 'aborted_stuck' | 'aborted_constraint';
