@@ -67,8 +67,10 @@ Do **not** mention internal tool names or graph nodes when talking to the user; 
 
 - **tiny scope**  
   - Micro‑changes only; avoid heavy commands unless required by the ticket.
-- **large scope**  
-  - Larger refactors or multi‑file work, but still bounded by budgets and planner decisions.
+  - Can be run ad-hoc without a ticket.
+- **normal / large scope**  
+  - Larger refactors or multi‑file work.
+  - **Must be executed via a ticket** in SDD projects. Do not attempt ad-hoc execution for these scopes.
 
 # High‑level flow
 1. **Plan** — Planner turns goal + SDD into a small plan and “needs” (research queries, files, tests).

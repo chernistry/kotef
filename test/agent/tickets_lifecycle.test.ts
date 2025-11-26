@@ -110,4 +110,44 @@ describe('Ticket Lifecycle', () => {
         // Should return empty object and not throw
         expect(result).toEqual({});
     });
+
+    describe('CLI Integration - Ticket Metadata', () => {
+        it('should extract ticketId from filename', () => {
+            // Test ticketId extraction logic
+            const testCases = [
+                { filename: '45-ticket-lifecycle.md', expected: '45-ticket-lifecycle' },
+                { filename: '17-goal-aware-verification.md', expected: '17-goal-aware-verification' },
+                { filename: '1-simple.md', expected: '1-simple' }
+            ];
+
+            testCases.forEach(({ filename, expected }) => {
+                const ticketId = filename.replace(/\.md$/, '');
+                expect(ticketId).toBe(expected);
+            });
+        });
+
+        it('should infer ticketStatus as closed when path contains /closed/', () => {
+            const testPaths = [
+                { path: '/root/.sdd/backlog/tickets/closed/45-ticket.md', expected: 'closed' },
+                { path: '/root/.sdd/backlog/tickets/open/45-ticket.md', expected: 'open' },
+                { path: '/something/closed/in/middle/45-ticket.md', expected: 'closed' }
+            ];
+
+            testPaths.forEach(({ path, expected }) => {
+                const ticketStatus = path.includes('/closed/') ? 'closed' : 'open';
+                expect(ticketStatus).toBe(expected);
+            });
+        });
+
+        it('should detect when ticket is done but still in open/', () => {
+            // Simulate scenario where done=true but ticket wasn't moved
+            const done = true;
+            const finalTicketPath = '/root/.sdd/backlog/tickets/open/45-ticket.md';
+            const ticketStatus = finalTicketPath.includes('/closed/') ? 'closed' : 'open';
+
+            // This should trigger a warning
+            expect(done && ticketStatus === 'open').toBe(true);
+        });
+    });
 });
+

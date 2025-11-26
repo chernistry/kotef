@@ -296,6 +296,7 @@ program
             let ticketContent = '';
             let ticketFileName: string | undefined;
             let ticketPath: string | undefined;
+            let ticketId: string | undefined;
             if (options.ticket) {
                 // Try to find ticket file
                 // This is a simplification, ideally we search for matching ID
@@ -306,6 +307,8 @@ program
                     ticketFileName = ticketFile;
                     ticketPath = path.join(ticketsDir, ticketFile);
                     ticketContent = await fs.readFile(ticketPath, 'utf-8');
+                    // Extract ticketId from filename (remove .md extension)
+                    ticketId = ticketFile.replace(/\.md$/, '');
                 } else {
                     log.warn(`Ticket ${options.ticket} not found.`);
                 }
@@ -313,6 +316,24 @@ program
 
             // Initialize State
             const taskScope = estimateTaskScope(options.goal, ticketContent, architectMd);
+
+            // Ticket Requirement Check (Ticket 46)
+            // If scope is not tiny, and we are in an SDD project, and no ticket is provided/found...
+            if (sddExists && taskScope !== 'tiny' && !options.ticket) {
+                // Check if any open tickets exist
+                const ticketsDir = path.join(sddDir, 'backlog/tickets/open');
+                const openTickets = await fs.readdir(ticketsDir).catch(() => []).then(files => files.filter(f => f.endsWith('.md')));
+
+                if (openTickets.length === 0) {
+                    log.error('Medium/Large task requires tickets', { taskScope, goal: options.goal });
+                    console.error(chalk.red('\n❌ Error: Medium/Large tasks require a ticket in SDD projects.'));
+                    console.error(chalk.yellow(`   Your goal was estimated as scope: '${taskScope}'`));
+                    console.error(chalk.white('   Please generate tickets first using:'));
+                    console.error(chalk.cyan('   kotef chat --goal "..."'));
+                    console.error(chalk.white('   Or create a ticket manually in .sdd/backlog/tickets/open/\n'));
+                    process.exit(1);
+                }
+            }
 
             // Build SDD summaries for token optimization (cached to disk)
             log.info('Building SDD summaries...');
@@ -361,6 +382,19 @@ program
                 return acc;
             }, 0);
 
+            // Infer final ticket status from path
+            let ticketStatus: 'open' | 'closed' | undefined;
+            const finalTicketPath = (result.sdd as any)?.ticketPath || ticketPath;
+            if (finalTicketPath) {
+                ticketStatus = finalTicketPath.includes('/closed/') ? 'closed' : 'open';
+
+                // Conservative warning: if done but ticket still open
+                if (result.done && ticketStatus === 'open') {
+                    log.warn('Ticket marked done but still in open/', { ticketId, ticketPath: finalTicketPath });
+                    console.warn(chalk.yellow(`⚠️  Warning: Ticket marked done but still in open/ (ticket_closer may have failed)`));
+                }
+            }
+
             const summary: RunSummary = {
                 status: result.done ? 'success' : 'partial',
                 plan: result.plan ? JSON.stringify(result.plan, null, 2) : 'No plan',
@@ -374,7 +408,11 @@ program
                     totalTokens: 0 // We don't track tokens yet
                 },
                 terminalStatus: result.terminalStatus as any,
-                stopReason: (result.plan as any)?.reason as string
+                stopReason: (result.plan as any)?.reason as string,
+                // Ticket lifecycle metadata
+                ticketId,
+                ticketPath: finalTicketPath,
+                ticketStatus
             };
 
             await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
@@ -559,6 +597,8 @@ program
                     const bestPracticesMd = await fs.readFile(path.join(sddDir, 'best_practices.md'), 'utf-8').catch(() => '');
                     const ticketPath = path.join(ticketsDir, ticket);
                     const ticketContent = await fs.readFile(ticketPath, 'utf-8');
+                    // Extract ticketId from filename
+                    const ticketId = ticket.replace(/\.md$/, '');
 
                     const taskScope = estimateTaskScope(`Execute ticket: ${ticket}`, ticketContent, architectMd);
                     const initialState: Partial<AgentState> = {
@@ -610,6 +650,19 @@ program
                     const endTime = Date.now();
                     const durationSeconds = (endTime - startTime) / 1000;
 
+                    // Infer final ticket status from path
+                    let ticketStatus: 'open' | 'closed' | undefined;
+                    const finalTicketPath = (result.sdd as any)?.ticketPath || ticketPath;
+                    if (finalTicketPath) {
+                        ticketStatus = finalTicketPath.includes('/closed/') ? 'closed' : 'open';
+
+                        // Conservative warning: if done but ticket still open
+                        if (result.done && ticketStatus === 'open') {
+                            log.warn('Ticket marked done but still in open/', { ticketId, ticketPath: finalTicketPath });
+                            console.warn(chalk.yellow(`⚠️  Warning: Ticket marked done but still in open/ (ticket_closer may have failed)`));
+                        }
+                    }
+
                     const summary: RunSummary = {
                         status: result.done ? 'success' : 'partial',
                         plan: result.plan ? JSON.stringify(result.plan, null, 2) : 'No plan',
@@ -618,7 +671,11 @@ program
                         issues: (result.sdd as any)?.issues,
                         durationSeconds,
                         terminalStatus: result.terminalStatus as any,
-                        stopReason: (result.plan as any)?.reason as string
+                        stopReason: (result.plan as any)?.reason as string,
+                        // Ticket lifecycle metadata
+                        ticketId,
+                        ticketPath: finalTicketPath,
+                        ticketStatus
                     };
 
                     await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
