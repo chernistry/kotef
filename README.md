@@ -1,6 +1,6 @@
 # kotef — unapologetically spec‑driven coding agent
 
-_heb. 'kotef' (קוטף) — 'one who picks/harvests'_
+_heb. 'kotef' (קוטף) — 'one who picks/harvests' (wordplay with 'katef' כתף — 'a shoulder to support you')_
 
 > “Give me a repo and a goal. I’ll figure out the rest.”
 
