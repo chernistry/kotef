@@ -15,6 +15,7 @@ import { buildSddSummaries } from './agent/sdd_summary.js';
 import { writeRunReport, RunSummary } from './agent/run_report.js';
 import { AgentState } from './agent/state.js';
 import { estimateTaskScope } from './agent/task_scope.js';
+import { ensureGitRepo } from './tools/git.js';
 
 const program = new Command();
 
@@ -245,6 +246,7 @@ program
     .option('--max-coder-turns <count>', 'Hard cap on coder tool-loop turns (default: profile-based)')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .option('--auto-approve', 'Skip interactive approval', false)
+    .option('--nogit', 'Disable git integration', false)
     .action(async (options) => {
         const runId = randomUUID();
         const rootDir = path.resolve(options.root);
@@ -286,6 +288,17 @@ program
                     process.exit(1);
                 }
             }
+
+            // Initialize git if enabled
+            const gitEnabled = !options.nogit && cfg.gitEnabled;
+            const gitInitialized = await ensureGitRepo(rootDir, {
+                enabled: gitEnabled,
+                autoInit: cfg.gitAutoInit,
+                dryRun: cfg.dryRun,
+                gitBinary: cfg.gitBinary,
+                logger: log
+            });
+            log.info('Git initialization status', { gitEnabled, gitInitialized });
 
             // Load SDD artifacts
             log.info('Loading SDD artifacts...');
@@ -449,6 +462,7 @@ program
     .option('--max-coder-turns <count>', 'Hard cap on coder tool-loop turns')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .option('--auto-approve', 'Skip interactive approval', false)
+    .option('--nogit', 'Disable git integration', false)
     .action(async (options) => {
         const rootDir = path.resolve(options.root);
         const envConfig = loadConfig();
@@ -481,6 +495,22 @@ program
         );
         console.log(chalk.gray('─'.repeat(72)));
         console.log(chalk.gray(`Project root: ${rootDir}\n`));
+
+        // Initialize git once at session start
+        const log = createLogger('chat-session');
+        const gitEnabled = !options.nogit && cfg.gitEnabled;
+        const gitInitialized = await ensureGitRepo(rootDir, {
+            enabled: gitEnabled,
+            autoInit: cfg.gitAutoInit,
+            dryRun: cfg.dryRun,
+            gitBinary: cfg.gitBinary,
+            logger: log
+        });
+        if (gitInitialized) {
+            console.log(chalk.gray('✓ Git repository ready\n'));
+        } else if (!gitEnabled) {
+            console.log(chalk.gray('ℹ Git integration disabled\n'));
+        }
 
         let keepRunning = true;
 

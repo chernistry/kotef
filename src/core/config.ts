@@ -63,6 +63,13 @@ export const KotefConfigSchema = z.object({
 
     /** Timeout for Kiro agent sessions in ms (default: 5 minutes) */
     kiroSessionTimeout: z.number().default(300000),
+
+    /** Git integration: enable git features (default: true) */
+    gitEnabled: z.boolean().default(true),
+    /** Git integration: auto-initialize repos when missing (default: true) */
+    gitAutoInit: z.boolean().default(true),
+    /** Git integration: path to git binary (default: 'git') */
+    gitBinary: z.string().default('git'),
 });
 
 export type KotefConfig = z.infer<typeof KotefConfigSchema>;
@@ -109,6 +116,11 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         // Coder mode config
         coderMode: (env.KOTEF_CODER_MODE || 'internal') as 'internal' | 'kiro',
         kiroSessionTimeout: parseInt(env.KIRO_SESSION_TIMEOUT || '300000', 10),
+
+        // Git integration config
+        gitEnabled: env.KOTEF_NO_GIT !== 'true',
+        gitAutoInit: env.KOTEF_GIT_AUTO_INIT !== 'false',
+        gitBinary: env.GIT_BINARY || 'git',
     };
 
     const parsed = KotefConfigSchema.parse(config);
