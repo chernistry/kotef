@@ -468,7 +468,10 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             totalSteps: currentSteps,
             progressHistory,
             // Set terminal status if done
-            ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success' } : {})
+            ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success' } : {}),
+            // Ticket 50: Pass through ADRs and assumptions
+            designDecisions: decision.designDecisions,
+            assumptions: decision.assumptions
         };
     };
 }

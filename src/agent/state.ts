@@ -27,8 +27,28 @@ export interface SddContext {
 
 export type ExecutionProfile = 'strict' | 'fast' | 'smoke' | 'yolo';
 
+export interface DesignDecision {
+    id?: string;
+    title: string;
+    context: string;
+    decision: string;
+    alternatives?: string[];
+    consequences?: string[];
+}
+
+export interface Assumption {
+    id?: string;
+    area?: string;
+    statement: string;
+    status: 'tentative' | 'confirmed' | 'rejected';
+    source: 'spec' | 'research' | 'guess';
+    notes?: string;
+}
+
 export interface AgentState {
     messages: ChatMessage[];
+    designDecisions?: DesignDecision[];
+    assumptions?: Assumption[];
     sdd: SddContext;
     plan?: any;
     researchResults?: any;

@@ -218,6 +218,23 @@ ${state.testResults.stderr ? `\n**Stderr**:\n\`\`\`\n${state.testResults.stderr.
         } else {
             report += `No research performed.\n`;
         }
+
+        // Ticket 50: ADRs and Assumptions
+        if (state.designDecisions && state.designDecisions.length > 0) {
+            report += `\n## Architectural Decisions (ADRs)\n`;
+            state.designDecisions.forEach(d => {
+                report += `- **${d.title}** (ID: ${d.id || 'pending'})\n`;
+                report += `  - Decision: ${d.decision}\n`;
+            });
+        }
+
+        if (state.assumptions && state.assumptions.length > 0) {
+            report += `\n## Assumptions Log\n`;
+            state.assumptions.forEach(a => {
+                const icon = a.status === 'confirmed' ? '✅' : a.status === 'rejected' ? '❌' : '⚠️';
+                report += `- ${icon} **[${a.status.toUpperCase()}]** ${a.statement} (Source: ${a.source})\n`;
+            });
+        }
     }
 
     await fs.writeFile(filepath, report, 'utf-8');

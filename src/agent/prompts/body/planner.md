@@ -99,10 +99,46 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
         "files": { "type": "array", "items": { "type": "string" } },
         "tests": { "type": "array", "items": { "type": "string" } }
       }
+    },
+    "designDecisions": {
+      "type": "array",
+      "description": "List of architectural decisions made in this step (will be saved as ADRs).",
+      "items": {
+        "type": "object",
+        "required": ["title", "context", "decision"],
+        "properties": {
+          "id": { "type": "string", "description": "Optional ID (e.g. ADR-001)" },
+          "title": { "type": "string" },
+          "context": { "type": "string" },
+          "decision": { "type": "string" },
+          "alternatives": { "type": "array", "items": { "type": "string" } },
+          "consequences": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "List of assumptions made or validated in this step.",
+      "items": {
+        "type": "object",
+        "required": ["statement", "status", "source"],
+        "properties": {
+          "id": { "type": "string", "description": "Optional ID (e.g. A-001)" },
+          "area": { "type": "string" },
+          "statement": { "type": "string" },
+          "status": { "type": "string", "enum": ["tentative", "confirmed", "rejected"] },
+          "source": { "type": "string", "enum": ["spec", "research", "guess"] },
+          "notes": { "type": "string" }
+        }
+      }
     }
   }
 }
 ```
+
+# Architectural Decisions & Assumptions (Ticket 50)
+- **ADRs**: If you make a significant structural decision (e.g. choosing a library, defining a new module pattern), record it in `designDecisions`.
+- **Assumptions**: If you rely on uncertain information (e.g. "assuming API returns JSON" without proof), record it in `assumptions` with `status="tentative"`. If you validate an assumption, update it with `status="confirmed"` or `"rejected"`.
 
 - **Use Diagnostics**: If `{{DIAGNOSTICS}}` shows compile errors (Source: 'build' or 'lsp') or test failures, your plan MUST address them.
   - **Prioritize Compile/LSP Errors**: Fix syntax/type errors before worrying about test logic.

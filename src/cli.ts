@@ -16,6 +16,7 @@ import { writeRunReport, RunSummary } from './agent/run_report.js';
 import { AgentState } from './agent/state.js';
 import { estimateTaskScope } from './agent/task_scope.js';
 import { ensureGitRepo, commitTicketRun, extractTicketTitle } from './tools/git.js';
+import { appendAdr, syncAssumptions } from './agent/utils/adr.js';
 
 const program = new Command();
 
@@ -379,6 +380,16 @@ program
 
             log.info('Run completed.', { done: result.done });
 
+            // Ticket 50: Persist ADRs and Assumptions
+            if (result.designDecisions && result.designDecisions.length > 0) {
+                for (const decision of result.designDecisions) {
+                    await appendAdr(sddDir, decision, log);
+                }
+            }
+            if (result.assumptions && result.assumptions.length > 0) {
+                await syncAssumptions(sddDir, result.assumptions, log);
+            }
+
             // Attempt commit if ticket completed successfully
             let commitHash: string | undefined;
             if (result.done && ticketContent) {
@@ -705,6 +716,16 @@ program
                     if (ticketPipelineOpen) {
                         console.log(PIPELINE_BOTTOM);
                         ticketPipelineOpen = false;
+                    }
+
+                    // Ticket 50: Persist ADRs and Assumptions
+                    if (result.designDecisions && result.designDecisions.length > 0) {
+                        for (const decision of result.designDecisions) {
+                            await appendAdr(sddDir, decision, log);
+                        }
+                    }
+                    if (result.assumptions && result.assumptions.length > 0) {
+                        await syncAssumptions(sddDir, result.assumptions, log);
                     }
 
                     const endTime = Date.now();
