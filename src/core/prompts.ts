@@ -14,6 +14,7 @@ export type RuntimePromptName =
     | 'researcher'
     | 'coder'
     | 'verifier'
+    | 'snitch'
     | 'research_query_refiner'
     | 'research_relevance_evaluator'
     | 'search_query_optimizer'
@@ -29,6 +30,7 @@ const RUNTIME_PROMPTS = new Set<RuntimePromptName>([
     'researcher',
     'coder',
     'verifier',
+    'snitch',
     'research_query_refiner',
     'research_relevance_evaluator',
     'search_query_optimizer',

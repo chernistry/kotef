@@ -79,6 +79,7 @@ describe('Risk Utilities', () => {
         it('should create risk register and append entries', async () => {
             const risks = [
                 {
+                    id: 'R-001',
                     area: 'Test',
                     type: 'reliability' as const,
                     severity: 'high' as const,
@@ -95,8 +96,8 @@ describe('Risk Utilities', () => {
         });
 
         it('should increment IDs', async () => {
-            const r1 = [{ area: 'A1', type: 'other' as const, severity: 'low' as const, status: 'open' as const, description: 'D1', evidence: 'E1' }];
-            const r2 = [{ area: 'A2', type: 'other' as const, severity: 'low' as const, status: 'open' as const, description: 'D2', evidence: 'E2' }];
+            const r1 = [{ id: 'R-001', area: 'A1', type: 'other' as const, severity: 'low' as const, status: 'open' as const, description: 'D1', evidence: 'E1' }];
+            const r2 = [{ id: 'R-002', area: 'A2', type: 'other' as const, severity: 'low' as const, status: 'open' as const, description: 'D2', evidence: 'E2' }];
 
             await appendRiskEntries(sddRoot, r1);
             await appendRiskEntries(sddRoot, r2);

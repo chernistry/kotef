@@ -19,6 +19,7 @@ export function deriveRiskEntries(state: AgentState): RiskEntry[] {
             : 'Unknown error';
 
         risks.push({
+            id: '', // Will be assigned by appendRiskEntries
             area: 'Agent Logic',
             type: 'reliability',
             severity: 'high',
@@ -32,6 +33,7 @@ export function deriveRiskEntries(state: AgentState): RiskEntry[] {
     // 2. Check for Budget Exhaustion
     if (state.terminalStatus === 'aborted_constraint' && state.budget && state.budget.commandsUsed >= state.budget.maxCommands) {
         risks.push({
+            id: '', // Will be assigned by appendRiskEntries
             area: 'Efficiency',
             type: 'performance',
             severity: 'medium',
@@ -54,6 +56,7 @@ export function deriveRiskEntries(state: AgentState): RiskEntry[] {
         for (const [command, count] of commandFailures) {
             if (count >= 2) {
                 risks.push({
+                    id: '', // Will be assigned by appendRiskEntries
                     area: 'Verification',
                     type: 'reliability',
                     severity: 'medium',

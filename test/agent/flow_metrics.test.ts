@@ -44,7 +44,7 @@ describe('Flow Metrics', () => {
             const state: Partial<AgentState> = {
                 terminalStatus: 'aborted_stuck',
                 diagnosticsLog: [
-                    { source: 'test', message: 'fail', timestamp: 1000, occurrenceCount: 1, lastSeenAt: 1000 }
+                    { source: 'test', message: 'fail', occurrenceCount: 1, firstSeenAt: 1000, lastSeenAt: 1000 }
                 ]
             };
 

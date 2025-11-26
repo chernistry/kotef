@@ -16,17 +16,16 @@ export function snitchNode(cfg: KotefConfig) {
         const sddRoot = path.join(cfg.rootDir, '.sdd');
 
         // 1. Generate Issues Log
-        const prompt = await loadRuntimePrompt('snitch', {
-            GOAL: state.sdd.goal || 'Unknown goal',
-            MESSAGES: JSON.stringify(state.messages.slice(-10)), // Last 10 messages for context
-            FAILURE_HISTORY: JSON.stringify(state.failureHistory || []),
-            TERMINAL_STATUS: state.terminalStatus || 'unknown',
-            BUDGET_STATE: JSON.stringify(state.budget || {})
-        });
+        const promptTemplate = await loadRuntimePrompt('snitch');
+        const prompt = promptTemplate
+            .replace('{{GOAL}}', state.sdd.goal || 'Unknown goal')
+            .replace('{{MESSAGES}}', JSON.stringify(state.messages.slice(-10)))
+            .replace('{{FAILURE_HISTORY}}', JSON.stringify(state.failureHistory || []))
+            .replace('{{TERMINAL_STATUS}}', state.terminalStatus || 'unknown')
+            .replace('{{BUDGET_STATE}}', JSON.stringify(state.budget || {}));
 
-        const response = await callChat({
+        const response = await callChat(cfg, [{ role: 'user', content: prompt }], {
             model: cfg.modelFast,
-            messages: [{ role: 'user', content: prompt }],
             temperature: 0.3
         });
 

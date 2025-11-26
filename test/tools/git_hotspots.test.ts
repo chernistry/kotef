@@ -24,8 +24,11 @@ describe('Git Hotspots', () => {
         // Let's assume we run this in the current project which IS a git repo.
 
         mockRunCommandSafe.mockImplementation(async (cmd) => {
+            const now = Date.now();
             if (cmd.includes('log -n 500')) {
                 return {
+                    command: 'git',
+                    args: ['log'],
                     exitCode: 0,
                     stdout: `src/file1.ts
 src/file1.ts
@@ -35,17 +38,37 @@ src/file3.ts
 .sdd/ignored.md
 node_modules/ignored.js
 `,
-                    stderr: ''
+                    stderr: '',
+                    timedOut: false,
+                    startTime: now,
+                    endTime: now,
+                    durationMs: 0
                 };
             }
             if (cmd.includes('log -1')) {
                 return {
+                    command: 'git',
+                    args: ['log'],
                     exitCode: 0,
                     stdout: '2023-10-27',
-                    stderr: ''
+                    stderr: '',
+                    timedOut: false,
+                    startTime: now,
+                    endTime: now,
+                    durationMs: 0
                 };
             }
-            return { exitCode: 1, stdout: '', stderr: '' };
+            return {
+                command: 'git',
+                args: [],
+                exitCode: 1,
+                stdout: '',
+                stderr: '',
+                timedOut: false,
+                startTime: now,
+                endTime: now,
+                durationMs: 0
+            };
         });
 
         // We pass process.cwd() so isGitRepo passes

@@ -53,6 +53,8 @@ export interface RiskEntry {
     status: 'open' | 'mitigated' | 'accepted' | 'closed';
     description: string;
     mitigation?: string;
+    evidence?: string;
+    links?: string[];
 }
 
 export interface AgentState {
