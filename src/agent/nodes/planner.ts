@@ -147,27 +147,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             loopCounters.lastTestSignature = lastTestSig;
         }
 
-        const replacements: Record<string, string> = {
-            '{{GOAL}}': safe(state.sdd.goal),
-            '{{TICKET}}': safe(state.sdd.ticket),
-            '{{PROJECT_SUMMARY}}': safe(JSON.stringify(state.projectSummary, null, 2)),
-            '{{SDD_PROJECT}}': summarize(state.sdd.project, 2500),
-            '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),
-            '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),
-            '{{STATE_PLAN}}': safe(state.plan),
-            '{{RESEARCH_RESULTS}}': safe(state.researchResults),
-            '{{RESEARCH_QUALITY}}': safe(state.researchQuality),
-            '{{FILE_CHANGES}}': safe(state.fileChanges),
-            '{{TEST_RESULTS}}': safe(state.testResults),
-            '{{FAILURE_HISTORY}}': safe(state.failureHistory),
-            '{{LOOP_COUNTERS}}': safe(state.loopCounters),
-            '{{TOTAL_STEPS}}': safe(currentSteps),
-            '{{TASK_SCOPE}}': state.taskScope || 'normal',
-            '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
-            '{{DETECTED_COMMANDS}}': safe(state.detectedCommands),
-            '{{FUNCTIONAL_OK}}': deriveFunctionalStatus(state.functionalChecks) ? 'true' : 'false',
-            '{{DIAGNOSTICS}}': (await import('../utils/diagnostics.js')).summarizeDiagnostics(state.diagnosticsLog),
-        };
+        // Prepare all token replacements for the planner prompt
+        // Note: no longer used directly; merged into promptReplacements below
 
         // Budget exhaustion check (Ticket 19)
         if (state.budget) {
@@ -291,9 +272,27 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
 
         const plannerPromptTemplate = await loadRuntimePrompt('planner');
         const promptReplacements: Record<string, string> = {
-            '{{PROJECT_SUMMARY}}': state.sddSummaries?.projectSummary || state.sdd.project || 'No project summary available.',
-            '{{ARCHITECT_SUMMARY}}': state.sddSummaries?.architectSummary || state.sdd.architect || 'No architecture summary available.',
-            '{{BEST_PRACTICES_SUMMARY}}': state.sddSummaries?.bestPracticesSummary || state.sdd.bestPractices || 'No best practices available.',
+            // Core context variables
+            '{{GOAL}}': safe(state.sdd.goal),
+            '{{TICKET}}': safe(state.sdd.ticket),
+            '{{PROJECT_SUMMARY}}': safe(JSON.stringify(state.projectSummary, null, 2)),
+            '{{SDD_PROJECT}}': summarize(state.sdd.project, 2500),
+            '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),
+            '{{SDD_BEST_PRACTICES}}': summarize(state.sdd.bestPractices, 2500),
+            '{{STATE_PLAN}}': safe(state.plan),
+            '{{RESEARCH_RESULTS}}': safe(state.researchResults),
+            '{{RESEARCH_QUALITY}}': safe(state.researchQuality),
+            '{{FILE_CHANGES}}': safe(state.fileChanges),
+            '{{TEST_RESULTS}}': safe(state.testResults),
+            '{{FAILURE_HISTORY}}': safe(state.failureHistory),
+            '{{LOOP_COUNTERS}}': safe(state.loopCounters),
+            '{{TOTAL_STEPS}}': safe(currentSteps),
+            '{{TASK_SCOPE}}': state.taskScope || 'normal',
+            '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
+            '{{DETECTED_COMMANDS}}': safe(state.detectedCommands),
+            '{{FUNCTIONAL_OK}}': deriveFunctionalStatus(state.functionalChecks) ? 'true' : 'false',
+            '{{DIAGNOSTICS}}': (await import('../utils/diagnostics.js')).summarizeDiagnostics(state.diagnosticsLog),
+            // SDD summaries and metrics (new additions)
             '{{RISK_REGISTER_SUMMARY}}': riskSummary,
             '{{FLOW_METRICS_SUMMARY}}': await loadFlowMetricsSummary(cfg.rootDir),
             '{{GIT_HOTSPOTS}}': formatHotspots(state.gitHotspots)
