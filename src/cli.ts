@@ -15,7 +15,7 @@ import { buildSddSummaries } from './agent/sdd_summary.js';
 import { writeRunReport, RunSummary } from './agent/run_report.js';
 import { AgentState } from './agent/state.js';
 import { estimateTaskScope } from './agent/task_scope.js';
-import { ensureGitRepo } from './tools/git.js';
+import { ensureGitRepo, commitTicketRun, extractTicketTitle } from './tools/git.js';
 
 const program = new Command();
 
@@ -379,6 +379,34 @@ program
 
             log.info('Run completed.', { done: result.done });
 
+            // Attempt commit if ticket completed successfully
+            let commitHash: string | undefined;
+            if (result.done && ticketContent) {
+                const filesChanged = Object.keys(result.fileChanges || {});
+                const ticketTitle = extractTicketTitle(ticketContent);
+
+                const commitResult = await commitTicketRun(rootDir, {
+                    enabled: gitEnabled,
+                    dryRun: cfg.dryRun,
+                    ticketId,
+                    ticketTitle,
+                    filesChanged,
+                    gitBinary: cfg.gitBinary,
+                    logger: log
+                });
+
+                if (commitResult.committed && commitResult.hash) {
+                    commitHash = commitResult.hash;
+                    console.log(chalk.green(`✓ Changes committed: ${commitResult.hash.substring(0, 7)}`));
+                } else if (commitResult.reason) {
+                    log.info('Commit skipped', { reason: commitResult.reason });
+                }
+            } else if (result.done && !ticketContent) {
+                log.info('No ticket content available for commit message');
+            } else {
+                log.info('Ticket not done, skipping commit');
+            }
+
             // Generate Report
             const endTime = Date.now();
             const durationSeconds = (endTime - startTime) / 1000;
@@ -425,7 +453,9 @@ program
                 // Ticket lifecycle metadata
                 ticketId,
                 ticketPath: finalTicketPath,
-                ticketStatus
+                ticketStatus,
+                // Git commit hash
+                commitHash
             };
 
             await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
@@ -680,6 +710,30 @@ program
                     const endTime = Date.now();
                     const durationSeconds = (endTime - startTime) / 1000;
 
+                    // Attempt commit if ticket completed successfully
+                    let commitHash: string | undefined;
+                    if (result.done && ticketContent) {
+                        const filesChanged = Object.keys(result.fileChanges || {});
+                        const ticketTitle = extractTicketTitle(ticketContent);
+
+                        const commitResult = await commitTicketRun(rootDir, {
+                            enabled: gitEnabled,
+                            dryRun: cfg.dryRun,
+                            ticketId,
+                            ticketTitle,
+                            filesChanged,
+                            gitBinary: cfg.gitBinary,
+                            logger: log
+                        });
+
+                        if (commitResult.committed && commitResult.hash) {
+                            commitHash = commitResult.hash;
+                            console.log(chalk.green(`  ✓ Committed: ${commitResult.hash.substring(0, 7)}`));
+                        } else if (commitResult.reason) {
+                            log.info('Commit skipped', { reason: commitResult.reason, ticketId });
+                        }
+                    }
+
                     // Infer final ticket status from path
                     let ticketStatus: 'open' | 'closed' | undefined;
                     const finalTicketPath = (result.sdd as any)?.ticketPath || ticketPath;
@@ -705,7 +759,9 @@ program
                         // Ticket lifecycle metadata
                         ticketId,
                         ticketPath: finalTicketPath,
-                        ticketStatus
+                        ticketStatus,
+                        // Git commit hash
+                        commitHash
                     };
 
                     await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);

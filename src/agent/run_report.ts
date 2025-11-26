@@ -23,6 +23,8 @@ export interface RunSummary {
     ticketPath?: string;
     ticketStatus?: 'open' | 'closed';
     followUpTickets?: string[];
+    // Git commit
+    commitHash?: string;
 }
 
 export async function writeRunReport(
@@ -74,6 +76,9 @@ export async function writeRunReport(
         }
         if (summary.ticketStatus) {
             report += `**Ticket Status:** ${summary.ticketStatus}\n`;
+        }
+        if (summary.commitHash) {
+            report += `**Commit Hash:** \`${summary.commitHash}\`\n`;
         }
         if (summary.followUpTickets && summary.followUpTickets.length > 0) {
             report += `**Follow-Up Tickets Created:**\n`;

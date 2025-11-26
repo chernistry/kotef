@@ -16,6 +16,173 @@ export interface GitStatus {
     hasUntracked: boolean;
 }
 
+export interface CommitResult {
+    committed: boolean;
+    hash?: string;
+    reason?: string;
+}
+
+export interface CommitParams {
+    enabled: boolean;
+    dryRun: boolean;
+    ticketId?: string;
+    ticketTitle?: string;
+    filesChanged: string[];
+    gitBinary?: string;
+    logger: Logger;
+}
+
+/**
+ * Extract ticket title from ticket markdown content.
+ * Looks for the first non-empty line starting with '#' and returns the cleaned title.
+ * 
+ * @param ticketContent - Full markdown content of the ticket
+ * @returns Cleaned ticket title or undefined if not found
+ */
+export function extractTicketTitle(ticketContent: string): string | undefined {
+    const lines = ticketContent.split('\n');
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('#')) {
+            // Strip leading # characters and whitespace
+            return trimmed.replace(/^#+\s*/, '').trim();
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Commit changes after a successful ticket run.
+ * 
+ * @param rootDir - Repository root directory
+ * @param params - Commit parameters
+ * @returns CommitResult with committed status, hash, and/or reason
+ */
+export async function commitTicketRun(rootDir: string, params: CommitParams): Promise<CommitResult> {
+    const { enabled, dryRun, ticketId, ticketTitle, filesChanged, gitBinary = 'git', logger } = params;
+
+    // Early exit: git disabled
+    if (!enabled) {
+        logger.info('Commit skipped: git disabled', { rootDir });
+        return { committed: false, reason: 'git disabled' };
+    }
+
+    // Early exit: dry-run mode
+    if (dryRun) {
+        logger.info('Commit skipped: dry-run mode', { rootDir, filesChanged });
+        return { committed: false, reason: 'dry-run mode' };
+    }
+
+    // Early exit: no changes
+    if (!filesChanged || filesChanged.length === 0) {
+        logger.info('Commit skipped: no changes', { rootDir });
+        return { committed: false, reason: 'no changes' };
+    }
+
+    // Deduplicate and normalize file paths
+    const uniqueFiles = Array.from(new Set(filesChanged));
+    logger.info('Preparing to commit changes', { rootDir, fileCount: uniqueFiles.length });
+
+    try {
+        // Stage files
+        // Try to add files individually first
+        let addResult = await runCommandSafe(`${gitBinary} add ${uniqueFiles.map(f => `"${f}"`).join(' ')}`, {
+            cwd: rootDir,
+            timeoutMs: 30000
+        });
+
+        // Fallback to git add -A if individual adds fail
+        if (addResult.exitCode !== 0) {
+            logger.debug('Individual file add failed, falling back to git add -A');
+            addResult = await runCommandSafe(`${gitBinary} add -A`, {
+                cwd: rootDir,
+                timeoutMs: 30000
+            });
+
+            if (addResult.exitCode !== 0) {
+                logger.warn('Failed to stage changes', {
+                    rootDir,
+                    stderr: addResult.stderr
+                });
+                return {
+                    committed: false,
+                    reason: `git add failed: ${addResult.stderr.substring(0, 200)}`
+                };
+            }
+        }
+
+        // Build commit message
+        const message = ticketId && ticketTitle
+            ? `[kotef] Ticket ${ticketId}: ${ticketTitle}`
+            : '[kotef] Automated changes (no ticket id)';
+
+        // Create commit
+        const commitResult = await runCommandSafe(`${gitBinary} commit -m "${message}"`, {
+            cwd: rootDir,
+            timeoutMs: 30000
+        });
+
+        if (commitResult.exitCode !== 0) {
+            // Check for common errors
+            const stderr = commitResult.stderr.toLowerCase();
+            if (stderr.includes('nothing to commit') || stderr.includes('no changes added')) {
+                logger.info('Commit skipped: no staged changes', { rootDir });
+                return { committed: false, reason: 'no staged changes' };
+            }
+            if (stderr.includes('user.name') || stderr.includes('user.email')) {
+                logger.warn('Commit failed: git identity not configured', {
+                    rootDir,
+                    stderr: commitResult.stderr
+                });
+                return {
+                    committed: false,
+                    reason: 'git identity not configured (set user.name and user.email)'
+                };
+            }
+
+            logger.warn('Commit failed', {
+                rootDir,
+                exitCode: commitResult.exitCode,
+                stderr: commitResult.stderr
+            });
+            return {
+                committed: false,
+                reason: `commit failed: ${commitResult.stderr.substring(0, 200)}`
+            };
+        }
+
+        // Get commit hash
+        const hashResult = await runCommandSafe(`${gitBinary} rev-parse HEAD`, {
+            cwd: rootDir,
+            timeoutMs: 5000
+        });
+
+        const hash = hashResult.exitCode === 0 ? hashResult.stdout.trim() : undefined;
+
+        logger.info('Changes committed successfully', {
+            rootDir,
+            hash,
+            message,
+            fileCount: uniqueFiles.length
+        });
+
+        return {
+            committed: true,
+            hash
+        };
+    } catch (e: any) {
+        logger.warn('Commit failed with exception', {
+            rootDir,
+            error: e.message
+        });
+        return {
+            committed: false,
+            reason: `exception: ${e.message}`
+        };
+    }
+}
+
+
 /**
  * Check if a directory is a git repository.
  * Checks for the existence of a .git directory directly using the filesystem.

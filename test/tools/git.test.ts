@@ -1,8 +1,9 @@
 import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { isGitRepo, ensureGitRepo, getGitStatus } from '../../src/tools/git.js';
+import { isGitRepo, ensureGitRepo, getGitStatus, commitTicketRun, extractTicketTitle } from '../../src/tools/git.js';
 import { createLogger } from '../../src/core/logger.js';
+import { runCommandSafe } from '../../src/tools/command_runner.js';
 
 describe('Git Tools', () => {
     const testRoot = path.resolve(process.cwd(), 'test-git-workspace');
@@ -203,6 +204,195 @@ describe('Git Tools', () => {
 
             expect(result).toBe(true);
             expect(await isGitRepo(testRoot, 'git')).toBe(true);
+        });
+    });
+
+    describe('extractTicketTitle', () => {
+        it('should extract title from ticket markdown', () => {
+            const content = `# Ticket: 49 Git commits per ticket run
+
+Some description here.`;
+            const title = extractTicketTitle(content);
+            expect(title).toBe('Ticket: 49 Git commits per ticket run');
+        });
+
+        it('should handle multiple # characters', () => {
+            const content = `## Some subtitle
+
+Content here.`;
+            const title = extractTicketTitle(content);
+            expect(title).toBe('Some subtitle');
+        });
+
+        it('should return undefined for no headings', () => {
+            const content = `Just plain text with no headings.`;
+            const title = extractTicketTitle(content);
+            expect(title).toBeUndefined();
+        });
+
+        it('should skip empty lines', () => {
+            const content = `
+
+# Title after empty lines`;
+            const title = extractTicketTitle(content);
+            expect(title).toBe('Title after empty lines');
+        });
+    });
+
+    describe('commitTicketRun', () => {
+        it('should return "git disabled" when disabled', async () => {
+            const result = await commitTicketRun(testRoot, {
+                enabled: false,
+                dryRun: false,
+                ticketId: '49',
+                ticketTitle: 'Test ticket',
+                filesChanged: ['test.txt'],
+                logger
+            });
+
+            expect(result.committed).toBe(false);
+            expect(result.reason).toBe('git disabled');
+        });
+
+        it('should return "dry-run mode" in dry-run', async () => {
+            const result = await commitTicketRun(testRoot, {
+                enabled: true,
+                dryRun: true,
+                ticketId: '49',
+                ticketTitle: 'Test ticket',
+                filesChanged: ['test.txt'],
+                logger
+            });
+
+            expect(result.committed).toBe(false);
+            expect(result.reason).toBe('dry-run mode');
+        });
+
+        it('should return "no changes" when filesChanged is empty', async () => {
+            const result = await commitTicketRun(testRoot, {
+                enabled: true,
+                dryRun: false,
+                ticketId: '49',
+                ticketTitle: 'Test ticket',
+                filesChanged: [],
+                logger
+            });
+
+            expect(result.committed).toBe(false);
+            expect(result.reason).toBe('no changes');
+        });
+
+        it('should create commit with ticket info', async () => {
+            // Initialize git repo
+            await ensureGitRepo(testRoot, {
+                enabled: true,
+                autoInit: true,
+                dryRun: false,
+                logger
+            });
+
+            // Configure git identity for the test
+            await runCommandSafe('git config user.name "Test User"', { cwd: testRoot });
+            await runCommandSafe('git config user.email "test@example.com"', { cwd: testRoot });
+
+            // Create a test file
+            await fs.writeFile(path.join(testRoot, 'test.txt'), 'test content');
+
+            const result = await commitTicketRun(testRoot, {
+                enabled: true,
+                dryRun: false,
+                ticketId: '49',
+                ticketTitle: 'Git commits per ticket run',
+                filesChanged: ['test.txt'],
+                logger
+            });
+
+            expect(result.committed).toBe(true);
+            expect(result.hash).toBeDefined();
+            expect(result.hash).toHaveLength(40); // SHA-1 hash length
+
+            // Verify commit message
+            const logResult = await runCommandSafe('git log --format=%B -n 1', { cwd: testRoot });
+            expect(logResult.stdout.trim()).toBe('[kotef] Ticket 49: Git commits per ticket run');
+        });
+
+        it('should create commit with fallback message when no ticket info', async () => {
+            await ensureGitRepo(testRoot, {
+                enabled: true,
+                autoInit: true,
+                dryRun: false,
+                logger
+            });
+
+            await runCommandSafe('git config user.name "Test User"', { cwd: testRoot });
+            await runCommandSafe('git config user.email "test@example.com"', { cwd: testRoot });
+
+            await fs.writeFile(path.join(testRoot, 'test2.txt'), 'test content');
+
+            const result = await commitTicketRun(testRoot, {
+                enabled: true,
+                dryRun: false,
+                filesChanged: ['test2.txt'],
+                logger
+            });
+
+            expect(result.committed).toBe(true);
+
+            // Verify fallback commit message
+            const logResult = await runCommandSafe('git log --format=%B -n 1', { cwd: testRoot });
+            expect(logResult.stdout.trim()).toBe('[kotef] Automated changes (no ticket id)');
+        });
+
+        it('should handle multiple files', async () => {
+            await ensureGitRepo(testRoot, {
+                enabled: true,
+                autoInit: true,
+                dryRun: false,
+                logger
+            });
+
+            await runCommandSafe('git config user.name "Test User"', { cwd: testRoot });
+            await runCommandSafe('git config user.email "test@example.com"', { cwd: testRoot });
+
+            await fs.writeFile(path.join(testRoot, 'file1.txt'), 'content1');
+            await fs.writeFile(path.join(testRoot, 'file2.txt'), 'content2');
+
+            const result = await commitTicketRun(testRoot, {
+                enabled: true,
+                dryRun: false,
+                ticketId: '50',
+                ticketTitle: 'Multiple files',
+                filesChanged: ['file1.txt', 'file2.txt'],
+                logger
+            });
+
+            expect(result.committed).toBe(true);
+            expect(result.hash).toBeDefined();
+        });
+
+        it('should deduplicate filesChanged', async () => {
+            await ensureGitRepo(testRoot, {
+                enabled: true,
+                autoInit: true,
+                dryRun: false,
+                logger
+            });
+
+            await runCommandSafe('git config user.name "Test User"', { cwd: testRoot });
+            await runCommandSafe('git config user.email "test@example.com"', { cwd: testRoot });
+
+            await fs.writeFile(path.join(testRoot, 'dup.txt'), 'content');
+
+            const result = await commitTicketRun(testRoot, {
+                enabled: true,
+                dryRun: false,
+                ticketId: '51',
+                ticketTitle: 'Duplicate test',
+                filesChanged: ['dup.txt', 'dup.txt', 'dup.txt'],
+                logger
+            });
+
+            expect(result.committed).toBe(true);
         });
     });
 });
