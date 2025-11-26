@@ -308,6 +308,89 @@ export async function getGitStatus(rootDir: string, gitBinary = 'git'): Promise<
 
         return { clean, hasUntracked };
     } catch (e) {
-        return null;
+    }
+}
+
+export interface GitHotspot {
+    file: string;
+    commits: number;
+    lastCommitDate?: string;
+}
+
+/**
+ * Get hotspot files based on commit frequency.
+ * 
+ * @param rootDir - Repository root directory
+ * @param opts - Options for limiting the analysis
+ * @returns List of hotspots sorted by commit count (descending)
+ */
+export async function getHotspots(rootDir: string, opts?: { maxCommits?: number; limit?: number; gitBinary?: string }): Promise<GitHotspot[]> {
+    const maxCommits = opts?.maxCommits || 500;
+    const limit = opts?.limit || 10;
+    const gitBinary = opts?.gitBinary || 'git';
+
+    try {
+        // Check if repo exists first
+        if (!await isGitRepo(rootDir, gitBinary)) {
+            return [];
+        }
+
+        // Get file change counts
+        // --name-only: show changed files
+        // --pretty=format:: suppress commit info (we just want file names)
+        // --no-merges: skip merge commits to avoid double counting
+        const logResult = await runCommandSafe(`${gitBinary} log -n ${maxCommits} --name-only --pretty=format: --no-merges .`, {
+            cwd: rootDir,
+            timeoutMs: 10000
+        });
+
+        if (logResult.exitCode !== 0) {
+            return [];
+        }
+
+        const fileCounts = new Map<string, number>();
+        const lines = logResult.stdout.split('\n');
+
+        for (const line of lines) {
+            const file = line.trim();
+            if (!file) continue;
+
+            // Filter out ignored paths
+            if (file.startsWith('.sdd/') ||
+                file.startsWith('node_modules/') ||
+                file.startsWith('dist/') ||
+                file.startsWith('coverage/') ||
+                file.endsWith('package-lock.json') ||
+                file.endsWith('yarn.lock')) {
+                continue;
+            }
+
+            fileCounts.set(file, (fileCounts.get(file) || 0) + 1);
+        }
+
+        // Sort by count descending
+        const sortedFiles = Array.from(fileCounts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, limit);
+
+        // Get last commit date for top files
+        const hotspots: GitHotspot[] = [];
+        for (const [file, count] of sortedFiles) {
+            // Get last commit date for this file
+            const dateResult = await runCommandSafe(`${gitBinary} log -1 --format=%cd --date=short -- "${file}"`, {
+                cwd: rootDir,
+                timeoutMs: 2000
+            });
+
+            hotspots.push({
+                file,
+                commits: count,
+                lastCommitDate: dateResult.exitCode === 0 ? dateResult.stdout.trim() : undefined
+            });
+        }
+
+        return hotspots;
+    } catch (e) {
+        return [];
     }
 }

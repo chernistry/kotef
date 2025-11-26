@@ -94,6 +94,7 @@ export interface AgentState {
     metrics?: RunMetrics;
     budget?: BudgetState;
     patchFingerprints?: Map<string, number>;
+    gitHotspots?: import('../tools/git.js').GitHotspot[];
 
     // Flow control
     terminalStatus?: TerminalStatus;

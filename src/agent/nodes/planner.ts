@@ -7,6 +7,7 @@ import { jsonrepair } from 'jsonrepair';
 import { buildProjectSummary } from '../utils/project_summary.js';
 import { deriveFunctionalStatus } from '../utils/functional_checks.js';
 import { makeSnapshot, assessProgress } from '../utils/progress_controller.js';
+import { getHotspots } from '../../tools/git.js';
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -53,6 +54,16 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             } catch (err) {
                 log.warn('Failed to build project summary', { error: (err as Error).message });
                 // Continue without summary - not critical
+            }
+
+            // Initialize git hotspots if not present (Ticket 54)
+            if (!state.gitHotspots && cfg.gitEnabled && !cfg.dryRun) {
+                try {
+                    state.gitHotspots = await getHotspots(cfg.rootDir || process.cwd(), { limit: 5 });
+                    log.info('Git hotspots loaded', { hotspots: state.gitHotspots });
+                } catch (err) {
+                    log.warn('Failed to load git hotspots', { error: (err as Error).message });
+                }
             }
         }
 
@@ -283,7 +294,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{ARCHITECT_SUMMARY}}': state.sddSummaries?.architectSummary || state.sdd.architect || 'No architecture summary available.',
             '{{BEST_PRACTICES_SUMMARY}}': state.sddSummaries?.bestPracticesSummary || state.sdd.bestPractices || 'No best practices available.',
             '{{RISK_REGISTER_SUMMARY}}': riskSummary,
-            '{{FLOW_METRICS_SUMMARY}}': await loadFlowMetricsSummary(cfg.rootDir)
+            '{{FLOW_METRICS_SUMMARY}}': await loadFlowMetricsSummary(cfg.rootDir),
+            '{{GIT_HOTSPOTS}}': formatHotspots(state.gitHotspots)
         };
 
         let systemPrompt = plannerPromptTemplate;
@@ -545,4 +557,9 @@ async function loadFlowMetricsSummary(rootDir: string): Promise<string> {
     } catch (e) {
         return 'No flow metrics available.';
     }
+}
+
+function formatHotspots(hotspots?: import('../../tools/git.js').GitHotspot[]): string {
+    if (!hotspots || hotspots.length === 0) return 'None detected.';
+    return hotspots.map(h => `- ${h.file} (${h.commits} commits, last: ${h.lastCommitDate})`).join('\n');
 }
