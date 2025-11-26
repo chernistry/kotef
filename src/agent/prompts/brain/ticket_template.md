@@ -3,9 +3,18 @@
 Use this as a canonical structure when creating tickets in `.sdd/backlog/tickets/open/`.
 
 ```markdown
-# Ticket: <nn> <short-title>
+# Ticket: {{TICKET_ID}} {{TICKET_TITLE}}
 
 Spec version: vX.Y / <commit or ADR reference>
+
+## User Problem
+- ...
+
+## Outcome / Success Signals
+- ...
+
+## Post-Release Observations
+- ...
 
 ## Context
 - Links to relevant sections in `.sdd/architect.md` (components, ADRs, API contracts, quality standards).

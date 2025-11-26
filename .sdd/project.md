@@ -19,6 +19,18 @@ The goal is to build a production‑grade AI coding/search agent (similar to Cla
   - `/Users/sasha/IdeaProjects/allthedocs/learning/research/ai_engineering/agentic_systems_building_best_practices.md`
 - Licensing model: All code in this repository is open source under Apache License 2.0. Future commercial offerings (e.g. "kotef Cloud", managed services, enterprise features) will be provided under separate commercial terms and maintained in separate private repositories. The open-source core remains free for commercial use with proper attribution.
 
+## Product Goals & Success Signals
+- **User Problem**: Developers spend too much time on context switching, manual research, and boilerplate coding. Existing agents often hallucinate or break things.
+- **Proposed Solution**: An autonomous agent ("Kotef") that uses a persistent "SDD Brain" to maintain context, enforce architectural standards, and perform grounded deep research before coding.
+- **Success Signals**:
+  - **Reduced Context Switching**: Users can delegate complex tasks (e.g., "add auth") and trust the agent to handle research and planning.
+  - **High Correctness**: Code changes respect existing patterns and pass tests on the first or second try.
+  - **Transparency**: Users can audit the agent's reasoning via SDD artifacts (`project.md`, tickets).
+- **Risks & Unknowns**:
+  - **Latency**: Deep research and planning can be slow.
+  - **Cost**: High token usage for large contexts.
+  - **Safety**: Ensuring the agent doesn't delete data or leak secrets.
+
 ## Definition of Done
 List 5–10 concrete conditions that must be true when the project is “Done” (functional and non‑functional).
 - Functional outcomes (what users can do):
