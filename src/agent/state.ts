@@ -45,6 +45,16 @@ export interface Assumption {
     notes?: string;
 }
 
+export interface RiskEntry {
+    id: string;
+    area: string;
+    type: string;
+    severity: 'low' | 'medium' | 'high';
+    status: 'open' | 'mitigated' | 'accepted' | 'closed';
+    description: string;
+    mitigation?: string;
+}
+
 export interface AgentState {
     messages: ChatMessage[];
     designDecisions?: DesignDecision[];
@@ -122,6 +132,10 @@ export interface ResearchQuality {
     relevance: number;
     confidence: number;
     coverage: number;
+    support: number; // 0-1
+    recency: number; // 0-1
+    diversity: number; // 0-1
+    hasConflicts: boolean;
     shouldRetry: boolean;
     reasons: string;
     attemptCount: number;

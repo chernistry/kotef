@@ -14,6 +14,10 @@ Your goal is to score the relevance, confidence, and coverage of the findings ag
 - **Relevance (0.0 - 1.0)**: Do the findings directly answer the specific technical questions in the goal?
 - **Confidence (0.0 - 1.0)**: Are the sources authoritative (official docs, reputable blogs) vs. random forums?
 - **Coverage (0.0 - 1.0)**: Do the findings cover all aspects of the goal, or just a part?
+- **Support Strength (0.0 - 1.0)**: Are there multiple agreeing sources? (High = many agreeing sources).
+- **Recency (0.0 - 1.0)**: Are the sources recent? (High = 2024/2025, Low = 2021 or older).
+- **Diversity (0.0 - 1.0)**: Are sources from different domains/vendors?
+- **Conflicts (Boolean)**: Do sources disagree on facts?
 
 ## Constraints
 1. Output MUST be valid JSON only. No markdown fences or extra text.
@@ -26,6 +30,10 @@ Your goal is to score the relevance, confidence, and coverage of the findings ag
   "relevance": number,
   "confidence": number,
   "coverage": number,
+  "support": number,
+  "recency": number,
+  "diversity": number,
+  "hasConflicts": boolean,
   "should_retry": boolean,
   "reasons": "string (short justification)"
 }

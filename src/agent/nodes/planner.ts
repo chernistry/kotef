@@ -7,7 +7,7 @@ import { jsonrepair } from 'jsonrepair';
 import { buildProjectSummary } from '../utils/project_summary.js';
 import { deriveFunctionalStatus } from '../utils/functional_checks.js';
 import { makeSnapshot, assessProgress } from '../utils/progress_controller.js';
-import { loadSddContext } from '../utils/sdd_loader.js';
+
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 
@@ -260,7 +260,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         // Ticket 51: Read Risk Register
         let riskSummary = 'No known risks.';
         try {
-            const riskFile = path.join(config.rootDir, '.sdd', 'risk_register.md');
+            const riskFile = path.join(cfg.rootDir, '.sdd', 'risk_register.md');
             const riskContent = await fs.readFile(riskFile, 'utf-8');
             // Simple heuristic: extract open High/Medium risks
             const lines = riskContent.split('\n').filter(l => l.startsWith('| R-'));
@@ -277,12 +277,18 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             // Ignore if missing
         }
 
-        const systemPrompt = await loadRuntimePrompt('planner', {
-            PROJECT_SUMMARY: state.sddSummaries?.projectSummary || state.sdd.project || 'No project summary available.',
-            ARCHITECT_SUMMARY: state.sddSummaries?.architectSummary || state.sdd.architect || 'No architecture summary available.',
-            BEST_PRACTICES_SUMMARY: state.sddSummaries?.bestPracticesSummary || state.sdd.bestPractices || 'No best practices available.',
-            RISK_REGISTER_SUMMARY: riskSummary
-        });
+        const plannerPromptTemplate = await loadRuntimePrompt('planner');
+        const promptReplacements: Record<string, string> = {
+            '{{PROJECT_SUMMARY}}': state.sddSummaries?.projectSummary || state.sdd.project || 'No project summary available.',
+            '{{ARCHITECT_SUMMARY}}': state.sddSummaries?.architectSummary || state.sdd.architect || 'No architecture summary available.',
+            '{{BEST_PRACTICES_SUMMARY}}': state.sddSummaries?.bestPracticesSummary || state.sdd.bestPractices || 'No best practices available.',
+            '{{RISK_REGISTER_SUMMARY}}': riskSummary
+        };
+
+        let systemPrompt = plannerPromptTemplate;
+        for (const [token, value] of Object.entries(promptReplacements)) {
+            systemPrompt = systemPrompt.replaceAll(token, value);
+        }
         // Add recent history to context
         const baseMessages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
@@ -461,10 +467,36 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             };
         }
 
-        // Research Quality Guardrails (Ticket 15)
-        if (nextNode === 'researcher' && state.researchQuality) {
+        // Research Quality Guardrails (Ticket 15 & 52)
+        // Check if we should block progress based on research quality
+        if ((nextNode === 'researcher' || nextNode === 'coder') && state.researchQuality) {
             const q = state.researchQuality;
-            if (q.relevance < 0.3 && q.attemptCount >= 3) {
+            const isStrict = state.runProfile === 'strict';
+
+            // Ticket 52: Strict profile gating
+            if (isStrict) {
+                const lowSupport = (q.support !== undefined && q.support < 0.7);
+                const lowRecency = (q.recency !== undefined && q.recency < 0.6);
+                const hasConflicts = q.hasConflicts === true;
+
+                if (lowSupport || lowRecency || hasConflicts) {
+                    log.warn('Research quality insufficient for strict profile', { quality: q, nextNode });
+                    decision.next = 'snitch';
+                    decision.reason = `Aborted (Strict Mode): Research quality insufficient for ${nextNode}. Support=${q.support}, Recency=${q.recency}, Conflicts=${q.hasConflicts}. Requires human review or manual overrides.`;
+                    return {
+                        terminalStatus: 'aborted_constraint',
+                        plan: decision,
+                        messages: [assistantMsg],
+                        runProfile: resolvedProfile,
+                        loopCounters,
+                        totalSteps: currentSteps,
+                        progressHistory
+                    };
+                }
+            }
+
+            // General low-quality abort (only for research loops)
+            if (nextNode === 'researcher' && q.relevance < 0.3 && q.attemptCount >= 3) {
                 log.warn('Research quality too low after max attempts, aborting research loop', { quality: q });
                 decision.next = 'snitch';
                 decision.reason = `Aborted: Research quality is too low (relevance ${q.relevance}) after ${q.attemptCount} attempts. Cannot proceed safely.`;

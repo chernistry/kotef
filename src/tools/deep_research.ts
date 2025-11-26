@@ -8,6 +8,10 @@ import { loadPrompt } from '../core/prompts.js';
 export interface DeepResearchFinding {
     statement: string;
     citations: { url: string; title?: string; snippet?: string }[];
+    support_strength?: number; // 0–1
+    recency_score?: number;    // 0–1, higher = more recent
+    source_diversity?: number; // 0–1
+    conflicts?: string[];      // short notes if sources disagree
 }
 
 export interface DeepResearchOptions {
@@ -63,10 +67,14 @@ export function computeResearchStrategy(
     return strategy;
 }
 
-interface ResearchQuality {
+export interface ResearchQuality {
     relevance: number;
     confidence: number;
     coverage: number;
+    support: number; // 0-1
+    recency: number; // 0-1
+    diversity: number; // 0-1
+    hasConflicts: boolean;
     shouldRetry: boolean;
     reasons: string;
 }
@@ -173,13 +181,18 @@ async function scoreResearchAttempt(
         const relevance = typeof parsed.relevance === 'number' ? parsed.relevance : 0.5;
         const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.5;
         const coverage = typeof parsed.coverage === 'number' ? parsed.coverage : 0.5;
+        const support = typeof parsed.support === 'number' ? parsed.support : 0.5;
+        const recency = typeof parsed.recency === 'number' ? parsed.recency : 0.5;
+        const diversity = typeof parsed.diversity === 'number' ? parsed.diversity : 0.5;
+        const hasConflicts = typeof parsed.hasConflicts === 'boolean' ? parsed.hasConflicts : false;
+
         const shouldRetry =
             typeof parsed.shouldRetry === 'boolean'
                 ? parsed.shouldRetry
                 : relevance < 0.7 || coverage < 0.7;
         const reasons = typeof parsed.reasons === 'string' ? parsed.reasons : 'No reasons provided.';
 
-        return { relevance, confidence, coverage, shouldRetry, reasons };
+        return { relevance, confidence, coverage, support, recency, diversity, hasConflicts, shouldRetry, reasons };
     } catch (e) {
         log.warn('Failed to score research attempt; proceeding without scoring', {
             error: (e as Error).message,
@@ -322,6 +335,10 @@ export async function deepResearch(
                 relevance: parsedEval.relevance || 0,
                 confidence: parsedEval.confidence || 0,
                 coverage: parsedEval.coverage || 0,
+                support: typeof parsedEval.support === 'number' ? parsedEval.support : 0.5,
+                recency: typeof parsedEval.recency === 'number' ? parsedEval.recency : 0.5,
+                diversity: typeof parsedEval.diversity === 'number' ? parsedEval.diversity : 0.5,
+                hasConflicts: parsedEval.hasConflicts || false,
                 shouldRetry: parsedEval.should_retry ?? true,
                 reasons: parsedEval.reasons || ''
             };
