@@ -3,7 +3,7 @@ import { KotefConfig } from '../../core/config.js';
 import { callChat, ChatMessage } from '../../core/llm.js';
 import { renderBrainTemplate, loadBrainTemplate } from '../../sdd/template_driver.js';
 import { deepResearch, DeepResearchFinding } from '../../tools/deep_research.js';
-import { loadPrompt } from '../../core/prompts.js';
+import { loadPrompt, loadRuntimePrompt } from '../../core/prompts.js';
 import { jsonrepair } from 'jsonrepair';
 import path from 'node:path';
 import fs from 'node:fs/promises';
@@ -194,27 +194,10 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
 
     // 1. Construct Prompt
     const ticketTemplate = loadBrainTemplate('ticket');
-    const prompt = `
-You are an expert Project Manager.
-Based on the Architecture Plan below, break down the implementation into sequential tickets.
-
-## Architecture Plan
-${architectContent}
-
-## Output Format
-You MUST respond with a single JSON object only. Do NOT include markdown fences, comments, or prose outside the JSON.
-
-The JSON object must have a 'tickets' array. Each item must have:
-- filename: string (e.g., "01-setup-core.md")
-- content: string (the full markdown content of the ticket)
-
-Use the following Ticket Template for the content:
-\`\`\`markdown
-${ticketTemplate}
-\`\`\`
-
-Ensure tickets are granular, have clear dependencies, and cover the entire MVP.
-`;
+    const promptTemplate = await loadRuntimePrompt('orchestrator_tickets');
+    const prompt = promptTemplate
+        .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
+        .replace('{{TICKET_TEMPLATE}}', ticketTemplate);
 
     // 2. Call LLM
     const messages: ChatMessage[] = [

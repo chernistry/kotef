@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { KotefConfig } from '../core/config.js';
 import { callChat, ChatMessage } from '../core/llm.js';
+import { loadRuntimePrompt } from '../core/prompts.js';
 import { createLogger } from '../core/logger.js';
 
 export interface SddSummaries {
@@ -116,33 +117,18 @@ async function summarizeWithLLM(cfg: KotefConfig, content: string, type: 'projec
         return '[No content available]';
     }
 
-    const prompts: Record<typeof type, string> = {
-        project: `Summarize this project.md file into 300-500 words. Include:
-- Project goal and scope
-- Tech stack
-- Definition of Done (key success criteria)
-- Any critical constraints or non-goals
-
-Keep it concise but preserve all critical information.`,
-        architect: `Summarize this architect.md file into 300-500 words. Include:
-- Architecture pattern(s) used
-- Key components and their relationships
-- Critical constraints and quality gates
-- Any non-negotiable design decisions
-
-Focus on what the coder/planner needs to know.`,
-        best_practices: `Summarize this best_practices.md file into 200-400 words. Include:
-- Code quality standards
-- Testing approach
-- Security guardrails
-- Performance/cost constraints
-
-Prioritize actionable rules the coder must follow.`
+    const promptTemplates: Record<typeof type, string> = {
+        project: await loadRuntimePrompt('sdd_summary_project'),
+        architect: await loadRuntimePrompt('sdd_summary_architect'),
+        best_practices: await loadRuntimePrompt('sdd_summary_best_practices')
     };
+
+    const promptTemplate = promptTemplates[type];
+    const prompt = promptTemplate.replace('{{CONTENT}}', content.slice(0, 15000));
 
     const messages: ChatMessage[] = [
         { role: 'system', content: 'You are a technical summarizer. Create concise, information-dense summaries that preserve critical details.' },
-        { role: 'user', content: `${prompts[type]}\n\n# Content to summarize:\n\n${content.slice(0, 15000)}` }
+        { role: 'user', content: prompt }
     ];
 
     try {
