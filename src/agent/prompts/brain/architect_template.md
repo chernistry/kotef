@@ -243,7 +243,9 @@ Provide concrete commands for common tasks (adapt to {{TECH_STACK}}):
 
 ## Backlog (Tickets)
 - Break the work into tickets with clear dependencies and Definition of Done alignment.
-- File structure: `.sdd/backlog/tickets/open/<nn>-<kebab>.md`
+- File structure: `.sdd/backlog/tickets/open/<nn>-<kebab>.md` (active tickets)
+- Completed tickets move to: `.sdd/backlog/tickets/closed/<nn>-<kebab>.md`
+- **Important**: Only use `open/` and `closed/` folders. Do NOT create `done/` or other folders.
 - Ticket format (each file, strongly recommended):
   - Header: `# Ticket: <nn> <short-title>`
   - Spec version: reference to this document (e.g., `Spec version: vX.Y` or commit/ADR).

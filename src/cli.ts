@@ -19,6 +19,34 @@ import { ensureGitRepo, commitTicketRun, extractTicketTitle } from './tools/git.
 import { appendAdr, syncAssumptions } from './agent/utils/adr.js';
 import { computeFlowMetrics } from './agent/utils/flow_metrics.js';
 
+/**
+ * Find the next open ticket with the lowest number
+ */
+async function findNextTicket(rootDir: string): Promise<{ id: string; path: string } | null> {
+    const openDir = path.join(rootDir, '.sdd', 'backlog', 'tickets', 'open');
+    try {
+        const files = await fs.readdir(openDir);
+        const ticketFiles = files.filter(f => f.endsWith('.md') && /^\d+/.test(f));
+        if (ticketFiles.length === 0) return null;
+
+        // Sort by ticket number
+        ticketFiles.sort((a, b) => {
+            const numA = parseInt(a.match(/^(\d+)/)?.[1] || '999999');
+            const numB = parseInt(b.match(/^(\d+)/)?.[1] || '999999');
+            return numA - numB;
+        });
+
+        const nextFile = ticketFiles[0];
+        const ticketId = nextFile.match(/^(\d+)/)?.[1] || '';
+        return {
+            id: ticketId,
+            path: path.join(openDir, nextFile)
+        };
+    } catch {
+        return null;
+    }
+}
+
 const program = new Command();
 
 type Styler = (value: string) => string;
@@ -248,6 +276,7 @@ program
     .option('--max-coder-turns <count>', 'Hard cap on coder tool-loop turns (default: profile-based)')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .option('--auto-approve', 'Skip interactive approval', false)
+    .option('--continue', 'Auto-continue to next ticket after completion', false)
     .option('--nogit', 'Disable git integration', false)
     .action(async (options) => {
         const runId = randomUUID();
@@ -418,6 +447,42 @@ program
                 log.info('No ticket content available for commit message');
             } else {
                 log.info('Ticket not done, skipping commit');
+            }
+
+            // Auto-continue to next ticket if current one is done
+            if (result.done) {
+                const nextTicket = await findNextTicket(rootDir);
+                if (nextTicket) {
+                    console.log(chalk.green(`\n✓ Ticket ${ticketId} completed!`));
+                    console.log(chalk.cyan(`→ Next ticket available: ${nextTicket.id}`));
+                    
+                    let shouldContinue = options.continue || options.autoApprove;
+                    
+                    if (!shouldContinue) {
+                        const rl = readline.createInterface({ input, output });
+                        const answer = await rl.question(chalk.yellow('Continue to next ticket? (y/N): '));
+                        rl.close();
+                        shouldContinue = answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
+                    }
+                    
+                    if (shouldContinue) {
+                        console.log(chalk.green(`\n▶ Starting ticket ${nextTicket.id}...\n`));
+                        // Recursively call with next ticket
+                        await program.parseAsync([
+                            process.argv[0],
+                            process.argv[1],
+                            'run',
+                            '--root', rootDir,
+                            '--ticket', nextTicket.id,
+                            ...(options.continue ? ['--continue'] : []),
+                            ...(options.autoApprove ? ['--auto-approve'] : []),
+                            ...(options.dryRun ? ['--dry-run'] : []),
+                            ...(options.nogit ? ['--nogit'] : []),
+                            ...(options.profile ? ['--profile', options.profile] : [])
+                        ]);
+                        return; // Exit current run
+                    }
+                }
             }
 
             // Generate Report

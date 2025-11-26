@@ -28,7 +28,7 @@ export async function buildProjectSummary(
     log.info('Building project summary', { rootDir });
 
     // 1. List all relevant files
-    const pattern = '**/*.{ts,tsx,js,jsx,py,pyw,go,rs,java,cs,md,json,yml,yaml,toml,html,css,vue}';
+    const pattern = '**/*.{ts,tsx,js,jsx,py,pyw,go,rs,java,cs,swift,md,json,yml,yaml,toml,html,css,vue}';
     const files = await listFiles({ rootDir }, pattern);
 
     // 2. Analyze file extensions for languages
@@ -76,6 +76,7 @@ function detectLanguages(files: string[]): string[] {
         rust: ['.rs'],
         java: ['.java'],
         csharp: ['.cs'],
+        swift: ['.swift'],
         vue: ['.vue']
     };
 

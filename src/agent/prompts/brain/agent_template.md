@@ -12,12 +12,14 @@ Required reading (use fs_read to access):
 - `.sdd/project.md` — project description (including the Definition of Done)
 - `.sdd/best_practices.md` — research and best practices
 - `.sdd/architect.md` — architecture specification
-- `.sdd/backlog/tickets/open/` — tickets sorted by prefix `nn-` and dependency order
+- `.sdd/backlog/tickets/open/` — active tickets sorted by prefix `nn-` and dependency order
+- `.sdd/backlog/tickets/closed/` — completed tickets (moved from open/ after completion)
 
 Operating rules:
 - Always consult architect.md (architecture + coding standards) first.
 - Execute backlog tasks by dependency order.
 - Write minimal viable code (MVP) with tests.
+- When closing tickets, move them from `open/` to `closed/` (NOT to `done/` or any other folder).
 - Respect formatters, linters, and conventions.
 - Update/clarify specs before changes if required.
 - No chain‑of‑thought disclosure; provide final results + brief rationale.

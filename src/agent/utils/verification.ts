@@ -103,7 +103,26 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
         };
     }
 
-    // 3. Check for Go
+    // 3. Check for Swift
+    const hasPackageSwift = await fileExists(rootDir, 'Package.swift');
+    const swiftFiles = await listFiles({ rootDir }, '**/*.swift');
+    
+    if (hasPackageSwift || swiftFiles.length > 0) {
+        const primaryTest = 'swift test';
+        const buildCommand = 'swift build';
+        const diagnosticCommand = buildCommand;
+        syntaxCheckCommand = buildCommand;
+
+        return {
+            stack: 'go', // Reuse 'go' for now, or add 'swift' to ProjectStack type
+            primaryTest,
+            buildCommand,
+            diagnosticCommand,
+            syntaxCheckCommand
+        };
+    }
+
+    // 4. Check for Go
     const hasGoMod = await fileExists(rootDir, 'go.mod');
     if (hasGoMod) {
         const primaryTest = 'go test ./...';
