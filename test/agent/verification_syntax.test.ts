@@ -14,6 +14,17 @@ vi.mock('node:fs/promises', () => ({
     }
 }));
 
+vi.mock('../../src/tools/package_manager.js', () => ({
+    detectPackageManager: vi.fn().mockResolvedValue({
+        name: 'npm',
+        installCommand: 'npm install',
+        runCommand: (script: string) => `npm run ${script}`,
+        execCommand: (command: string) => `npx ${command}`
+    }),
+    resolveScriptCommand: vi.fn((pm, script) => `npm run ${script}`),
+    resolveExecCommand: vi.fn((pm, command) => `npx ${command}`)
+}));
+
 describe('Syntax Command Detection', () => {
     const mockConfig = { rootDir: '/test' } as any;
 

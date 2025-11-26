@@ -7,6 +7,16 @@ import { listFiles } from '../../src/tools/fs.js';
 // Mock fs and listFiles
 vi.mock('node:fs/promises');
 vi.mock('../../src/tools/fs.js');
+vi.mock('../../src/tools/package_manager.js', () => ({
+    detectPackageManager: vi.fn().mockResolvedValue({
+        name: 'npm',
+        installCommand: 'npm install',
+        runCommand: (script: string) => `npm run ${script}`,
+        execCommand: (command: string) => `npx ${command}`
+    }),
+    resolveScriptCommand: vi.fn((pm, script) => `npm run ${script}`),
+    resolveExecCommand: vi.fn((pm, command) => `npx ${command}`)
+}));
 
 describe('Verification Policy - detectCommands', () => {
     const mockConfig: KotefConfig = {
@@ -33,7 +43,7 @@ describe('Verification Policy - detectCommands', () => {
 
         const result = await detectCommands(mockConfig);
         expect(result.stack).toBe('node');
-        expect(result.primaryTest).toBe('npm test');
+        expect(result.primaryTest).toBe('npm run test');
         expect(result.smokeTest).toBeUndefined();
     });
 

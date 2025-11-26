@@ -456,7 +456,14 @@ Status: Approved
     - if present, kotef loads and respects existing SDD artifacts;
     - if missing, kotef runs an internal **SDD bootstrap flow** to create minimal `.sdd/project.md`, `.sdd/best_practices.md`, `.sdd/architect.md`, and initial tickets based on the user’s natural-language request and a light repo scan.
 
-## 3. Metric Profile & Strategic Risk Map
+### Metric Profile & Strategic Risk Map
+
+Kotef maintains a **Strategic Risk Map** in `.sdd/risk_register.md`. This register tracks recurring failures, budget exhaustion events, and other risks detected during runs.
+
+- **High Severity Risks**: Automatically trigger the creation of Tech Debt tickets.
+- **Planner Integration**: The planner uses open risks to adjust its strategy (e.g., choosing stricter verification profiles for high-risk areas).
+
+See `.sdd/risk_register.md` for the current list of risks.
 
 ### Metric Profile
 -   **SecRisk (0.25)**: Highest priority. Sandbox escapes or data leaks are unacceptable.

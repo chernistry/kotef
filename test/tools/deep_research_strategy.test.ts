@@ -60,4 +60,27 @@ describe('Research Strategy Logic', () => {
         expect(strategy.maxAttempts).toBe(5);
         expect(strategy.level).toBe('shallow');
     });
+
+    it('should use medium strategy for reference type (default)', () => {
+        const options: DeepResearchOptions = { taskTypeHint: 'reference' };
+        const strategy = computeResearchStrategy(goal, options);
+        // Reference type doesn't trigger deep search - uses default medium
+        expect(strategy.level).toBe('medium');
+        expect(strategy.searchDepth).toBe('basic');
+    });
+
+    it('should use medium strategy for debug type (default)', () => {
+        const options: DeepResearchOptions = { taskTypeHint: 'debug' };
+        const strategy = computeResearchStrategy(goal, options);
+        // Debug type doesn't trigger deep search - uses default medium
+        expect(strategy.level).toBe('medium');
+        expect(strategy.searchDepth).toBe('basic');
+    });
+
+    it('should use deep strategy for research type', () => {
+        const options: DeepResearchOptions = { taskTypeHint: 'research' };
+        const strategy = computeResearchStrategy(goal, options);
+        expect(strategy.level).toBe('deep');
+        expect(strategy.searchDepth).toBe('advanced');
+    });
 });

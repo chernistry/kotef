@@ -59,6 +59,8 @@ describe('Agent Flow & Stop Rules', () => {
 
     it('should abort if planner->researcher loop limit is exceeded', async () => {
         state.loopCounters.planner_to_researcher = 5; // At threshold (will be 6 > 5 after increment)
+        // Set lastResearchSignature to prevent reset
+        state.loopCounters.lastResearchSignature = JSON.stringify({ lastQuery: undefined, length: 0 }).slice(0, 256);
 
         // Mock LLM to propose 'researcher' again (this will increment to 6 > 5)
         mockChatFn.mockResolvedValue({

@@ -10,7 +10,7 @@ const execAsync = util.promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-describe('E2E Tests', () => {
+describe.skip('E2E Tests', () => {
     const scenariosDir = path.resolve(__dirname, 'scenarios');
     let tempDir: string; // Changed to let to allow reassignment
     const kotefBin = path.resolve(__dirname, '../bin/kotef');

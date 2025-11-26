@@ -7,6 +7,9 @@ import { jsonrepair } from 'jsonrepair';
 import { buildProjectSummary } from '../utils/project_summary.js';
 import { deriveFunctionalStatus } from '../utils/functional_checks.js';
 import { makeSnapshot, assessProgress } from '../utils/progress_controller.js';
+import { loadSddContext } from '../utils/sdd_loader.js';
+import path from 'node:path';
+import { promises as fs } from 'node:fs';
 
 function initializeBudget(profile: ExecutionProfile, scope: TaskScope): BudgetState {
     const zeros = { commandsUsed: 0, testRunsUsed: 0, webRequestsUsed: 0, commandHistory: [] };
@@ -254,18 +257,32 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             };
         }
 
-        let systemPrompt = promptTemplate;
-        for (const [token, value] of Object.entries(replacements)) {
-            systemPrompt = systemPrompt.replaceAll(token, value);
+        // Ticket 51: Read Risk Register
+        let riskSummary = 'No known risks.';
+        try {
+            const riskFile = path.join(config.rootDir, '.sdd', 'risk_register.md');
+            const riskContent = await fs.readFile(riskFile, 'utf-8');
+            // Simple heuristic: extract open High/Medium risks
+            const lines = riskContent.split('\n').filter(l => l.startsWith('| R-'));
+            const openRisks = lines.filter(l => l.includes('| open |') && (l.includes('| high |') || l.includes('| medium |')));
+            if (openRisks.length > 0) {
+                riskSummary = openRisks.map(l => {
+                    const parts = l.split('|').map(p => p.trim());
+                    // | ID | Area | Type | Severity | Status | Description | ...
+                    // parts[0] is empty, parts[1] is ID, etc.
+                    return `- [${parts[4].toUpperCase()}] ${parts[2]} (${parts[6]}): ${parts[3]}`; // Severity Area: Description
+                }).join('\n');
+            }
+        } catch (e) {
+            // Ignore if missing
         }
 
-        // Use summaries if available (significantly reduces token usage)
-        if (state.sddSummaries) {
-            systemPrompt = systemPrompt.replaceAll('{{SDD_PROJECT}}', state.sddSummaries.projectSummary);
-            systemPrompt = systemPrompt.replaceAll('{{SDD_ARCHITECT}}', state.sddSummaries.architectSummary);
-            systemPrompt = systemPrompt.replaceAll('{{SDD_BEST_PRACTICES}}', state.sddSummaries.bestPracticesSummary);
-        }
-
+        const systemPrompt = await loadRuntimePrompt('planner', {
+            PROJECT_SUMMARY: state.sddSummaries?.projectSummary || state.sdd.project || 'No project summary available.',
+            ARCHITECT_SUMMARY: state.sddSummaries?.architectSummary || state.sdd.architect || 'No architecture summary available.',
+            BEST_PRACTICES_SUMMARY: state.sddSummaries?.bestPracticesSummary || state.sdd.bestPractices || 'No best practices available.',
+            RISK_REGISTER_SUMMARY: riskSummary
+        });
         // Add recent history to context
         const baseMessages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
@@ -413,7 +430,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                 messages: [assistantMsg],
                 runProfile: resolvedProfile,
                 loopCounters,
-                totalSteps: currentSteps
+                totalSteps: currentSteps,
+                progressHistory
             };
         }
         if (nextNode === 'verifier' && loopCounters.planner_to_verifier > MAX_LOOP_EDGE) {
@@ -425,7 +443,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                 messages: [assistantMsg],
                 runProfile: resolvedProfile,
                 loopCounters,
-                totalSteps: currentSteps
+                totalSteps: currentSteps,
+                progressHistory
             };
         }
         if (nextNode === 'coder' && loopCounters.planner_to_coder > MAX_LOOP_EDGE) {
@@ -437,7 +456,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                 messages: [assistantMsg],
                 runProfile: resolvedProfile,
                 loopCounters,
-                totalSteps: currentSteps
+                totalSteps: currentSteps,
+                progressHistory
             };
         }
 
@@ -454,7 +474,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                     messages: [assistantMsg],
                     runProfile: resolvedProfile,
                     loopCounters,
-                    totalSteps: currentSteps
+                    totalSteps: currentSteps,
+                    progressHistory
                 };
             }
         }

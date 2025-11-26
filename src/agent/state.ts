@@ -49,6 +49,7 @@ export interface AgentState {
     messages: ChatMessage[];
     designDecisions?: DesignDecision[];
     assumptions?: Assumption[];
+    riskEntries?: RiskEntry[];
     sdd: SddContext;
     plan?: any;
     researchResults?: any;
