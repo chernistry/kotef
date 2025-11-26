@@ -158,6 +158,7 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
   - If goal is met but unrelated global tests fail (and profile is NOT strict), use `terminalStatus: "done_partial"` and explain in `reason`.
   - Specifically, if `FUNCTIONAL_OK` is `"true"` and you are in `fast`/`yolo` profile, consider `done_partial` when remaining failures are non‑critical (e.g. lint/coverage) and would be too expensive to fix within budgets.
   - If all checks pass, use `terminalStatus: "done_success"`.
+  - **Retrospective**: When setting `next="done"`, include a brief retrospective in the `reason` field (e.g., "Success. Key challenge was X. Learned Y.").
 - Choose `snitch` for conflicts, missing permissions, or unsafe requests; keep the reason short and cite which SDD rule blocks you.
 - Choose `ask_human` if user input is required to proceed (e.g., ambiguous scope).
 

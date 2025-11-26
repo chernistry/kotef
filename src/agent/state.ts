@@ -114,6 +114,29 @@ export interface AgentState {
     diagnosticsSummary?: string;
     /** Flag indicating if code index has been built for this run. */
     codeIndexBuilt?: boolean;
+
+    // Phase Tracking (Ticket 56)
+    currentPhase?: AgentPhase;
+    phaseHistory?: PhaseHistoryEntry[];
+}
+
+export type AgentPhase =
+    | 'understand_goal'
+    | 'analyze_system_state'
+    | 'design_decide'
+    | 'plan_work'
+    | 'implement'
+    | 'verify'
+    | 'refactor'
+    | 'document'
+    | 'integrate'
+    | 'retro';
+
+export interface PhaseHistoryEntry {
+    phase: AgentPhase;
+    startedAt: number;
+    endedAt?: number;
+    summary?: string;
 }
 
 export type TerminalStatus = 'done_success' | 'done_partial' | 'aborted_stuck' | 'aborted_constraint';

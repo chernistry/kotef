@@ -251,4 +251,59 @@ ${state.testResults.stderr ? `\n**Stderr**:\n\`\`\`\n${state.testResults.stderr.
 
     await fs.writeFile(filepath, report, 'utf-8');
     console.log(`Run report written to: ${filepath}`);
+
+    // Ticket 56: Write Retrospective
+    if (state) {
+        await writeRetrospective(sddRoot, runId, state, summary);
+    }
 }
+
+async function writeRetrospective(
+    sddRoot: string,
+    runId: string,
+    state: AgentState,
+    summary: RunSummary
+): Promise<void> {
+    const retroFile = path.join(sddRoot, 'runs', 'retrospectives.md');
+    const timestamp = new Date().toISOString();
+
+    // Format phase history
+    const history = state.phaseHistory || [];
+    const phaseFlow = history.map(h => h.phase).join(' → ');
+
+    // Calculate durations
+    const totalDuration = summary.durationSeconds ? `${summary.durationSeconds.toFixed(1)}s` : 'N/A';
+
+    let entry = `\n## Run ${timestamp} (ID: ${runId})\n`;
+    entry += `- **Goal**: ${state.sdd.goal || 'Unknown'}\n`;
+    entry += `- **Outcome**: ${state.terminalStatus || summary.status}\n`;
+    if (summary.stopReason) {
+        entry += `- **Stop Reason**: ${summary.stopReason}\n`;
+    }
+    entry += `- **Phases**: ${phaseFlow}\n`;
+    entry += `- **Duration**: ${totalDuration}\n`;
+
+    if (state.budget) {
+        entry += `- **Budget**: ${state.budget.commandsUsed} cmds, ${state.budget.testRunsUsed} tests, ${state.budget.webRequestsUsed} web\n`;
+    }
+
+    if (summary.flowMetrics) {
+        entry += `- **Metrics**: ChangeSize=${summary.flowMetrics.changeSize}, FailMode=${summary.flowMetrics.failureMode}\n`;
+    }
+
+    // Add notes/learnings if available (e.g. from snitch or planner reason)
+    const reason = (state.plan as any)?.reason || summary.error;
+    if (reason) {
+        entry += `- **Notes**: ${reason}\n`;
+    }
+
+    try {
+        // Ensure directory exists (it should, but just in case)
+        await fs.mkdir(path.dirname(retroFile), { recursive: true });
+        await fs.appendFile(retroFile, entry, 'utf-8');
+    } catch (e) {
+        // Try creating if doesn't exist
+        await fs.writeFile(retroFile, `# Retrospectives Log\n${entry}`, 'utf-8');
+    }
+}
+

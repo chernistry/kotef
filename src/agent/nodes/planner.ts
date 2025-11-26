@@ -7,6 +7,7 @@ import { jsonrepair } from 'jsonrepair';
 import { buildProjectSummary } from '../utils/project_summary.js';
 import { deriveFunctionalStatus } from '../utils/functional_checks.js';
 import { makeSnapshot, assessProgress } from '../utils/progress_controller.js';
+import { transitionPhase } from '../utils/phase_tracker.js';
 import { getHotspots } from '../../tools/git.js';
 
 import path from 'node:path';
@@ -526,6 +527,38 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         }
 
         // Update state with the new plan/decision
+        // Ticket 56: Phase Tracking
+        // Map next node to phase
+        let nextPhase: import('../state.js').AgentPhase | undefined;
+        if (decision.next === 'researcher') nextPhase = 'analyze_system_state';
+        else if (decision.next === 'coder') nextPhase = 'implement';
+        else if (decision.next === 'verifier') nextPhase = 'verify';
+        else if (decision.next === 'done') nextPhase = 'retro';
+        else if (decision.next === 'snitch') nextPhase = 'retro'; // Snitch usually ends or pauses, treat as retro/stop
+
+        // If we are staying in planner (e.g. loop), we might be in 'plan_work' or 'design_decide'
+        // But plannerNode returns the *next* step.
+        // The *current* execution of plannerNode could be considered 'plan_work'.
+        // However, we want to set the phase for the *next* iteration or the tool call.
+
+        let phaseUpdates = {};
+        if (nextPhase) {
+            phaseUpdates = transitionPhase(state, nextPhase, decision.reason);
+        } else {
+            // Default to 'plan_work' if we are looping back to planner or unknown
+            // But wait, planner returns a partial state that *will be applied*.
+            // So if we set currentPhase here, it applies to the state *after* planner.
+            // If next is 'researcher', state.currentPhase becomes 'analyze_system_state'. Correct.
+        }
+
+        // Special case: Initial phase
+        if (!state.currentPhase) {
+            // If we are here, we are planning. But we missed the 'understand_goal' phase?
+            // We can retroactively add it or just start here.
+            // Let's assume the very first planner run transitions FROM understand_goal TO plan_work.
+            // But we are returning the *result* of planning.
+        }
+
         return {
             plan: decision,
             messages: [assistantMsg], // Append assistant's thought process
@@ -537,7 +570,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success' } : {}),
             // Ticket 50: Pass through ADRs and assumptions
             designDecisions: decision.designDecisions,
-            assumptions: decision.assumptions
+            assumptions: decision.assumptions,
+            ...phaseUpdates
         };
     };
 }
