@@ -4,6 +4,20 @@ import { deepResearch } from '../../tools/deep_research.js';
 import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
 
+function getTaskTypeHint(text: string): 'reference' | 'debug' | 'architecture' | 'research' {
+    const lower = text.toLowerCase();
+    if (lower.includes('architecture') || lower.includes('design') || lower.includes('pattern') || lower.includes('structure')) {
+        return 'architecture';
+    }
+    if (lower.includes('error') || lower.includes('fail') || lower.includes('fix') || lower.includes('bug') || lower.includes('exception') || lower.includes('stack')) {
+        return 'debug';
+    }
+    if (lower.includes('how to') || lower.includes('example') || lower.includes('syntax') || lower.includes('api')) {
+        return 'reference';
+    }
+    return 'research';
+}
+
 export function researcherNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('researcher');
@@ -94,15 +108,26 @@ export function researcherNode(cfg: KotefConfig) {
         }
 
         const profile = state.runProfile || 'fast';
-        const useDeep = profile === 'strict';
-        // Profile enum: strict, fast, smoke, yolo.
-        // Deep research is expensive. Use it for strict.
-        // For fast/yolo, use shallow web search unless explicitly requested?
+        const taskScope = state.taskScope || 'normal';
+        const taskTypeHint = getTaskTypeHint((state.sdd.goal || '') + ' ' + (state.sdd.ticket || ''));
+        const sddContextSnippet = (state.sdd.bestPractices || '').slice(0, 1000);
+
+        // Decision logic:
+        // - Tiny scope -> shallow search (unless strict profile)
+        // - Large scope / Architecture / Research -> deep research
+        // - Debug -> deep research (handled by strategy)
+        // - Strict profile -> deep research
+
+        const useDeep = profile === 'strict' ||
+            taskScope === 'large' ||
+            taskTypeHint === 'architecture' ||
+            taskTypeHint === 'research';
+
         const primaryQuery = queries[0];
-        log.info('Executing research', { primaryQuery, count: queries.length, profile });
+        log.info('Executing research', { primaryQuery, count: queries.length, profile, taskScope, taskTypeHint, useDeep });
 
         try {
-            if (profile === 'strict') {
+            if (useDeep && taskScope !== 'tiny') {
                 // If we already have research for this query and quality says "no retry",
                 // avoid redundant deep research and surface a "no new info" signal.
                 if (
@@ -122,7 +147,9 @@ export function researcherNode(cfg: KotefConfig) {
 
                 const result = await deepResearch(cfg, primaryQuery, {
                     originalGoal: state.sdd.goal,
-                    maxAttempts: 3
+                    taskScope,
+                    taskTypeHint,
+                    sddContextSnippet
                 });
                 return {
                     researchResults: result.findings,
