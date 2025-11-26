@@ -282,7 +282,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{PROJECT_SUMMARY}}': state.sddSummaries?.projectSummary || state.sdd.project || 'No project summary available.',
             '{{ARCHITECT_SUMMARY}}': state.sddSummaries?.architectSummary || state.sdd.architect || 'No architecture summary available.',
             '{{BEST_PRACTICES_SUMMARY}}': state.sddSummaries?.bestPracticesSummary || state.sdd.bestPractices || 'No best practices available.',
-            '{{RISK_REGISTER_SUMMARY}}': riskSummary
+            '{{RISK_REGISTER_SUMMARY}}': riskSummary,
+            '{{FLOW_METRICS_SUMMARY}}': await loadFlowMetricsSummary(cfg.rootDir)
         };
 
         let systemPrompt = plannerPromptTemplate;
@@ -527,4 +528,21 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             assumptions: decision.assumptions
         };
     };
+}
+
+async function loadFlowMetricsSummary(rootDir: string): Promise<string> {
+    try {
+        const cacheFile = path.join(rootDir, '.sdd', 'cache', 'flow_metrics.json');
+        const content = await fs.readFile(cacheFile, 'utf-8');
+        const m = JSON.parse(content);
+        return `
+- Success Rate: ${(m.successRate * 100).toFixed(1)}%
+- Avg Duration: ${m.averageDurationSeconds.toFixed(1)}s
+- Avg Change Size: ${m.averageChangeSize.toFixed(1)} files
+- Recent Trend: ${m.recentTrend}
+- Top Failures: ${Object.entries(m.failureModes).map(([k, v]) => `${k} (${v})`).join(', ')}
+`.trim();
+    } catch (e) {
+        return 'No flow metrics available.';
+    }
 }

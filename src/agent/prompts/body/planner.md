@@ -19,6 +19,7 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Loop Counters: `{{LOOP_COUNTERS}}`
 - Total Steps: `{{TOTAL_STEPS}}`
 - Functional OK: `{{FUNCTIONAL_OK}}`
+- Flow Metrics (DORA): `{{FLOW_METRICS_SUMMARY}}`
 
 # Policies & Guardrails
 - **SDD is law**: follow `.sdd/project.md`, `.sdd/architect.md`, and tickets. If a request conflicts, set `next="snitch"` with a short reason.

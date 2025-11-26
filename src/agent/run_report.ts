@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { AgentState } from './state.js';
+import { FlowMetrics } from './utils/flow_metrics.js';
 
 export interface RunSummary {
     plan: string;
@@ -16,6 +17,7 @@ export interface RunSummary {
         llmCalls: number;
         totalTokens: number;
     };
+    flowMetrics?: FlowMetrics;
     terminalStatus?: string;
     stopReason?: string;
     // Ticket lifecycle
@@ -91,6 +93,16 @@ export async function writeRunReport(
         report += `- **Tool Calls:** ${summary.metrics.toolCalls}\n`;
         report += `- **LLM Calls:** ${summary.metrics.llmCalls}\n`;
         report += `- **Total Tokens:** ${summary.metrics.totalTokens}\n`;
+    }
+
+    if (summary.flowMetrics) {
+        const fm = summary.flowMetrics;
+        report += `\n## Flow Metrics (DORA Proxies)\n`;
+        report += `- **Change Size:** ${fm.changeSize} files\n`;
+        report += `- **Diagnostic Latency:** ${fm.diagnosticLatencySeconds.toFixed(1)}s\n`;
+        report += `- **Verification Runs:** ${fm.verificationRuns}\n`;
+        report += `- **Failure Mode:** ${fm.failureMode}\n`;
+        report += `- **Resource Usage:** ${fm.commandsUsed} cmds, ${fm.testRunsUsed} tests, ${fm.webRequestsUsed} web\n`;
     }
 
     report += `\n## Plan\n${summary.plan || 'No plan generated.'}\n`;

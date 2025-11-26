@@ -17,6 +17,7 @@ import { AgentState } from './agent/state.js';
 import { estimateTaskScope } from './agent/task_scope.js';
 import { ensureGitRepo, commitTicketRun, extractTicketTitle } from './tools/git.js';
 import { appendAdr, syncAssumptions } from './agent/utils/adr.js';
+import { computeFlowMetrics } from './agent/utils/flow_metrics.js';
 
 const program = new Command();
 
@@ -381,13 +382,14 @@ program
             log.info('Run completed.', { done: result.done });
 
             // Ticket 50: Persist ADRs and Assumptions
-            if (result.designDecisions && result.designDecisions.length > 0) {
-                for (const decision of result.designDecisions) {
+            const typedResult = result as unknown as AgentState;
+            if (typedResult.designDecisions && typedResult.designDecisions.length > 0) {
+                for (const decision of typedResult.designDecisions) {
                     await appendAdr(sddDir, decision, log);
                 }
             }
-            if (result.assumptions && result.assumptions.length > 0) {
-                await syncAssumptions(sddDir, result.assumptions, log);
+            if (typedResult.assumptions && typedResult.assumptions.length > 0) {
+                await syncAssumptions(sddDir, typedResult.assumptions, log);
             }
 
             // Attempt commit if ticket completed successfully
@@ -466,7 +468,9 @@ program
                 ticketPath: finalTicketPath,
                 ticketStatus,
                 // Git commit hash
-                commitHash
+                commitHash,
+                // Ticket 53: Flow Metrics
+                flowMetrics: computeFlowMetrics(result as unknown as AgentState, startTime, endTime)
             };
 
             await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
@@ -719,13 +723,14 @@ program
                     }
 
                     // Ticket 50: Persist ADRs and Assumptions
-                    if (result.designDecisions && result.designDecisions.length > 0) {
-                        for (const decision of result.designDecisions) {
+                    const typedResult = result as unknown as AgentState;
+                    if (typedResult.designDecisions && typedResult.designDecisions.length > 0) {
+                        for (const decision of typedResult.designDecisions) {
                             await appendAdr(sddDir, decision, log);
                         }
                     }
-                    if (result.assumptions && result.assumptions.length > 0) {
-                        await syncAssumptions(sddDir, result.assumptions, log);
+                    if (typedResult.assumptions && typedResult.assumptions.length > 0) {
+                        await syncAssumptions(sddDir, typedResult.assumptions, log);
                     }
 
                     const endTime = Date.now();
@@ -782,7 +787,9 @@ program
                         ticketPath: finalTicketPath,
                         ticketStatus,
                         // Git commit hash
-                        commitHash
+                        commitHash,
+                        // Ticket 53: Flow Metrics
+                        flowMetrics: computeFlowMetrics(result as unknown as AgentState, startTime, endTime)
                     };
 
                     await writeRunReport(sddDir, runId, summary, result as unknown as AgentState);
