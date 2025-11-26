@@ -4,6 +4,7 @@ import { createLogger } from '../core/logger.js';
 export interface WebSearchOptions {
     provider?: 'tavily' | 'brave' | 'serper';
     maxResults?: number;
+    search_depth?: 'basic' | 'advanced';
 }
 
 export interface WebSearchResult {
@@ -27,9 +28,9 @@ export async function webSearch(
 ): Promise<WebSearchResult[]> {
     const log = createLogger('web-search');
     const provider = options.provider || 'tavily';
-    const cacheKey = `${provider}:${query}`;
+    const cacheKey = `${provider}:${query}:${options.search_depth || 'basic'}`;
 
-    log.info('Web search started', { query, provider, maxResults: options.maxResults });
+    log.info('Web search started', { query, provider, maxResults: options.maxResults, depth: options.search_depth });
 
     if (cfg.mockMode) {
         log.info('Mock mode enabled, returning mock results');
@@ -50,7 +51,7 @@ export async function webSearch(
 
     try {
         if (provider === 'tavily') {
-            results = await searchTavily(cfg, query, options.maxResults);
+            results = await searchTavily(cfg, query, options.maxResults, options.search_depth);
             log.info('Search completed', { provider, resultsCount: results.length });
         } else {
             throw new Error(`Unsupported search provider: ${provider}`);
@@ -65,7 +66,7 @@ export async function webSearch(
     return results;
 }
 
-async function searchTavily(cfg: KotefConfig, query: string, maxResults = 5): Promise<WebSearchResult[]> {
+async function searchTavily(cfg: KotefConfig, query: string, maxResults = 5, searchDepth: 'basic' | 'advanced' = 'basic'): Promise<WebSearchResult[]> {
     const log = createLogger('tavily');
 
     if (!cfg.searchApiKey) {
@@ -73,7 +74,7 @@ async function searchTavily(cfg: KotefConfig, query: string, maxResults = 5): Pr
         throw new Error('Search API key is missing (TAVILY_API_KEY)');
     }
 
-    log.info('Calling Tavily API', { query, maxResults });
+    log.info('Calling Tavily API', { query, maxResults, searchDepth });
 
     const response = await fetch('https://api.tavily.com/search', {
         method: 'POST',
@@ -84,7 +85,7 @@ async function searchTavily(cfg: KotefConfig, query: string, maxResults = 5): Pr
             api_key: cfg.searchApiKey,
             query,
             max_results: maxResults,
-            search_depth: 'basic', // or 'advanced' if we want deep search
+            search_depth: searchDepth,
         }),
     });
 

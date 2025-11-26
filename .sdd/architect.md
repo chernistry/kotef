@@ -555,10 +555,19 @@ graph TD
 
 ### 6.4. CLI (`src/cli.ts`)
 -   Entry point `bin/kotef`.
--   Commands:
-    -   `kotef run [ticket-id]`: Execute a task.
-    -   `kotef init`: Scaffold .sdd in a new project.
-    -   `kotef run [ticket-id]`: Execute a task.
+-   Commands (current implementation):
+    -   `kotef run`:
+        - Run the agent once against a project.
+        - Options:
+            - `--root <path>` — project root.
+            - `--goal "<text>"` — natural-language goal (bootstraps `.sdd` if missing and generates tickets).
+            - `--ticket <id>` — execute a specific ticket from `.sdd/backlog/tickets/open`.
+        - Writes a run report under `.sdd/runs/`.
+    -   `kotef chat`:
+        - Interactive loop:
+            - Accepts a goal from the user.
+            - Runs SDD orchestration (Research → Architect → Tickets) when needed.
+            - Executes generated tickets sequentially, with per-ticket run reports.
 
 ### 6.5. MCP Integration (Experimental)
 -   **Purpose**: Connect to external Model Context Protocol (MCP) servers for enhanced code intelligence and tools.
@@ -882,4 +891,3 @@ Run reports (`.sdd/runs/*.md`) include:
 This ensures full traceability for debugging stuck states and understanding agent behavior.
 
 ---
-

@@ -15,6 +15,52 @@ export interface DeepResearchOptions {
     originalGoal?: string;
     /** Max number of query attempts with refinement (including the first). */
     maxAttempts?: number;
+    /** Scope of the task to determine research depth. */
+    taskScope?: 'tiny' | 'normal' | 'large';
+    /** Type of task to hint strategy selection. */
+    taskTypeHint?: 'reference' | 'debug' | 'architecture' | 'research';
+    /** Relevant SDD context to guide research. */
+    sddContextSnippet?: string;
+    /** Technical stack hint. */
+    techStackHint?: string;
+}
+
+export interface ResearchStrategy {
+    level: 'none' | 'shallow' | 'medium' | 'deep';
+    maxAttempts: number;
+    maxResults: number;
+    topPages: number;
+    searchDepth: 'basic' | 'advanced';
+}
+
+export function computeResearchStrategy(
+    goal: string,
+    options: DeepResearchOptions
+): ResearchStrategy {
+    const scope = options.taskScope || 'normal';
+    const type = options.taskTypeHint;
+
+    // Default strategy: medium
+    let strategy: ResearchStrategy = {
+        level: 'medium',
+        maxAttempts: 3,
+        maxResults: 5,
+        topPages: 3,
+        searchDepth: 'basic'
+    };
+
+    if (scope === 'tiny') {
+        strategy = { level: 'shallow', maxAttempts: 1, maxResults: 3, topPages: 1, searchDepth: 'basic' };
+    } else if (scope === 'large' || type === 'architecture' || type === 'research') {
+        strategy = { level: 'deep', maxAttempts: 4, maxResults: 7, topPages: 5, searchDepth: 'advanced' };
+    }
+
+    // Overrides if explicit maxAttempts is provided (legacy compatibility)
+    if (options.maxAttempts !== undefined) {
+        strategy.maxAttempts = Math.max(1, options.maxAttempts);
+    }
+
+    return strategy;
 }
 
 interface ResearchQuality {
@@ -182,13 +228,15 @@ async function refineResearchQuery(
 export async function deepResearch(
     cfg: KotefConfig,
     goal: string,
-    options: DeepResearchOptions & { techStackHint?: string } = {},
+    options: DeepResearchOptions = {},
 ): Promise<DeepResearchResult> {
     const log = createLogger('deep-research');
-    const maxAttempts = Math.max(1, options.maxAttempts ?? 3);
+    const strategy = computeResearchStrategy(goal, options);
     const techStackHint = options.techStackHint || '';
 
-    log.info('Starting deep research', { goal, techStackHint, maxAttempts });
+    log.info('Starting deep research', { goal, techStackHint, strategy });
+
+    const maxAttempts = strategy.maxAttempts;
 
     // 1. Optimize initial query
     let currentQuery = goal;
@@ -218,7 +266,10 @@ export async function deepResearch(
 
         let searchResults: any[] = [];
         try {
-            searchResults = await webSearch(cfg, currentQuery, { maxResults: 5 });
+            searchResults = await webSearch(cfg, currentQuery, {
+                maxResults: strategy.maxResults,
+                search_depth: strategy.searchDepth
+            });
         } catch (e) {
             log.warn('Web search failed', { error: (e as Error).message });
         }
@@ -237,7 +288,7 @@ export async function deepResearch(
         }
 
         // Fetch pages
-        const topResults = searchResults.slice(0, 3);
+        const topResults = searchResults.slice(0, strategy.topPages);
         const pageContents: string[] = [];
         for (const result of topResults) {
             try {
@@ -284,6 +335,17 @@ export async function deepResearch(
         if (quality && quality.relevance >= 0.7 && quality.coverage >= 0.6) {
             log.info('Research quality met thresholds', { quality });
             break;
+        }
+
+        // Diminishing returns check
+        if (attempt > 0 && attempts[attempt - 1].quality) {
+            const prev = attempts[attempt - 1].quality!;
+            const current = quality!;
+            const improvement = (current.relevance - prev.relevance) + (current.coverage - prev.coverage);
+            if (improvement < 0.05) {
+                log.info('Stopping due to diminishing returns', { improvement, attempt });
+                break;
+            }
         }
 
         if (attempt === maxAttempts - 1) break;
