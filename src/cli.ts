@@ -1,3 +1,5 @@
+import { runSddOrchestration } from './agent/graphs/sdd_orchestrator.js';
+
 import { Command } from 'commander';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -380,13 +382,26 @@ program
                 const openTickets = await fs.readdir(ticketsDir).catch(() => []).then(files => files.filter(f => f.endsWith('.md')));
 
                 if (openTickets.length === 0) {
-                    log.error('Medium/Large task requires tickets', { taskScope, goal: options.goal });
-                    console.error(chalk.red('\n❌ Error: Medium/Large tasks require a ticket in SDD projects.'));
-                    console.error(chalk.yellow(`   Your goal was estimated as scope: '${taskScope}'`));
-                    console.error(chalk.white('   Please generate tickets first using:'));
-                    console.error(chalk.cyan('   kotef chat --goal "..."'));
-                    console.error(chalk.white('   Or create a ticket manually in .sdd/backlog/tickets/open/\n'));
-                    process.exit(1);
+                    log.info('Medium/Large task requires tickets. Auto-generating...', { taskScope, goal: options.goal });
+                    console.log(chalk.yellow('\n⚠️  Medium/Large task detected with no tickets.'));
+                    console.log(chalk.blue('   Auto-generating tickets via SDD Orchestrator...'));
+
+                    try {
+                        await runSddOrchestration(cfg, rootDir, options.goal);
+
+                        // Re-scan for tickets
+                        const newTickets = await fs.readdir(ticketsDir).catch(() => []).then(files => files.filter(f => f.endsWith('.md')));
+                        if (newTickets.length === 0) {
+                            throw new Error('Orchestrator finished but no tickets were found.');
+                        }
+                        console.log(chalk.green(`\n✅ Successfully generated ${newTickets.length} tickets.`));
+                        console.log(chalk.white('   Proceeding with execution...\n'));
+                    } catch (err) {
+                        log.error('Failed to auto-generate tickets', { error: (err as Error).message });
+                        console.error(chalk.red('\n❌ Error: Failed to auto-generate tickets.'));
+                        console.error(chalk.white(`   Details: ${(err as Error).message}`));
+                        process.exit(1);
+                    }
                 }
             }
 
@@ -466,16 +481,16 @@ program
                 if (nextTicket) {
                     console.log(chalk.green(`\n✓ Ticket ${ticketId} completed!`));
                     console.log(chalk.cyan(`→ Next ticket available: ${nextTicket.id}`));
-                    
+
                     let shouldContinue = options.continue || options.autoApprove;
-                    
+
                     if (!shouldContinue) {
                         const rl = readline.createInterface({ input, output });
                         const answer = await rl.question(chalk.yellow('Continue to next ticket? (y/N): '));
                         rl.close();
                         shouldContinue = answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
                     }
-                    
+
                     if (shouldContinue) {
                         console.log(chalk.green(`\n▶ Starting ticket ${nextTicket.id}...\n`));
                         // Recursively call with next ticket
@@ -573,7 +588,7 @@ program
         }
     });
 
-import { runSddOrchestration } from './agent/graphs/sdd_orchestrator.js';
+
 
 program
     .command('chat')
