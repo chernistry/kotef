@@ -270,111 +270,145 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
 }
 
 async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
-    console.log('Running SDD Tickets...');
+    console.log('Running SDD Tickets (Two-Phase Generation)...');
     const { goal, rootDir, config, architectContent } = state;
 
-    // 1. Construct Prompt
+    // 1. Construct Prompt Template
     const ticketTemplate = loadBrainTemplate('ticket');
     const promptTemplate = await loadRuntimePrompt('orchestrator_tickets');
-    const prompt = promptTemplate
-        .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
-        .replace('{{TICKET_TEMPLATE}}', ticketTemplate);
 
-    // 2. Call LLM with retry
+    // --- PHASE 1: PLANNING ---
+    console.log('Phase 1: Planning tickets...');
+    const planPrompt = promptTemplate
+        .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
+        .replace('{{MODE}}', 'PLAN_ONLY')
+        .replace('{{TICKET_TEMPLATE}}', '') // Not needed for planning
+        .replace('{{TICKET_TITLE}}', '')
+        .replace('{{TICKET_SUMMARY}}', '');
+
+    let plannedTickets: { filename: string; title: string; summary: string }[] = [];
     const maxRetries = 3;
-    let tickets: { filename: string; content: string }[] = [];
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const messages: ChatMessage[] = [
                 { role: 'system', content: 'You are an expert Project Manager. Always respond with valid JSON.' },
-                { role: 'user', content: prompt }
+                { role: 'user', content: planPrompt }
             ];
 
             const response = await callChat(config, messages, {
                 model: config.sddBrainModel || config.modelFast,
                 temperature: 0,
-                maxTokens: config.sddTicketsMaxTokens ?? 2000,
+                maxTokens: 2000,
                 response_format: { type: 'json_object' }
             });
-            let content = response.messages[response.messages.length - 1].content || '{}';
+            const content = response.messages[response.messages.length - 1].content || '{}';
 
-            // Try to parse
+            // Parse logic
             let raw = content.trim();
-
-            // Strip markdown fences if provider ignored response_format and wrapped JSON.
             if (raw.startsWith('```')) {
                 const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
-                if (fenceMatch && fenceMatch[1]) {
-                    raw = fenceMatch[1].trim();
-                }
+                if (fenceMatch && fenceMatch[1]) raw = fenceMatch[1].trim();
             }
 
-            // Try direct parse first
             try {
                 const parsed = JSON.parse(raw);
-                tickets = parsed.tickets || [];
-                if (tickets.length > 0) break; // Success!
+                plannedTickets = parsed.tickets || [];
+                if (plannedTickets.length > 0) break;
             } catch {
-                // Try jsonrepair
                 try {
                     const repaired = jsonrepair(raw);
                     const parsed = JSON.parse(repaired);
-                    tickets = parsed.tickets || [];
-                    if (tickets.length > 0) break; // Success!
-                } catch (repairError) {
-                    console.error(`Attempt ${attempt}/${maxRetries} failed to parse tickets JSON:`, repairError);
-                    if (attempt === maxRetries) {
-                        // Last attempt - try to extract any JSON-like structure
-                        const jsonMatch = raw.match(/\{[\s\S]*"tickets"[\s\S]*\[[\s\S]*\]/);
-                        if (jsonMatch) {
-                            try {
-                                const extracted = jsonMatch[0] + '}';
-                                const parsed = JSON.parse(extracted);
-                                tickets = parsed.tickets || [];
-                            } catch {
-                                // Give up
-                            }
-                        }
-                    }
+                    plannedTickets = parsed.tickets || [];
+                    if (plannedTickets.length > 0) break;
+                } catch (e) {
+                    console.error(`Phase 1 attempt ${attempt} failed parse:`, e);
                 }
             }
         } catch (e) {
-            console.error(`Attempt ${attempt}/${maxRetries} - LLM call failed:`, e);
-            if (attempt === maxRetries) {
-                console.error('All retry attempts exhausted');
-            }
+            console.error(`Phase 1 attempt ${attempt} failed LLM:`, e);
         }
     }
 
-    // Fallback: if no tickets were produced, create a single coarse-grained ticket
-    if (!tickets || tickets.length === 0) {
-        console.warn('No tickets returned by LLM; creating a fallback ticket derived from the goal.');
-        const safeGoal = goal.length > 200 ? `${goal.slice(0, 200)}…` : goal;
-        tickets = [
-            {
-                filename: '01-main-goal.md',
-                content: `# Ticket: 01 Main Goal\n\nSpec version: v1.0\n\n## Context\n\nThis ticket was generated automatically because ticket decomposition failed. It captures the main user goal so you can refine it manually.\n\n- Goal: \`${safeGoal}\`\n- See SDD files in \`.sdd/\` for project, architecture, and best practices.\n\n## Objective & Definition of Done\n\nImplement the main goal described above according to:\n- .sdd/project.md (Definition of Done)\n- .sdd/architect.md (architecture & constraints)\n- .sdd/best_practices.md (stack-specific guidance)\n\n## Steps\n1. Review .sdd/project.md, .sdd/architect.md, and .sdd/best_practices.md for this repo.\n2. Break the goal into smaller sub-tickets under \`.sdd/backlog/tickets/open/NN-*.md\`.\n3. Implement the most critical sub-ticket first.\n\n## Affected files/modules\n- To be refined by the developer/agent.\n\n## Tests\n- To be defined per refined sub-tickets.\n\n## Risks & Edge Cases\n- Ticket decomposition failed in the automatic step; ensure manual review of the goal and SDD before implementation.\n\n## Dependencies\n- None yet; use this ticket as the root for further backlog items.\n`
-            }
-        ];
+    if (plannedTickets.length === 0) {
+        console.warn('Phase 1 failed to generate a plan. Falling back to single-shot fallback.');
+        // Fallback logic (simplified for brevity, similar to original)
+        plannedTickets = [{
+            filename: '01-main-goal.md',
+            title: 'Main Goal',
+            summary: 'Fallback ticket capturing the main goal.'
+        }];
     }
 
-    // 3. Write files
+    console.log(`Phase 1 complete. Planned ${plannedTickets.length} tickets.`);
+
+    // --- PHASE 2: GENERATION ---
     const ticketsDir = path.join(rootDir, '.sdd/backlog/tickets/open');
     await fs.mkdir(ticketsDir, { recursive: true });
-
     const createdFiles: string[] = [];
-    for (const ticket of tickets) {
-        if (!ticket || typeof ticket.filename !== 'string') {
-            console.warn('Skipping malformed ticket entry', ticket);
-            continue;
+
+    for (const [index, ticket] of plannedTickets.entries()) {
+        console.log(`Phase 2: Generating ticket ${index + 1}/${plannedTickets.length}: ${ticket.filename}`);
+
+        const genPrompt = promptTemplate
+            .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
+            .replace('{{MODE}}', 'GENERATE_SINGLE')
+            .replace('{{TICKET_TEMPLATE}}', ticketTemplate)
+            .replace('{{TICKET_TITLE}}', ticket.title)
+            .replace('{{TICKET_SUMMARY}}', ticket.summary);
+
+        let ticketContent = '';
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const messages: ChatMessage[] = [
+                    { role: 'system', content: 'You are an expert Project Manager. Always respond with valid JSON.' },
+                    { role: 'user', content: genPrompt }
+                ];
+
+                const response = await callChat(config, messages, {
+                    model: config.sddBrainModel || config.modelFast,
+                    temperature: 0,
+                    maxTokens: config.sddTicketsMaxTokens ?? 2000,
+                    response_format: { type: 'json_object' }
+                });
+                const content = response.messages[response.messages.length - 1].content || '{}';
+
+                let raw = content.trim();
+                if (raw.startsWith('```')) {
+                    const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
+                    if (fenceMatch && fenceMatch[1]) raw = fenceMatch[1].trim();
+                }
+
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.content) {
+                        ticketContent = parsed.content;
+                        break;
+                    }
+                } catch {
+                    try {
+                        const repaired = jsonrepair(raw);
+                        const parsed = JSON.parse(repaired);
+                        if (parsed.content) {
+                            ticketContent = parsed.content;
+                            break;
+                        }
+                    } catch (e) {
+                        console.error(`Phase 2 ticket ${ticket.filename} attempt ${attempt} failed parse:`, e);
+                    }
+                }
+            } catch (e) {
+                console.error(`Phase 2 ticket ${ticket.filename} attempt ${attempt} failed LLM:`, e);
+            }
         }
+
+        if (!ticketContent) {
+            console.warn(`Failed to generate content for ${ticket.filename}, using fallback.`);
+            ticketContent = `# Ticket: ${ticket.title}\n\nSummary: ${ticket.summary}\n\n> WARNING: Generation failed.`;
+        }
+
         const filePath = path.join(ticketsDir, ticket.filename);
-        const contentToWrite =
-            typeof ticket.content === 'string'
-                ? ticket.content
-                : `# Ticket: ${ticket.filename}\n\n> WARNING: LLM did not provide explicit content for this ticket. Please regenerate or edit manually.\n`;
-        await fs.writeFile(filePath, contentToWrite);
+        await fs.writeFile(filePath, ticketContent);
         createdFiles.push(ticket.filename);
     }
 

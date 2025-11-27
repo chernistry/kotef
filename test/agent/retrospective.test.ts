@@ -109,7 +109,7 @@ describe('Retrospective Node', () => {
             },
             totalSteps: 5,
             progressHistory: [
-                { node: 'coder', fileChangeCount: 2, timestamp: 123, signature: 'sig1' }
+                { node: 'coder', fileChangeCount: 2, timestamp: 123, sameErrorCount: 0, functionalChecksCount: 0 }
             ],
             consecutiveNoOps: 0,
             sameErrorCount: 0
@@ -162,7 +162,7 @@ describe('Retrospective Node', () => {
             },
             totalSteps: 5,
             progressHistory: [
-                { node: 'coder', fileChangeCount: 2, timestamp: 123, signature: 'sig1' }
+                { node: 'coder', fileChangeCount: 2, timestamp: 123, sameErrorCount: 0, functionalChecksCount: 0 }
             ],
             consecutiveNoOps: 0,
             sameErrorCount: 0

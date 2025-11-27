@@ -1,37 +1,130 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import os from 'node:os';
-import { describe, it, afterEach, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { runSddOrchestration } from '../../src/agent/graphs/sdd_orchestrator.js';
 import { KotefConfig } from '../../src/core/config.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
-describe('SDD Orchestrator Graph', () => {
-    let tempDir: string;
+// Mock dependencies
+vi.mock('node:fs/promises', () => ({
+    default: {
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn().mockResolvedValue('Mock file content'),
+        mkdir: vi.fn().mockResolvedValue(undefined)
+    },
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    readFile: vi.fn().mockResolvedValue('Mock file content'),
+    mkdir: vi.fn().mockResolvedValue(undefined)
+}));
 
-    afterEach(async () => {
-        if (tempDir) {
-            await fs.rm(tempDir, { recursive: true, force: true });
+vi.mock('node:fs', async () => {
+    return {
+        promises: {
+            writeFile: vi.fn(),
+            readFile: vi.fn(),
+            mkdir: vi.fn()
         }
+    };
+});
+
+vi.mock('../../src/core/llm.js', () => ({
+    callChat: vi.fn()
+}));
+
+vi.mock('../../src/sdd/template_driver.js', () => ({
+    renderBrainTemplate: vi.fn().mockReturnValue('Mock template'),
+    loadBrainTemplate: vi.fn().mockReturnValue('Mock ticket template')
+}));
+
+vi.mock('../../src/tools/deep_research.js', () => ({
+    deepResearch: vi.fn().mockResolvedValue({ findings: [] })
+}));
+
+vi.mock('../../src/core/prompts.js', () => ({
+    loadRuntimePrompt: vi.fn().mockResolvedValue('Mock prompt {{MODE}}'),
+    loadPrompt: vi.fn().mockResolvedValue('Mock prompt')
+}));
+
+vi.mock('../../src/agent/utils/sdd_validation.js', () => ({
+    validateBestPracticesDoc: vi.fn().mockReturnValue({ ok: true }),
+    validateArchitectDoc: vi.fn().mockReturnValue({ ok: true })
+}));
+
+import { callChat } from '../../src/core/llm.js';
+
+describe('SDD Orchestrator', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
     });
 
-    it('should run full SDD flow and create artifacts', async () => {
-        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kotef-sdd-test-'));
+    it('should use two-phase generation for tickets', async () => {
+        const config = { rootDir: '/tmp/test', modelFast: 'test-model' } as KotefConfig;
+        const mockCallChat = vi.mocked(callChat);
 
-        const config: KotefConfig = {
-            apiKey: 'dummy',
-            mockMode: true,
-            modelFast: 'gpt-4o-mini',
-            modelStrong: 'gpt-4o',
-            maxRunSeconds: 60,
-            maxTokensPerRun: 1000,
-            maxWebRequestsPerRun: 5
-        };
+        // Mock responses for the sequence:
+        // 1. Research (best_practices.md)
+        // 2. Architect (architect.md)
+        // 3. Tickets Phase 1 (Plan)
+        // 4. Tickets Phase 2 (Ticket 1)
+        // 5. Tickets Phase 2 (Ticket 2)
 
-        await runSddOrchestration(config, tempDir, 'Build a CLI tool');
-        // Verify tickets
-        const ticketsDir = path.join(tempDir, '.sdd/backlog/tickets/open');
-        const tickets = await fs.readdir(ticketsDir).catch(() => []);
-        expect(tickets.length).toBeGreaterThan(0);
-        expect(tickets).toContain('01-mock-ticket.md');
+        mockCallChat
+            // Research
+            .mockResolvedValueOnce({
+                messages: [{ role: 'assistant', content: 'Best practices content' }]
+            })
+            // Architect
+            .mockResolvedValueOnce({
+                messages: [{ role: 'assistant', content: 'Architect content' }]
+            })
+            // Tickets Phase 1 (Plan)
+            .mockResolvedValueOnce({
+                messages: [{
+                    role: 'assistant',
+                    content: JSON.stringify({
+                        tickets: [
+                            { filename: '01-t1.md', title: 'T1', summary: 'S1' },
+                            { filename: '02-t2.md', title: 'T2', summary: 'S2' }
+                        ]
+                    })
+                }]
+            })
+            // Tickets Phase 2 (Ticket 1)
+            .mockResolvedValueOnce({
+                messages: [{
+                    role: 'assistant',
+                    content: JSON.stringify({ content: '# Ticket 1 Content' })
+                }]
+            })
+            // Tickets Phase 2 (Ticket 2)
+            .mockResolvedValueOnce({
+                messages: [{
+                    role: 'assistant',
+                    content: JSON.stringify({ content: '# Ticket 2 Content' })
+                }]
+            });
+
+        await runSddOrchestration(config, '/tmp/test', 'Test Goal');
+
+        // Verify Phase 1 call
+        const planCall = mockCallChat.mock.calls.find(call =>
+            call[1][1].content.includes('PLAN_ONLY')
+        );
+        expect(planCall).toBeDefined();
+
+        // Verify Phase 2 calls
+        const genCalls = mockCallChat.mock.calls.filter(call =>
+            call[1][1].content.includes('GENERATE_SINGLE')
+        );
+        expect(genCalls).toHaveLength(2);
+
+        // Verify file writes
+        expect(fs.writeFile).toHaveBeenCalledWith(
+            expect.stringContaining('01-t1.md'),
+            '# Ticket 1 Content'
+        );
+        expect(fs.writeFile).toHaveBeenCalledWith(
+            expect.stringContaining('02-t2.md'),
+            '# Ticket 2 Content'
+        );
     });
 });
