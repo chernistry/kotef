@@ -12,6 +12,8 @@ You are the **Verifier** node for Kotef. You confirm whether the Definition of D
 - Execution profile: `{{EXECUTION_PROFILE}}`
 - Task scope: `{{TASK_SCOPE}}`
 
+Note: SDD inputs are summaries. If you need full context, use `read_file` on `.sdd/project.md`, `.sdd/architect.md`, or `.sdd/best_practices.md`.
+
 # Rules
 - **Runtime Verification**
   - **Check Diagnostics**: Look for `[RUNTIME_LOG]` or `[LSP]` errors in `{{DIAGNOSTICS}}`.

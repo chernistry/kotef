@@ -7,6 +7,7 @@ import { loadPrompt, loadRuntimePrompt } from '../../core/prompts.js';
 import { jsonrepair } from 'jsonrepair';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { validateBestPracticesDoc, validateArchitectDoc } from '../utils/sdd_validation.js';
 
 export interface SddOrchestratorState {
     goal: string;
@@ -93,6 +94,25 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
         if (result.quality) {
             console.log(`Research Quality: Relevance=${result.quality.relevance}, Confidence=${result.quality.confidence}, Coverage=${result.quality.coverage}`);
         }
+
+        // Ticket 65: Persist raw context
+        if (result.rawSearchResults || result.rawPagesSample) {
+            const contextDir = path.join(rootDir, '.sdd', 'context');
+            await fs.mkdir(contextDir, { recursive: true });
+
+            // Simple hash of goal to avoid filename issues
+            const goalHash = Buffer.from(goal).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+            const contextFile = path.join(contextDir, `deep_research_${goalHash}.json`);
+
+            await fs.writeFile(contextFile, JSON.stringify({
+                goal,
+                timestamp: new Date().toISOString(),
+                quality: result.quality,
+                rawSearchResults: result.rawSearchResults,
+                rawPagesSample: result.rawPagesSample
+            }, null, 2));
+            console.log(`Persisted raw research context to ${contextFile}`);
+        }
     } catch (e) {
         console.warn('Deep research failed, falling back to model-only research:', e);
         findings = [];
@@ -131,13 +151,50 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
         { role: 'user', content: prompt }
     ];
 
-    const response = await callChat(config, messages, {
-        model: config.modelFast,
+    const model = config.sddBrainModel || config.modelStrong || config.modelFast;
+    const maxTokens = config.sddBestPracticesMaxTokens ?? 3500;
+
+    let response = await callChat(config, messages, {
+        model,
         temperature: 0,
-        // Best practices doc: target ~15–20k chars (~3.5k tokens).
-        maxTokens: 3500
+        maxTokens
     });
-    const content = response.messages[response.messages.length - 1].content || '';
+    let content = response.messages[response.messages.length - 1].content || '';
+
+    // Validation & Retry
+    let validation = validateBestPracticesDoc(content);
+    if (!validation.ok) {
+        console.warn('Best practices doc validation failed:', validation);
+        // Simple retry if truncated
+        if (validation.truncated) {
+            console.log('Retrying best_practices.md generation due to truncation...');
+            messages.push({ role: 'assistant', content });
+            messages.push({ role: 'user', content: 'The previous output was truncated. Please continue from where you left off, or regenerate the missing sections.' });
+
+            // For simplicity in this MVP, we'll just ask for a full regeneration with a slightly stronger hint if possible, 
+            // but "continue" is harder to stitch. Let's try a full regeneration with a "be concise" hint if it was length-related?
+            // Actually, let's just try one more time with the same prompt but maybe a higher token limit if allowed? 
+            // For now, let's just log and proceed, or maybe try one regeneration.
+
+            // Let's try a regeneration with an explicit instruction to be complete.
+            messages.pop(); // remove assistant
+            messages.pop(); // remove user
+            messages.push({ role: 'user', content: prompt + '\n\nIMPORTANT: Ensure the document is complete and not truncated. If you are running out of tokens, summarize less critical sections.' });
+
+            response = await callChat(config, messages, {
+                model,
+                temperature: 0,
+                maxTokens: Math.min(maxTokens * 1.2, 16000) // Bump limit slightly if possible
+            });
+            content = response.messages[response.messages.length - 1].content || '';
+            validation = validateBestPracticesDoc(content);
+        }
+    }
+
+    if (!validation.ok) {
+        console.warn('Best practices doc is still potentially incomplete after retry:', validation);
+        content += '\n\n> [!WARNING]\n> This document may be incomplete or truncated. Please review manually.';
+    }
 
     // 4. Write file
     const sddDir = path.join(rootDir, '.sdd');
@@ -172,13 +229,37 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
         { role: 'user', content: fullPrompt }
     ];
 
-    const response = await callChat(config, messages, {
-        model: config.modelFast,
+    const model = config.sddBrainModel || config.modelStrong || config.modelFast;
+    const maxTokens = config.sddArchitectMaxTokens ?? 4000;
+
+    let response = await callChat(config, messages, {
+        model,
         temperature: 0,
-        // Architecture spec: also ~15–20k chars, allow a bit more.
-        maxTokens: 4000
+        maxTokens
     });
-    const content = response.messages[response.messages.length - 1].content || '';
+    let content = response.messages[response.messages.length - 1].content || '';
+
+    // Validation & Retry
+    let validation = validateArchitectDoc(content);
+    if (!validation.ok) {
+        console.warn('Architect doc validation failed:', validation);
+        if (validation.truncated) {
+            console.log('Retrying architect.md generation due to truncation...');
+            messages.push({ role: 'user', content: 'The previous output was truncated. Please regenerate the full document and ensure it is complete.' });
+            response = await callChat(config, messages, {
+                model,
+                temperature: 0,
+                maxTokens: Math.min(maxTokens * 1.2, 16000)
+            });
+            content = response.messages[response.messages.length - 1].content || '';
+            validation = validateArchitectDoc(content);
+        }
+    }
+
+    if (!validation.ok) {
+        console.warn('Architect doc is still potentially incomplete after retry:', validation);
+        content += '\n\n> [!WARNING]\n> This document may be incomplete or truncated. Please review manually.';
+    }
 
     // 3. Write file
     const sddDir = path.join(rootDir, '.sdd');
@@ -202,7 +283,7 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
     // 2. Call LLM with retry
     const maxRetries = 3;
     let tickets: { filename: string; content: string }[] = [];
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const messages: ChatMessage[] = [
@@ -211,9 +292,9 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
             ];
 
             const response = await callChat(config, messages, {
-                model: config.modelFast,
+                model: config.sddBrainModel || config.modelFast,
                 temperature: 0,
-                maxTokens: 2000,
+                maxTokens: config.sddTicketsMaxTokens ?? 2000,
                 response_format: { type: 'json_object' }
             });
             let content = response.messages[response.messages.length - 1].content || '{}';

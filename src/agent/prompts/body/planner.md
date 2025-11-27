@@ -16,6 +16,8 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Failure History: `{{FAILURE_HISTORY}}`
 - Execution Profile: `{{EXECUTION_PROFILE}}`
 - Task Scope: `{{TASK_SCOPE}}`
+
+Note: SDD inputs are summaries. If you need full context, use `read_file` on `.sdd/project.md`, `.sdd/architect.md`, or `.sdd/best_practices.md`.
 - Loop Counters: `{{LOOP_COUNTERS}}`
 - Total Steps: `{{TOTAL_STEPS}}`
 - Functional OK: `{{FUNCTIONAL_OK}}`
@@ -24,6 +26,8 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Context Scan: `{{CONTEXT_SCAN}}`
 - Impact Map: `{{IMPACT_MAP}}`
 - Risk Map: `{{RISK_MAP}}`
+
+Note: SDD inputs are summaries. If you need full context, use `read_file` on `.sdd/project.md`, `.sdd/architect.md`, or `.sdd/best_practices.md`.
 
 # Context Inference & Goal Shaping
 - **Context Inference**: If the user goal is vague (e.g., "fix build", "cleanup"), use `{{CONTEXT_SCAN}}` to infer the intent. Look at `gitStatus` for recent changes and `files` for project structure.

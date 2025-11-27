@@ -72,6 +72,22 @@ export const KotefConfigSchema = z.object({
     gitAutoInit: z.boolean().default(true),
     /** Git integration: path to git binary (default: 'git') */
     gitBinary: z.string().default('git'),
+
+    /** Ticket 64: SDD Brain Config */
+    sddBrainModel: z.string().optional(),
+    sddBestPracticesMaxTokens: z.number().optional(),
+    sddArchitectMaxTokens: z.number().optional(),
+    sddTicketsMaxTokens: z.number().optional(),
+
+    /** Ticket 65: Deep Research Config */
+    deepResearchMaxTokens: z.number().optional(),
+    deepResearchMaxPages: z.number().optional(),
+    deepResearchPageSnippetChars: z.number().optional(),
+    deepResearchMaxFindings: z.number().optional(),
+
+    /** Ticket 65: SDD Summary Config */
+    sddSummaryInputChars: z.number().optional(),
+    sddSummaryMaxTokens: z.number().optional(),
 });
 
 export type KotefConfig = z.infer<typeof KotefConfigSchema>;
@@ -134,6 +150,22 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         gitEnabled: env.KOTEF_NO_GIT !== 'true',
         gitAutoInit: env.KOTEF_GIT_AUTO_INIT !== 'false',
         gitBinary: env.GIT_BINARY || 'git',
+
+        // Ticket 64: SDD Brain Config
+        sddBrainModel: env.KOTEF_SDD_BRAIN_MODEL, // Optional, defaults to modelStrong/modelFast logic
+        sddBestPracticesMaxTokens: parseInt(env.KOTEF_SDD_BEST_PRACTICES_MAX_TOKENS || '0', 10) || undefined,
+        sddArchitectMaxTokens: parseInt(env.KOTEF_SDD_ARCHITECT_MAX_TOKENS || '0', 10) || undefined,
+        sddTicketsMaxTokens: parseInt(env.KOTEF_SDD_TICKETS_MAX_TOKENS || '0', 10) || undefined,
+
+        // Ticket 65: Deep Research Config
+        deepResearchMaxTokens: parseInt(env.KOTEF_DEEP_RESEARCH_MAX_TOKENS || '0', 10) || undefined,
+        deepResearchMaxPages: parseInt(env.KOTEF_DEEP_RESEARCH_MAX_PAGES || '0', 10) || undefined,
+        deepResearchPageSnippetChars: parseInt(env.KOTEF_DEEP_RESEARCH_PAGE_SNIPPET_CHARS || '0', 10) || undefined,
+        deepResearchMaxFindings: parseInt(env.KOTEF_DEEP_RESEARCH_MAX_FINDINGS || '0', 10) || undefined,
+
+        // Ticket 65: SDD Summary Config
+        sddSummaryInputChars: parseInt(env.KOTEF_SDD_SUMMARY_INPUT_CHARS || '0', 10) || undefined,
+        sddSummaryMaxTokens: parseInt(env.KOTEF_SDD_SUMMARY_MAX_TOKENS || '0', 10) || undefined,
     };
 
     const parsed = KotefConfigSchema.parse(config);

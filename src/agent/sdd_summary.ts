@@ -124,7 +124,8 @@ async function summarizeWithLLM(cfg: KotefConfig, content: string, type: 'projec
     };
 
     const promptTemplate = promptTemplates[type];
-    const prompt = promptTemplate.replace('{{CONTENT}}', content.slice(0, 15000));
+    const inputLimit = cfg.sddSummaryInputChars ?? 15000;
+    const prompt = promptTemplate.replace('{{CONTENT}}', content.slice(0, inputLimit));
 
     const messages: ChatMessage[] = [
         { role: 'system', content: 'You are a technical summarizer. Create concise, information-dense summaries that preserve critical details.' },
@@ -134,7 +135,7 @@ async function summarizeWithLLM(cfg: KotefConfig, content: string, type: 'projec
     try {
         const response = await callChat(cfg, messages, {
             model: cfg.modelFast, // Use fast model for cost efficiency
-            maxTokens: 512,
+            maxTokens: cfg.sddSummaryMaxTokens ?? 512,
             temperature: 0
         });
 

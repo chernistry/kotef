@@ -14,6 +14,20 @@ export interface DeepResearchFinding {
     conflicts?: string[];      // short notes if sources disagree
 }
 
+export interface WebSearchResult {
+    url: string;
+    title: string;
+    snippet: string;
+    source?: string;
+}
+
+export interface DeepResearchResult {
+    findings: DeepResearchFinding[];
+    quality: (ResearchQuality & { lastQuery: string; attemptCount: number }) | null;
+    rawSearchResults?: WebSearchResult[];
+    rawPagesSample?: { url: string; content: string }[];
+}
+
 export interface DeepResearchOptions {
     /** Original natural-language goal (used for scoring and refinement). */
     originalGoal?: string;
@@ -83,6 +97,8 @@ interface ResearchAttempt {
     query: string;
     findings: DeepResearchFinding[];
     quality: ResearchQuality | null;
+    rawSearchResults?: WebSearchResult[];
+    rawPagesSample?: { url: string; content: string }[];
 }
 
 async function summarizeFindings(
@@ -247,7 +263,12 @@ export async function deepResearch(
     const strategy = computeResearchStrategy(goal, options);
     const techStackHint = options.techStackHint || '';
 
-    log.info('Starting deep research', { goal, techStackHint, strategy });
+    // Config-driven limits
+    const maxTokens = cfg.deepResearchMaxTokens || 2000;
+    const maxPages = cfg.deepResearchMaxPages || strategy.topPages;
+    const snippetChars = cfg.deepResearchPageSnippetChars || 4000;
+
+    log.info('Starting deep research', { goal, techStackHint, strategy, limits: { maxTokens, maxPages, snippetChars } });
 
     const maxAttempts = strategy.maxAttempts;
 
@@ -301,12 +322,16 @@ export async function deepResearch(
         }
 
         // Fetch pages
-        const topResults = searchResults.slice(0, strategy.topPages);
+        const topResults = searchResults.slice(0, maxPages);
         const pageContents: string[] = [];
+        const rawPagesSample: { url: string; content: string }[] = [];
+
         for (const result of topResults) {
             try {
                 const page = await fetchPage(cfg, result.url);
-                pageContents.push(`Source: ${result.url}\nTitle: ${result.title}\nContent:\n${page.content}\n---`);
+                const truncatedContent = page.content.slice(0, snippetChars);
+                pageContents.push(`Source: ${result.url}\nTitle: ${result.title}\nContent:\n${truncatedContent}\n---`);
+                rawPagesSample.push({ url: result.url, content: truncatedContent });
             } catch (e) {
                 pageContents.push(`Source: ${result.url}\nTitle: ${result.title}\nContent (Snippet):\n${result.snippet}\n---`);
             }
@@ -346,7 +371,7 @@ export async function deepResearch(
             log.warn('Failed to score research', { error: (e as Error).message });
         }
 
-        attempts.push({ query: currentQuery, findings, quality });
+        attempts.push({ query: currentQuery, findings, quality, rawSearchResults: searchResults, rawPagesSample });
 
         // Check if good enough
         if (quality && quality.relevance >= 0.7 && quality.coverage >= 0.6) {
@@ -399,11 +424,8 @@ export async function deepResearch(
 
     return {
         findings: best?.findings || [],
-        quality: best?.quality ? { ...best.quality, lastQuery: best.query, attemptCount: attempts.length } : null
+        quality: best?.quality ? { ...best.quality, lastQuery: best.query, attemptCount: attempts.length } : null,
+        rawSearchResults: (best as any)?.rawSearchResults,
+        rawPagesSample: (best as any)?.rawPagesSample
     };
-}
-
-export interface DeepResearchResult {
-    findings: DeepResearchFinding[];
-    quality: (ResearchQuality & { lastQuery: string; attemptCount: number }) | null;
 }

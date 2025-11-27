@@ -138,4 +138,28 @@ describe('Deep Research Flow', () => {
         // Should return best of bad attempts (or last)
         expect(result.quality).not.toBeNull();
     });
+    it('should return raw data for persistence', async () => {
+        // Mock optimizer
+        vi.spyOn(llmModule, 'callChat').mockResolvedValueOnce({
+            messages: [{ role: 'assistant', content: JSON.stringify({ query: 'optimized query' }) }]
+        } as any);
+
+        // Mock summarizer
+        vi.spyOn(llmModule, 'callChat').mockResolvedValueOnce({
+            messages: [{ role: 'assistant', content: JSON.stringify([{ statement: 'finding', citations: [] }]) }]
+        } as any);
+
+        // Mock evaluator
+        vi.spyOn(llmModule, 'callChat').mockResolvedValueOnce({
+            messages: [{ role: 'assistant', content: JSON.stringify({ relevance: 0.9, coverage: 0.9, should_retry: false }) }]
+        } as any);
+
+        const result = await deepResearch(mockConfig, 'goal');
+
+        expect(result.rawSearchResults).toBeDefined();
+        expect(result.rawSearchResults?.length).toBeGreaterThan(0);
+        expect(result.rawPagesSample).toBeDefined();
+        expect(result.rawPagesSample?.length).toBeGreaterThan(0);
+        expect(result.rawPagesSample?.[0].content).toContain('Mock page content');
+    });
 });
