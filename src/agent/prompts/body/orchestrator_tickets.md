@@ -35,6 +35,11 @@ Respond with a **single JSON object**:
    - Summary: `{{TICKET_SUMMARY}}`
 3. **Content**: Write the full markdown content using the template below.
 
+### Mandatory Rules for Content
+1. **Testing**: If this ticket implements code, it MUST include a step to run/add tests.
+   - If the project lacks a test runner, the FIRST ticket MUST include "Configure test harness (Vitest/Jest)".
+2. **Git**: The **FINAL** step of every ticket MUST be: "Commit changes to git with a descriptive message".
+
 **Output Format (GENERATE_SINGLE)**:
 Respond with a **single JSON object**:
 ```json
