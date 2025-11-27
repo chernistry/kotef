@@ -24,6 +24,8 @@ Task:
 Produce architect.md as the source of truth for implementation.
 
 Output Structure (Markdown):
+Start the document with: `# Architect Specification`
+
 ## Hard Constraints (if applicable)
 - Domain-specific prohibitions (e.g., no heuristics, no regex parsers, tool-first grounding)
 - Compliance requirements (GDPR, accessibility, security standards)

@@ -18,14 +18,17 @@ const BEST_PRACTICES_HEADINGS = [
 
 const ARCHITECT_HEADINGS = [
     '# Architect Specification',
-    '## 1. Overview',
-    '## 2. Hard Constraints & Preconditions',
-    '## 4. Alternatives',
-    '## 5. Architecture Overview',
-    '## 6. Component Specifications',
-    '## 7. Code Standards & Conventions',
-    '## 8. Implementation Plan',
-    '## 9. Decision Log'
+    '## Hard Constraints',
+    '## Go/No-Go Preconditions',
+    '## Goals & Non-Goals',
+    '## Metric Profile & Strategic Risk Map',
+    '## Alternatives',
+    '## Research Conflicts & Resolutions',
+    '## MVP Recommendation',
+    '## Architecture Overview',
+    '## Components',
+    '## Code Standards & Conventions',
+    '## Implementation Steps'
 ];
 
 export function validateBestPracticesDoc(content: string): SddDocValidationResult {
