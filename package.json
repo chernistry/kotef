@@ -43,6 +43,8 @@
         "npm-run-path": "^6.0.0",
         "openai": "^4.28.0",
         "robots-parser": "^3.0.1",
+        "tree-sitter-wasms": "^0.1.13",
+        "web-tree-sitter": "^0.25.10",
         "zod": "^3.22.4"
     },
     "devDependencies": {

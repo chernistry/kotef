@@ -68,6 +68,57 @@ export function snitchNode(cfg: KotefConfig) {
             ? `${existingIssues}\n\n${reason}`
             : reason;
 
+        // 3. Blocklist tickets that are clearly stuck in loops to avoid re-selecting them blindly
+        try {
+            const terminalStatus = state.terminalStatus;
+            const ticketPath = state.sdd?.ticketPath;
+            const loopReason = reason || '';
+
+            if (ticketPath && terminalStatus === 'aborted_stuck') {
+                const ticketFile = path.basename(ticketPath);
+                const match = ticketFile.match(/^(\d+)/);
+                const ticketId = match?.[1];
+
+                if (ticketId && /loop|stuck|Max steps limit reached/i.test(loopReason)) {
+                    const cacheDir = path.join(sddRoot, 'cache');
+                    const blockFile = path.join(cacheDir, 'blocked_tickets.json');
+
+                    await fs.mkdir(cacheDir, { recursive: true });
+
+                    let data: any = { ids: [], reasons: {} as Record<string, string[]> };
+                    try {
+                        const content = await fs.readFile(blockFile, 'utf-8');
+                        const parsed = JSON.parse(content);
+                        if (Array.isArray(parsed)) {
+                            data.ids = parsed;
+                        } else {
+                            data = {
+                                ids: Array.isArray(parsed.ids) ? parsed.ids : [],
+                                reasons: parsed.reasons && typeof parsed.reasons === 'object' ? parsed.reasons : {}
+                            };
+                        }
+                    } catch {
+                        // Ignore missing/invalid file, start fresh
+                    }
+
+                    if (!data.ids.includes(ticketId)) {
+                        data.ids.push(ticketId);
+                    }
+                    if (!data.reasons[ticketId]) {
+                        data.reasons[ticketId] = [];
+                    }
+                    if (!data.reasons[ticketId].includes(loopReason)) {
+                        data.reasons[ticketId].push(loopReason);
+                    }
+
+                    await fs.writeFile(blockFile, JSON.stringify(data, null, 2), 'utf-8');
+                    log.info('Marked ticket as blocked due to stuck loop', { ticketId, reason: loopReason });
+                }
+            }
+        } catch (e) {
+            log.warn('Failed to update blocked tickets cache', { error: (e as Error).message });
+        }
+
         return {
             sdd: {
                 ...state.sdd,

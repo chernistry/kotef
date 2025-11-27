@@ -38,19 +38,31 @@ function expandTilde(filepath: string): string {
  */
 async function findNextTicket(rootDir: string): Promise<{ id: string; path: string } | null> {
     const openDir = path.join(rootDir, '.sdd', 'backlog', 'tickets', 'open');
+    const blockedIds = await loadBlockedTicketIds(rootDir);
     try {
         const files = await fs.readdir(openDir);
         const ticketFiles = files.filter(f => f.endsWith('.md') && /^\d+/.test(f));
         if (ticketFiles.length === 0) return null;
 
+        // Filter out tickets that are explicitly blocked
+        const candidateFiles = ticketFiles.filter(f => {
+            const id = f.match(/^(\d+)/)?.[1];
+            if (!id) return false;
+            return !blockedIds.has(id);
+        });
+
+        if (candidateFiles.length === 0) {
+            return null;
+        }
+
         // Sort by ticket number
-        ticketFiles.sort((a, b) => {
+        candidateFiles.sort((a, b) => {
             const numA = parseInt(a.match(/^(\d+)/)?.[1] || '999999');
             const numB = parseInt(b.match(/^(\d+)/)?.[1] || '999999');
             return numA - numB;
         });
 
-        const nextFile = ticketFiles[0];
+        const nextFile = candidateFiles[0];
         const ticketId = nextFile.match(/^(\d+)/)?.[1] || '';
         return {
             id: ticketId,
@@ -58,6 +70,28 @@ async function findNextTicket(rootDir: string): Promise<{ id: string; path: stri
         };
     } catch {
         return null;
+    }
+}
+
+/**
+ * Load ticket IDs that should be skipped automatically (blocked/stuck).
+ */
+async function loadBlockedTicketIds(rootDir: string): Promise<Set<string>> {
+    const blockedFile = path.join(rootDir, '.sdd', 'cache', 'blocked_tickets.json');
+    try {
+        const content = await fs.readFile(blockedFile, 'utf-8');
+        const parsed = JSON.parse(content);
+
+        let ids: string[] = [];
+        if (Array.isArray(parsed)) {
+            ids = parsed;
+        } else if (Array.isArray(parsed.ids)) {
+            ids = parsed.ids;
+        }
+
+        return new Set(ids.filter(id => typeof id === 'string' && id.trim().length > 0));
+    } catch {
+        return new Set();
     }
 }
 

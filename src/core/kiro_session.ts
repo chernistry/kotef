@@ -97,10 +97,12 @@ export async function runKiroAgentSession(
 
         // Snapshot directory after Kiro runs
         const after = await snapshotDirectory(options.rootDir);
-        const changedFiles = await detectChanges(before, after);
+        const changedFilesRaw = await detectChanges(before, after);
+        const changedFiles = changedFilesRaw.filter(p => !isEphemeralPath(p));
 
         log.info('File changes detected', {
-            changedFiles: changedFiles.length,
+            changedFilesTotal: changedFilesRaw.length,
+            changedFilesSignificant: changedFiles.length,
             files: changedFiles,
         });
 
@@ -149,9 +151,10 @@ export async function runKiroAgentSession(
 
             // Return partial results on timeout
             const after = await snapshotDirectory(options.rootDir);
-            const changedFiles = await detectChanges(before, after);
+            const changedFilesRaw = await detectChanges(before, after);
+            const changedFiles = changedFilesRaw.filter(p => !isEphemeralPath(p));
 
-            console.log(`⚠️  Kiro session timed out after ${timeout}ms. Detected ${changedFiles.length} file changes.`);
+            console.log(`⚠️  Kiro session timed out after ${timeout}ms. Detected ${changedFiles.length} significant file changes.`);
 
             return {
                 success: false,
@@ -188,6 +191,9 @@ async function snapshotDirectory(rootDir: string): Promise<FileSnapshot[]> {
             // Skip node_modules, .git, and other common ignored dirs
             if (relativePath.includes('node_modules') ||
                 relativePath.includes('.git') ||
+                relativePath.startsWith('.next' + path.sep) ||
+                relativePath.startsWith('dist' + path.sep) ||
+                relativePath.startsWith('build' + path.sep) ||
                 relativePath.startsWith('.sdd/')) {
                 continue;
             }
@@ -237,4 +243,24 @@ async function detectChanges(
     }
 
     return changed;
+}
+
+/**
+ * Heuristic filter for ephemeral / build artifacts.
+ * These files changing does not necessarily mean meaningful source progress.
+ */
+function isEphemeralPath(p: string): boolean {
+    const normalized = p.replace(/\\/g, '/');
+
+    const ephemeralPrefixes = [
+        '.next/',
+        '.turbo/',
+        'dist/',
+        'build/',
+        'coverage/',
+        '.cache/',
+        'logs/'
+    ];
+
+    return ephemeralPrefixes.some(prefix => normalized.startsWith(prefix));
 }

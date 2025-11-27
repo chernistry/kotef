@@ -191,7 +191,7 @@ export function verifierNode(cfg: KotefConfig) {
                 hasFileChanges
             });
             try {
-                const { runTsLspDiagnosticsViaServer } = await import('../../tools/lsp.js');
+                const { runTsLspDiagnosticsViaServer } = await import('../../tools/diagnostics.js');
 
                 // Get changed files for targeted diagnostics (max 50 files to avoid overhead)
                 const changedFiles = hasFileChanges

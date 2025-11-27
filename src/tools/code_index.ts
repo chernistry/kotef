@@ -2,6 +2,7 @@ import { Project, SourceFile, SyntaxKind, Node } from 'ts-morph';
 import { createLogger } from '../core/logger.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { TreeSitterCodeIndex } from './code_index_treesitter.js';
 
 const log = createLogger('code_index');
 
@@ -22,14 +23,14 @@ export interface CodeIndex {
     dispose(): void;
 }
 
-class TsMorphCodeIndex implements CodeIndex {
+export class TsMorphCodeIndex implements CodeIndex {
     private project: Project | null = null;
     private rootDir: string = '';
     private symbolMap: Map<string, CodeSnippet[]> = new Map();
     private fileMap: Map<string, CodeSnippet[]> = new Map();
 
     async build(rootDir: string, filePatterns?: string[]): Promise<void> {
-        log.info('Building code index', { rootDir });
+        log.info('Building TsMorph code index', { rootDir });
         this.rootDir = rootDir;
 
         // Create ts-morph project
@@ -49,7 +50,16 @@ class TsMorphCodeIndex implements CodeIndex {
         });
 
         // Add source files based on patterns
-        const patterns = filePatterns || ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'];
+        // Default to TS/JS only
+        const patterns = filePatterns ?
+            filePatterns.filter(p => p.endsWith('.ts') || p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.jsx')) :
+            ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'];
+
+        if (patterns.length === 0) {
+            // No TS/JS patterns, skip
+            return;
+        }
+
         const exclude = ['**/node_modules/**', '**/dist/**', '**/.sdd/**', '**/test/**', '**/tests/**'];
 
         for (const pattern of patterns) {
@@ -70,21 +80,22 @@ class TsMorphCodeIndex implements CodeIndex {
         // Index all files
         await this.indexAllFiles();
 
-        log.info('Code index built', {
+        log.info('TsMorph index built', {
             fileCount: this.project.getSourceFiles().length,
             symbolCount: this.symbolMap.size
         });
     }
 
     async update(changedFiles: string[]): Promise<void> {
-        if (!this.project) {
-            log.warn('Cannot update index: not initialized');
-            return;
-        }
+        if (!this.project) return;
 
-        log.info('Updating code index', { fileCount: changedFiles.length });
+        // Filter for TS/JS files
+        const relevantFiles = changedFiles.filter(f => /\.(ts|tsx|js|jsx)$/.test(f));
+        if (relevantFiles.length === 0) return;
 
-        for (const filePath of changedFiles) {
+        log.info('Updating TsMorph index', { fileCount: relevantFiles.length });
+
+        for (const filePath of relevantFiles) {
             const absolutePath = path.resolve(this.rootDir, filePath);
 
             // Remove old entries
@@ -96,8 +107,7 @@ class TsMorphCodeIndex implements CodeIndex {
                 const sourceFile = this.project.addSourceFileAtPath(absolutePath);
                 this.indexFile(sourceFile);
             } catch {
-                // File was deleted, already removed from index
-                log.debug('File deleted, removed from index', { filePath });
+                // File was deleted
             }
         }
     }
@@ -115,7 +125,6 @@ class TsMorphCodeIndex implements CodeIndex {
         this.project = null;
         this.symbolMap.clear();
         this.fileMap.clear();
-        log.info('Code index disposed');
     }
 
     private async indexAllFiles(): Promise<void> {
@@ -236,12 +245,70 @@ class TsMorphCodeIndex implements CodeIndex {
     }
 }
 
+export class CompositeCodeIndex implements CodeIndex {
+    private tsIndex = new TsMorphCodeIndex();
+    private treeSitterIndex = new TreeSitterCodeIndex();
+
+    async build(rootDir: string, filePatterns?: string[]): Promise<void> {
+        // Split patterns? Or just let them handle it?
+        // TsMorph handles .ts/.js
+        // TreeSitter handles .py, .go, .rs, .java (and .ts/.js but we can skip if we want)
+
+        // For now, let's let TreeSitter handle non-TS/JS files to avoid duplication
+        // Or we can let it handle everything and prefer TsMorph for TS/JS queries?
+        // Simpler: 
+        // TsMorph: **/*.{ts,tsx,js,jsx}
+        // TreeSitter: **/*.{py,go,rs,java}
+
+        const tsPatterns = filePatterns ?
+            filePatterns.filter(p => /\.(ts|tsx|js|jsx)$/.test(p)) :
+            ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'];
+
+        const otherPatterns = filePatterns ?
+            filePatterns.filter(p => !/\.(ts|tsx|js|jsx)$/.test(p)) :
+            ['**/*.py', '**/*.go', '**/*.rs', '**/*.java'];
+
+        await Promise.all([
+            this.tsIndex.build(rootDir, tsPatterns),
+            this.treeSitterIndex.build(rootDir, otherPatterns)
+        ]);
+    }
+
+    async update(changedFiles: string[]): Promise<void> {
+        const tsFiles = changedFiles.filter(f => /\.(ts|tsx|js|jsx)$/.test(f));
+        const otherFiles = changedFiles.filter(f => !/\.(ts|tsx|js|jsx)$/.test(f));
+
+        await Promise.all([
+            this.tsIndex.update(tsFiles),
+            this.treeSitterIndex.update(otherFiles)
+        ]);
+    }
+
+    querySymbol(symbolName: string): CodeSnippet[] {
+        const tsResults = this.tsIndex.querySymbol(symbolName);
+        const otherResults = this.treeSitterIndex.querySymbol(symbolName);
+        return [...tsResults, ...otherResults];
+    }
+
+    queryFile(filePath: string): CodeSnippet[] {
+        if (/\.(ts|tsx|js|jsx)$/.test(filePath)) {
+            return this.tsIndex.queryFile(filePath);
+        }
+        return this.treeSitterIndex.queryFile(filePath);
+    }
+
+    dispose(): void {
+        this.tsIndex.dispose();
+        this.treeSitterIndex.dispose();
+    }
+}
+
 // Singleton instance
 let globalIndex: CodeIndex | null = null;
 
 export function getCodeIndex(): CodeIndex {
     if (!globalIndex) {
-        globalIndex = new TsMorphCodeIndex();
+        globalIndex = new CompositeCodeIndex();
     }
     return globalIndex;
 }
