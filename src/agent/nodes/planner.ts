@@ -668,7 +668,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             // Ticket 50: Pass through ADRs and assumptions
             designDecisions: decision.designDecisions,
             assumptions: decision.assumptions,
-            ...phaseUpdates
+            ...phaseUpdates,
+            clarified_goal: decision.clarified_goal
         };
     };
 }

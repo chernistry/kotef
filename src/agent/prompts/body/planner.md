@@ -37,6 +37,12 @@ Note: SDD inputs are summaries. If you need full context, use `read_file` on `.s
     - `Batch`: 1-4 hours. Multiple related fixes.
     - `Big`: > 4 hours. Major refactor or feature.
   - **Non-Goals**: Explicitly state what you will NOT do.
+- **Shape Up Analysis**:
+  - Analyze the goal to define `clarified_goal`.
+  - `functional_outcomes`: What specific behaviors will change?
+  - `non_functional_risks`: Performance, security, or regression risks.
+  - `DoD_checks`: How will we verify success? (e.g. "Run npm test", "Manual check of X")
+  - `constraints`: Any strict rules (e.g. "No new deps", "Must use existing util").
 
 # Policies & Guardrails
 - **SDD is law**: follow `.sdd/project.md`, `.sdd/architect.md`, and tickets. If a request conflicts, set `next="snitch"` with a short reason.
@@ -163,6 +169,16 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
         "appetite": { "type": "string", "enum": ["Small", "Batch", "Big"] },
         "non_goals": { "type": "array", "items": { "type": "string" } },
         "clarified_intent": { "type": "string" }
+      }
+    },
+    "clarified_goal": {
+      "type": "object",
+      "required": ["functional_outcomes", "non_functional_risks", "DoD_checks", "constraints"],
+      "properties": {
+        "functional_outcomes": { "type": "array", "items": { "type": "string" } },
+        "non_functional_risks": { "type": "array", "items": { "type": "string" } },
+        "DoD_checks": { "type": "array", "items": { "type": "string" } },
+        "constraints": { "type": "array", "items": { "type": "string" } }
       }
     }
   }

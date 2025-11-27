@@ -13,6 +13,13 @@ export interface FunctionalCheck {
     stderrSample?: string;
 }
 
+export interface ClarifiedGoal {
+    functional_outcomes: string[];
+    non_functional_risks: string[];
+    DoD_checks: string[];
+    constraints: string[];
+}
+
 export interface SddContext {
     /** Optional natural-language goal that triggered this run. */
     goal?: string;
@@ -140,6 +147,7 @@ export interface AgentState {
         nonGoals: string[];
         clarifiedIntent: string;
     };
+    clarified_goal?: ClarifiedGoal;
 
     // Phase Tracking (Ticket 56)
     currentPhase?: AgentPhase;
