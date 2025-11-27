@@ -25,6 +25,16 @@ Create a comprehensive best‑practices guide for {{PROJECT_NAME}} that is:
    - what to do instead or how to migrate away from them.
 8) Verification‑ready — for each major recommendation (and “don’t do this”), note how to validate it (tests, metrics, experiments) so the architect/agent can reuse these checks.
 
+## Validation Checklist (CRITICAL)
+You MUST include the following headers exactly as written (case-insensitive):
+- `# Best Practices & Research`
+- `## 1. TL;DR`
+- `## 2. Landscape`
+- `## 3. Architecture Patterns`
+- `## 4. Conflicting Practices & Alternatives`
+- `## 5. References`
+If you miss any of these, the system will reject your output.
+
 ## Output Structure (Markdown)
 ### 1. TL;DR (≤10 bullets)
 - Key decisions and patterns (why, trade‑offs, MVP vs later)

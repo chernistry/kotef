@@ -42,18 +42,35 @@ function validateDoc(content: string, requiredHeadings: string[], docName: strin
     const warnings: string[] = [];
     let truncated = false;
 
+    const lines = content.trim().split('\n');
+
     // Check for required headings
     for (const heading of requiredHeadings) {
-        // Simple check: does the heading exist at the start of a line?
-        // We use a regex to allow for loose matching (e.g. extra spaces)
-        const regex = new RegExp(`^${escapeRegExp(heading)}`, 'm');
-        if (!regex.test(content)) {
+        // Relaxed check: case-insensitive, allows extra spaces/markdown chars
+        // e.g. "## 1. TL;DR" matches "## 1. TL;DR", "## 1. tl;dr", "##   1. TL;DR  "
+        // We strip special regex chars from the heading first, then build a flexible regex.
+
+        // 1. Remove markdown header markers (#) and trim to get the core text
+        const coreText = heading.replace(/^#+\s*/, '').trim();
+
+        // 2. Build regex: 
+        // ^\s*#+\s*  -> start of line, optional space, one or more #, optional space
+        // ...core text... -> the text we are looking for (escaped)
+        // .*$ -> allow trailing chars on the line
+        // Simple line-based check to avoid regex complexity/fragility
+        const coreTextLower = coreText.toLowerCase();
+        const found = lines.some(line => {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('#')) return false;
+            return trimmed.toLowerCase().includes(coreTextLower);
+        });
+
+        if (!found) {
             missingSections.push(heading);
         }
     }
 
     // Check for truncation
-    const lines = content.trim().split('\n');
     const lastLine = lines[lines.length - 1].trim();
 
     // Heuristic 1: Last line is a header (starts with #)

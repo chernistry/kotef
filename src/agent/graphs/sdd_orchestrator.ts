@@ -130,12 +130,28 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
                 })
                 .join('\n\n');
 
+    // Check for existing best_practices.md (Ticket 66: Partial File Handling)
+    const sddDirForCheck = path.join(rootDir, '.sdd');
+    const bestPracticesPath = path.join(sddDirForCheck, 'best_practices.md');
+    let existingContent = '';
+    try {
+        existingContent = await fs.readFile(bestPracticesPath, 'utf-8');
+        const validation = validateBestPracticesDoc(existingContent);
+        if (validation.ok) {
+            console.log('Found valid existing best_practices.md, skipping generation.');
+            return { researchContent: existingContent };
+        }
+        console.log('Found partial/invalid best_practices.md, attempting to complete/repair...');
+    } catch {
+        // File doesn't exist, proceed with generation
+    }
+
     console.log('Generating best_practices.md with LLM...');
 
     const { techStack, domain, projectDescription } = metadata;
 
     // 2. Render prompt with web research injected as additional context
-    const prompt = renderBrainTemplate('research', {
+    let prompt = renderBrainTemplate('research', {
         projectName: path.basename(rootDir),
         domain,
         techStack,
@@ -144,6 +160,11 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
         goal,
         additionalContext: `Web research findings for goal "${goal}":\n\n${findingsContext}`
     });
+
+    // If we have partial content, inject it into the prompt
+    if (existingContent) {
+        prompt += `\n\nIMPORTANT: A partial draft of the document already exists. Please use it as a starting point and COMPLETE it, fixing any missing sections or validation errors. Do not start from scratch if the draft is good.\n\nEXISTING DRAFT:\n${existingContent}`;
+    }
 
     // 3. Call LLM to synthesize best_practices.md from template + findings
     const messages: ChatMessage[] = [
@@ -224,7 +245,23 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
 
     const { techStack, domain, projectDescription } = await loadProjectMetadata(rootDir, goal);
 
-    const prompt = renderBrainTemplate('architect', {
+    // Check for existing architect.md
+    const sddDirForCheck = path.join(rootDir, '.sdd');
+    const architectPath = path.join(sddDirForCheck, 'architect.md');
+    let existingContent = '';
+    try {
+        existingContent = await fs.readFile(architectPath, 'utf-8');
+        const validation = validateArchitectDoc(existingContent);
+        if (validation.ok) {
+            console.log('Found valid existing architect.md, skipping generation.');
+            return { architectContent: existingContent };
+        }
+        console.log('Found partial/invalid architect.md, attempting to complete/repair...');
+    } catch {
+        // File doesn't exist
+    }
+
+    let prompt = renderBrainTemplate('architect', {
         projectName: path.basename(rootDir),
         domain,
         techStack,
@@ -233,6 +270,10 @@ async function sddArchitect(state: SddOrchestratorState): Promise<Partial<SddOrc
         goal,
         research: researchContent
     });
+
+    if (existingContent) {
+        prompt += `\n\nIMPORTANT: A partial draft of the document already exists. Please use it as a starting point and COMPLETE it, fixing any missing sections or validation errors.\n\nEXISTING DRAFT:\n${existingContent}`;
+    }
 
     // Append research content for LLM context
     const fullPrompt = `${prompt}\n\n## Context from Research\n${researchContent}`;
