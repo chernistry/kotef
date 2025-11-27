@@ -5,6 +5,13 @@ import { callChat } from '../core/llm.js';
 import { promises as fs } from 'node:fs';
 import { runSddOrchestration } from './graphs/sdd_orchestrator.js';
 import { renderBrainTemplate } from '../sdd/template_driver.js';
+import { fileURLToPath } from 'url';
+import { createLogger } from '../core/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const log = createLogger('bootstrap');
 
 export interface BootstrapContext {
     cfg: KotefConfig;
@@ -17,7 +24,14 @@ export async function bootstrapSddForProject(
     rootDir: string,
     goal: string
 ): Promise<void> {
-    console.log(`Bootstrapping SDD for ${rootDir} with goal: "${goal}"`);
+    log.info(`Bootstrapping SDD for ${rootDir} with goal: "${goal}"`);
+
+    // Helper to safe write
+    const safeWrite = async (relPath: string, content: string) => {
+        const absPath = resolvePath({ rootDir }, relPath);
+        await fs.mkdir(path.dirname(absPath), { recursive: true });
+        await fs.writeFile(absPath, content);
+    };
 
     // 1. Scan repo
     const files = await listFiles({ rootDir }, '**/*.{json,ts,js,md,yml,yaml}');
@@ -31,12 +45,12 @@ export async function bootstrapSddForProject(
             const deps = { ...pkg.dependencies, ...pkg.devDependencies };
             stackHints = `Node.js project. Dependencies: ${Object.keys(deps).join(', ')}`;
         } catch (e) {
-            console.warn("Failed to read package.json", e);
+            log.warn("Failed to read package.json", { error: e });
         }
     }
 
     // 2. Synthesize Project Spec (project.md)
-    console.log('Synthesizing project.md...');
+    log.info('Synthesizing project.md...');
     const projectPrompt = await renderBrainTemplate('bootstrap_project', {
         projectName: path.basename(rootDir),
         domain: 'general',
@@ -53,47 +67,37 @@ export async function bootstrapSddForProject(
         }
     );
 
-    let projectMdContent = projectResponse.messages[projectResponse.messages.length - 1].content;
+    let projectMdContent = projectResponse.messages[projectResponse.messages.length - 1].content || '';
     // Strip markdown code blocks if present
     projectMdContent = projectMdContent.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
 
-    // Helper to safe write
-    const safeWrite = async (relPath: string, content: string) => {
-        const absPath = resolvePath({ rootDir }, relPath);
-        await fs.mkdir(path.dirname(absPath), { recursive: true });
-        await fs.writeFile(absPath, content);
-    };
-
     const sddDir = path.join(rootDir, '.sdd');
-    // await fs.mkdir(sddDir, { recursive: true }); // This is now handled by safeWrite
 
     // Write project.md if not exists
     const projectMdPath = path.join(sddDir, 'project.md');
     try {
         await fs.access(projectMdPath);
-        console.log('Skipping .sdd/project.md (already exists)');
+        log.info('Skipping .sdd/project.md (already exists)');
     } catch {
         await safeWrite('.sdd/project.md', projectMdContent);
-        console.log('Created: .sdd/project.md');
+        log.info('Created: .sdd/project.md');
     }
 
     // 3. Seed implementing agent spec from SDDRush agent template (agent.md)
-    // This file describes how an implementing agent should behave in this repo
-    // (reading .sdd/*.md, executing tickets in order, quality gates, Snitch Protocol, etc.).
     try {
         const agentMdPath = path.join(sddDir, 'agent.md');
         await fs.access(agentMdPath);
-        console.log('Skipping .sdd/agent.md (already exists)');
+        log.info('Skipping .sdd/agent.md (already exists)');
     } catch {
-        console.log('Seeding .sdd/agent.md from brain agent_template.md...');
-        const agentSpec = renderBrainTemplate('agent', {
+        log.info('Seeding .sdd/agent.md from brain agent_template.md...');
+        const agentSpec = await renderBrainTemplate('agent', {
             projectName: path.basename(rootDir),
             domain: 'general',
             techStack: stackHints,
             year: new Date().getFullYear()
         });
         await safeWrite('.sdd/agent.md', agentSpec);
-        console.log('Created: .sdd/agent.md');
+        log.info('Created: .sdd/agent.md');
     }
 
     // 4. Run SDD Orchestration

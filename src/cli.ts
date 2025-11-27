@@ -284,6 +284,7 @@ program
     .option('--ticket <id>', 'Ticket ID to work on')
     .option('--goal <text>', 'Natural language goal (triggers bootstrap if no SDD)')
     .option('--dry-run', 'Run in dry-run mode (no file writes)', false)
+    .option('--offline', 'Skip web research (use only local context)', false)
     .option('--max-time <seconds>', 'Maximum run time in seconds')
     .option('--max-tokens <count>', 'Maximum tokens per run')
     .option('--profile <profile>', 'Execution profile (strict, fast, smoke, yolo)')
@@ -302,6 +303,7 @@ program
             ...envConfig,
             rootDir,
             dryRun: options.dryRun || envConfig.dryRun,
+            offlineMode: options.offline || envConfig.offlineMode,
             maxRunSeconds: options.maxTime ? parseInt(options.maxTime) : envConfig.maxRunSeconds,
             maxTokensPerRun: options.maxTokens ? parseInt(options.maxTokens) : envConfig.maxTokensPerRun,
             maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns

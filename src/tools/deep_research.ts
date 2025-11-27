@@ -305,6 +305,16 @@ export async function deepResearch(
     options: DeepResearchOptions = {},
 ): Promise<DeepResearchResult> {
     const log = createLogger('deep-research');
+
+    // Offline mode: skip web research entirely
+    if (cfg.offlineMode) {
+        log.info('Offline mode enabled, skipping web research');
+        return {
+            findings: [],
+            quality: null,
+        };
+    }
+
     const strategy = computeResearchStrategy(goal, options);
     const techStackHint = options.techStackHint || '';
 

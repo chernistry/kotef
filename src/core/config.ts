@@ -25,6 +25,8 @@ export const KotefConfigSchema = z.object({
     maxTokensPerRun: z.number().default(10000),
     /** Max number of outbound web requests per run (search + fetch). */
     maxWebRequestsPerRun: z.number().default(30),
+    /** Skip web research entirely (offline mode). */
+    offlineMode: z.boolean().default(false),
     /** Max tool call turns in coder node (0 = use profile defaults, 1-500 = hard cap). */
     maxCoderTurns: z.number().int().min(0).max(500).default(0),
     /** If true, use deterministic mock responses for LLM calls */
@@ -128,6 +130,7 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         maxRunSeconds: parseInt(env.MAX_RUN_SECONDS || '300', 10),
         maxTokensPerRun: parseInt(env.MAX_TOKENS_PER_RUN || '100000', 10),
         maxWebRequestsPerRun: parseInt(env.MAX_WEB_REQUESTS_PER_RUN || '20', 10),
+        offlineMode: env.KOTEF_OFFLINE === 'true',
         maxCoderTurns,
         mockMode: env.KOTEF_MOCK_MODE === 'true',
 

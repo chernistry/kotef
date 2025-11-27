@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'node:child_process';
 import { createLogger } from '../core/logger.js';
+import { safeParse } from '../utils/json.js';
 import * as path from 'node:path';
 
 const log = createLogger('ts_lsp_client');
@@ -236,8 +237,8 @@ function handleServerMessages(handle: LspClientHandle, data: Buffer): void {
         const contentLengthMatch = headers.match(/Content-Length: (\d+)/);
 
         if (!contentLengthMatch) {
-            log.error('Invalid LSP message: missing Content-Length');
-            handle.buffer = handle.buffer.slice(headerEnd + 4);
+            log.error('Invalid LSP message: missing Content-Length header', { headers });
+            handle.buffer = handle.buffer.slice(headerEnd + 4); // Skip malformed header
             continue;
         }
 
@@ -253,11 +254,11 @@ function handleServerMessages(handle: LspClientHandle, data: Buffer): void {
         const messageContent = handle.buffer.slice(messageStart, messageEnd);
         handle.buffer = handle.buffer.slice(messageEnd);
 
-        try {
-            const message = JSON.parse(messageContent);
+        const message = safeParse(messageContent);
+        if (message) {
             handleMessage(handle, message);
-        } catch (error) {
-            log.error('Failed to parse LSP message', { error, messageContent });
+        } else {
+            log.error('Failed to parse LSP message content as JSON', { messageContent });
         }
     }
 }
