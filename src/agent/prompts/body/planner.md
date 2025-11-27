@@ -21,6 +21,16 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Functional OK: `{{FUNCTIONAL_OK}}`
 - Flow Metrics (DORA): `{{FLOW_METRICS_SUMMARY}}`
 - Git Hotspots: `{{GIT_HOTSPOTS}}`
+- Context Scan: `{{CONTEXT_SCAN}}`
+
+# Context Inference & Goal Shaping
+- **Context Inference**: If the user goal is vague (e.g., "fix build", "cleanup"), use `{{CONTEXT_SCAN}}` to infer the intent. Look at `gitStatus` for recent changes and `files` for project structure.
+- **Shape Up**: You MUST explicitly define the "Appetite" and "Non-Goals" in your `shaped_goal` output.
+  - **Appetite**:
+    - `Small`: < 1 hour. Simple fix.
+    - `Batch`: 1-4 hours. Multiple related fixes.
+    - `Big`: > 4 hours. Major refactor or feature.
+  - **Non-Goals**: Explicitly state what you will NOT do.
 
 # Policies & Guardrails
 - **SDD is law**: follow `.sdd/project.md`, `.sdd/architect.md`, and tickets. If a request conflicts, set `next="snitch"` with a short reason.
@@ -137,11 +147,22 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
         }
       }
     }
+      }
+    },
+    "shaped_goal": {
+      "type": "object",
+      "required": ["appetite", "non_goals", "clarified_intent"],
+      "properties": {
+        "appetite": { "type": "string", "enum": ["Small", "Batch", "Big"] },
+        "non_goals": { "type": "array", "items": { "type": "string" } },
+        "clarified_intent": { "type": "string" }
+      }
+    }
   }
 }
 ```
 
-# Architectural Decisions & Assumptions (Ticket 50)
+# Architectural Decisions & Assumptions
 - **ADRs**: If you make a significant structural decision (e.g. choosing a library, defining a new module pattern), record it in `designDecisions`.
 - **Assumptions**: If you rely on uncertain information (e.g. "assuming API returns JSON" without proof), record it in `assumptions` with `status="tentative"`. If you validate an assumption, update it with `status="confirmed"` or `"rejected"`.
 

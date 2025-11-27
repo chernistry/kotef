@@ -117,6 +117,19 @@ export interface AgentState {
     /** Flag indicating if code index has been built for this run. */
     codeIndexBuilt?: boolean;
 
+    // Context Shaping (Ticket 59)
+    contextScan?: {
+        cwd: string;
+        files: string[];
+        gitStatus: string;
+        readmeSummary?: string;
+    };
+    shapedGoal?: {
+        appetite: 'Small' | 'Batch' | 'Big';
+        nonGoals: string[];
+        clarifiedIntent: string;
+    };
+
     // Phase Tracking (Ticket 56)
     currentPhase?: AgentPhase;
     phaseHistory?: PhaseHistoryEntry[];

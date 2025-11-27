@@ -12,6 +12,41 @@ import { getHotspots } from '../../tools/git.js';
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import { execa } from 'execa';
+
+export async function scanContext(rootDir: string): Promise<NonNullable<AgentState['contextScan']>> {
+    const cwd = rootDir;
+    let files: string[] = [];
+    let gitStatus = '';
+    let readmeSummary = '';
+
+    try {
+        // List files (depth 2)
+        const { stdout: lsOut } = await execa('find', ['.', '-maxdepth', '2', '-not', '-path', '\'*/.*\''], { cwd });
+        files = lsOut.split('\n').filter(Boolean).map(f => f.replace(/^\.\//, ''));
+    } catch (e) {
+        files = ['(failed to list files)'];
+    }
+
+    try {
+        // Git status
+        const { stdout: statusOut } = await execa('git', ['status', '--short'], { cwd });
+        gitStatus = statusOut || '(clean)';
+    } catch (e) {
+        gitStatus = '(not a git repo)';
+    }
+
+    try {
+        // Read README
+        const readmePath = path.join(cwd, 'README.md');
+        const content = await fs.readFile(readmePath, 'utf-8');
+        readmeSummary = content.slice(0, 1000) + (content.length > 1000 ? '...' : '');
+    } catch (e) {
+        // Ignore missing README
+    }
+
+    return { cwd, files, gitStatus, readmeSummary };
+}
 
 function initializeBudget(profile: ExecutionProfile, scope: TaskScope): BudgetState {
     const zeros = { commandsUsed: 0, testRunsUsed: 0, webRequestsUsed: 0, commandHistory: [] };
@@ -65,6 +100,16 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                 } catch (err) {
                     log.warn('Failed to load git hotspots', { error: (err as Error).message });
                 }
+            }
+        }
+
+        // Context Scan (Ticket 59)
+        if (!state.contextScan) {
+            try {
+                state.contextScan = await scanContext(cfg.rootDir || process.cwd());
+                log.info('Context scan completed', { files: state.contextScan.files.length });
+            } catch (err) {
+                log.warn('Failed to scan context', { error: (err as Error).message });
             }
         }
 
@@ -313,7 +358,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             // SDD summaries and metrics (new additions)
             '{{RISK_REGISTER_SUMMARY}}': riskSummary,
             '{{FLOW_METRICS_SUMMARY}}': await loadFlowMetricsSummary(cfg.rootDir),
-            '{{GIT_HOTSPOTS}}': formatHotspots(state.gitHotspots)
+            '{{GIT_HOTSPOTS}}': formatHotspots(state.gitHotspots),
+            '{{CONTEXT_SCAN}}': state.contextScan ? JSON.stringify(state.contextScan, null, 2) : 'Not available'
         };
 
         let systemPrompt = plannerPromptTemplate;

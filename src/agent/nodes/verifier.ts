@@ -159,8 +159,11 @@ export function verifierNode(cfg: KotefConfig) {
 
         // Run LSP diagnostics if appropriate (Ticket 33)
         // Use full LSP server for file-level diagnostics when possible
+        // Only for TypeScript/JavaScript projects
+        const isJsProject = detected.stack === 'node' || detected.stack === 'vite_frontend';
         if (
             cfg.enableTsLspDiagnostics &&
+            isJsProject &&
             (executionProfile === 'strict' || (executionProfile === 'fast' && hasFileChanges))
         ) {
             try {
