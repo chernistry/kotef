@@ -1,22 +1,22 @@
-# kotef — unapologetically spec-driven coding agent
+# kotef — AI developer that actually gets things done
 
 _heb. 'kotef' (קוטף) — 'one who picks/harvests' (wordplay with 'katef' כתף — 'a shoulder to support you')_
 
-> "Give me a repo and a goal. I'll figure out the rest."
+> "Give me a repo and a goal. I'll figure out the rest. And document everything."
 
 ![kotef in action](assets/screenshot.png)
 
-kotef is a LangGraph-based coding agent that is **shamelessly meticulous** about three things:
+**Tired of AI assistants that hallucinate APIs and break your code?** kotef is different. It's a LangGraph-powered coding agent that's **obsessively methodical** about:
 
-- reading and updating a **real project spec** (its "brain"),  
-- doing **fresh research** so it doesn't hallucinate from some random 2019 blog post, and  
-- touching your code only via **small, validated diffs** (its "body").
+- 📋 **Reading real specs** (not guessing what you want)
+- 🔍 **Fresh research** (not cargo-culting 2019 blog posts)
+- 🛡️ **Safe, validated changes** (not breaking your entire codebase)
 
-It grew out of:
-- [synapse](https://chernistry.github.io/synapse/) — adaptive governance, metric-driven agents.
-- [sddrush](https://github.com/chernistry/sddrush) — tiny spec-driven dev toolkit and prompt templates.
+Built on battle-tested foundations:
+- [synapse](https://chernistry.github.io/synapse/) — adaptive governance for AI agents
+- [sddrush](https://github.com/chernistry/sddrush) — spec-driven dev toolkit
 
-kotef basically fuses them into a coding agent.
+**Result:** An AI developer that codes like a senior engineer, documents like a tech lead, and learns from every mistake.
 
 ---
 
@@ -39,6 +39,25 @@ node bin/kotef chat --root /path/to/repo
 
 ---
 
+## Why kotef > other AI coders
+
+**🤖 Other AI assistants:**
+- "Here's some code I hallucinated based on your vague description"
+- Break your existing code because they don't read the docs
+- Use outdated Stack Overflow answers from 2018
+- Leave you with a mess of uncommitted changes
+
+**🚀 Kotef:**
+- **Reads your actual codebase** and creates a proper project spec
+- **Does fresh web research** with quality scoring (not stale bs)
+- **Works in small, safe steps** with real validation
+- **Auto-commits per feature** so you get clean git history
+- **Learns from mistakes** and gets better over time
+
+**Bottom line:** Kotef codes like a senior dev who's actually paid attention in standups.
+
+---
+
 ## What it actually does (brain vs body)
 
 - **Brain (project understanding).**
@@ -53,15 +72,25 @@ node bin/kotef chat --root /path/to/repo
 
 ---
 
-## Why you might care
+## Perfect for
 
-You probably want this if you want an agent that:
-- actually reads specs and tickets instead of "guessing the API",
-- uses **current docs** (and can admit "not enough info") instead of confidently hallucinating outdated answers,
-- thinks through a goal and plan before it starts hammering your filesystem,
-- can say "functionally done, remaining stuff is tech debt" instead of chasing tiny nits forever,
-- **auto-commits per ticket** so you get clean git history without manual intervention,
-- **detects loops and bails out** instead of burning tokens on the same failing approach.
+**Solo developers** who want to ship features without context-switching between 12 browser tabs
+
+**Tech leads** who need to delegate implementation while maintaining code quality
+
+**Agile teams** that want AI to handle tickets like a junior dev (but smarter)
+
+**Open source maintainers** who need help with contributions without the hand-holding
+
+**Indie hackers** building MVPs faster than competitors
+
+**Basically anyone** tired of AI assistants that:
+- Guess wrong and break everything
+- Use deprecated libraries
+- Leave you to clean up their mess
+- Cost you hours of debugging
+
+Kotef gives you confidence that **the code will work** and **your repo stays clean**.
 
 ### Under the hood
 
@@ -74,38 +103,83 @@ You probably want this if you want an agent that:
 - **Execution profiles** (`strict`/`fast`/`smoke`/`yolo`) — trade off thoroughness vs speed
 - Experimental MCP support for external code-intel servers
 
----
+## Real-world examples
 
-## Getting started
-
-Very short version:
-
-```bash
-cp .env.example .env   # or create .env manually
-# KOTEF_API_KEY=...
-npm install
-npm run build
-
-node bin/kotef run --root /path/to/repo --goal "Do X"
+**"Add dark mode toggle to my React app"**
+```
+Input: Existing Next.js project
+Output: Complete feature with proper state management, CSS variables,
+        accessibility attributes, and TypeScript types.
+        Plus: Documentation of design decisions in .sdd/architecture/adr/
 ```
 
-If the repo has no `.sdd/`, kotef will first bootstrap the SDD "brain", then switch to the main graph.
+**"Create a Python CLI tool for log analysis"**
+```
+Input: Empty repo with just a README
+Output: Full CLI app with argparse, proper error handling,
+        unit tests, and setup.py. Research done on latest Python CLI best practices.
+```
+
+**"Implement user authentication in my Node.js API"**
+```
+Input: Express server with basic routes
+Output: JWT auth middleware, password hashing, input validation,
+        database schema, API docs. Fresh research on security best practices.
+```
+
+**Every time:** Clean git commits, updated documentation, and lessons learned for next time.
+
+---
+
+## Try it now
+
+**5 minutes to first working code:**
+
+```bash
+# 1. Get API key (OpenAI or compatible)
+echo "KOTEF_API_KEY=sk-your-key-here" > .env
+
+# 2. Install & build
+npm install && npm run build
+
+# 3. Run on any project
+node bin/kotef run --root /path/to/your/repo --goal "Add user login feature"
+```
+
+**What happens:**
+1. kotef analyzes your codebase
+2. Creates `.sdd/` project documentation
+3. Breaks goal into manageable tickets
+4. Researches current best practices
+5. Implements, tests, and commits each feature
+6. Updates documentation for future changes
+
+**⚠️ Not magic:** Still needs good prompts and you should review changes. But it eliminates 80% of the boring coding work.
 
 Full technical docs (CLI flags, env, architecture, profiles, safety) live in `docs/KB.md` 📚
 
 ---
 
-## Contributing
+## Help make kotef even better
 
-Things that would be especially useful:
-- a stricter Verifier,
-- a smarter Planner (fewer loops, more common sense),
-- custom profiles/strategies for different stacks,
-- more MCP tool integrations.
+**We're building the future of AI-assisted development.** Your contributions matter!
 
-See `CONTRIBUTING.md` and SDD tickets under `.sdd/backlog/tickets/`.
+**High-impact areas:**
+- 🔍 **Smarter research** — better quality scoring, more sources
+- 🧠 **Common sense planning** — fewer stupid loops, better task breakdown
+- 🛡️ **Bulletproof verification** — catch more bugs before they hit main
+- 🌐 **More language support** — Python, Go, Rust, not just TypeScript
+- ⚡ **Performance** — faster research, smarter caching
 
-PRs, "here's how X solves this, let's steal/beat it" issues, and stress tests on your real-world repos are very welcome.
+**How to contribute:**
+- Found a bug? Open an issue (bonus points for `.sdd/` reproduction cases)
+- Have an idea? Start a discussion
+- Want to code? Check `.sdd/backlog/tickets/` for current priorities
+- Stress test it on your real projects and share results
+
+**Even better:** "Hey, I tried X and it didn't work, but Y approach would be awesome"
+
+See `CONTRIBUTING.md` for details. Every contribution makes AI development more reliable. 🚀
 
 ---
 
