@@ -98,6 +98,11 @@ If the SDD snippets in this prompt look truncated, use `read_file` on `.sdd/proj
   - Use tools internally, then report only the outcome.  
   - Do not include reasoning steps or multi‑paragraph explanations in the final JSON; keep `notes` short and concrete.
 
+- **Code Quality Standards (Senior Level)**
+  - **Structure**: Refuse to create flat file structures for non-trivial apps. Organize by feature or type (e.g., `src/components`, `src/hooks`, `src/utils`).
+  - **Styling**: Do NOT use hardcoded hex/rgb values in components. Define CSS variables in a global stylesheet and use `var(--token)`.
+  - **Resilience**: Ensure the application root is wrapped in an Error Boundary.
+
 ## Patch Rules
 - When using `write_patch`, output a **plain unified diff**:
   - No markdown fences (no ```).
