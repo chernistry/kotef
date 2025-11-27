@@ -73,7 +73,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             if (!trimmed) {
                 throw new Error('Empty planner response');
             }
-            
+
             // Strip markdown fences
             if (trimmed.startsWith('```')) {
                 const fenceMatch = trimmed.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
@@ -81,7 +81,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                     trimmed = fenceMatch[1].trim();
                 }
             }
-            
+
             try {
                 return JSON.parse(trimmed);
             } catch (firstErr) {
@@ -584,7 +584,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             totalSteps: currentSteps,
             progressHistory,
             // Set terminal status if done
-            ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success' } : {}),
+            ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success', done: true } : {}),
             // Ticket 50: Pass through ADRs and assumptions
             designDecisions: decision.designDecisions,
             assumptions: decision.assumptions,

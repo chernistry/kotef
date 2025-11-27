@@ -16,6 +16,11 @@ export function ticketCloserNode(_cfg: KotefConfig) {
             return {};
         }
 
+        if (_cfg.dryRun) {
+            log.info('Dry-run mode: skipping ticket close operation.', { ticketPath });
+            return {};
+        }
+
         try {
             const openPath = ticketPath;
             const openDir = path.dirname(openPath);

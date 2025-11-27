@@ -162,7 +162,10 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
 
             if (next === 'coder') return 'coder';
             if (next === 'verifier') return 'verifier';
-            if (next === 'done') return 'end';
+            if (next === 'done') {
+                const ticketPath = (state.sdd as any)?.ticketPath;
+                return ticketPath ? 'ticket_closer' : 'end';
+            }
             if (next === 'snitch' || next === 'ask_human') return 'snitch';
 
             // Fallback: if research already exists, go to coder; else research
@@ -175,6 +178,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             coder: "coder" as any,
             verifier: "verifier" as any,
             snitch: "snitch" as any,
+            ticket_closer: "ticket_closer" as any,
             end: END
         }
     );
