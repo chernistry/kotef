@@ -398,6 +398,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             // Core context variables
             '{{GOAL}}': safe(state.sdd.goal),
             '{{TICKET}}': safe(state.sdd.ticket),
+            '{{TICKET_ID}}': safe(state.sdd.ticketId),
             '{{PROJECT_SUMMARY}}': safe(JSON.stringify(state.projectSummary, null, 2)),
             '{{SDD_PROJECT}}': summarize(state.sdd.project, 2500),
             '{{SDD_ARCHITECT}}': summarize(state.sdd.architect, 2500),

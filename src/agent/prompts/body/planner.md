@@ -4,6 +4,7 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 
 # Inputs
 - User goal: `{{GOAL}}`
+- Ticket ID: `{{TICKET_ID}}`
 - Current ticket: `{{TICKET}}`
 - SDD project (may be truncated): `{{SDD_PROJECT}}`
 - SDD architect (may be truncated): `{{SDD_ARCHITECT}}`

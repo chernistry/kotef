@@ -485,7 +485,8 @@ program
                     architect: architectMd,
                     bestPractices: bestPracticesMd,
                     ticket: ticketContent,
-                    ticketPath
+                    ticketPath,
+                    ticketId
                 },
                 hasSdd: true,
                 // In YOLO mode we bias the planner/coder towards the most aggressive profile.
