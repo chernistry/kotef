@@ -18,6 +18,10 @@ export interface EvalScenario {
         maxWebRequests?: number;
         maxSteps?: number;
     };
+    qualityCheck?: {
+        command: string;
+        maxLintErrors?: number;
+    };
 }
 
 export interface EvalMetrics {
@@ -27,6 +31,7 @@ export interface EvalMetrics {
     webRequestsUsed: number;
     duration: number;
     terminalStatus: string;
+    qualityScore?: number;
 }
 
 export interface EvalResult {
@@ -59,7 +64,7 @@ export async function runEvalScenario(
     try {
         // Copy fixture if provided
         if (scenario.fixtureDir) {
-            const fixturePath = path.join(process.cwd(), 'scripts/eval/fixtures', scenario.fixtureDir);
+            const fixturePath = path.join(process.cwd(), 'test/eval/fixtures', scenario.fixtureDir);
             await copyDir(fixturePath, sandboxDir);
             if (verbose) console.log(`   📁 Copied fixture from ${scenario.fixtureDir}`);
         }
@@ -120,6 +125,31 @@ export async function runEvalScenario(
             }
         } catch (err) {
             if (verbose) console.log(`   ⚠️  Could not parse run report: ${(err as Error).message}`);
+        }
+
+        // Run Quality Check if defined
+        if (scenario.qualityCheck) {
+            if (verbose) console.log(`   🔍 Running quality check: ${scenario.qualityCheck.command}`);
+            try {
+                // We expect lint commands to exit non-zero on error, but we want to capture that
+                execSync(scenario.qualityCheck.command, {
+                    cwd: sandboxDir,
+                    stdio: 'pipe', // Capture output
+                    timeout: 60000
+                });
+                // If it succeeds without error, score is 100
+                metrics.qualityScore = 100;
+            } catch (err: any) {
+                // If it fails, estimate score based on output lines or exit code
+                // This is a naive heuristic: 100 - (10 * error_lines)
+                // A better approach would be to parse specific lint output formats, but this is a start.
+                const output = err.stdout?.toString() || '';
+                const errorLines = output.split('\n').filter((l: string) => l.includes('error') || l.includes('Error')).length;
+                const penalty = Math.max(1, errorLines) * 10;
+                metrics.qualityScore = Math.max(0, 100 - penalty);
+
+                if (verbose) console.log(`   ⚠️  Quality check failed. Score: ${metrics.qualityScore}`);
+            }
         }
 
         // Check thresholds
@@ -237,17 +267,18 @@ export function generateEvalReport(results: EvalResult[]): string {
     report += `**Results**: ${passed}/${total} passed (${passRate}%)\n\n`;
 
     // Summary table
-    report += '| Scenario | Status | Commands | Tests | Web | Time |\n';
-    report += '|----------|--------|----------|-------|-----|------|\n';
+    report += '| Scenario | Status | Commands | Tests | Web | Quality | Time |\n';
+    report += '|----------|--------|----------|-------|-----|---------|------|\n';
 
     for (const result of results) {
         const status = result.success ? '✅ PASS' : '❌ FAIL';
         const cmd = result.metrics.commandsUsed;
         const tests = result.metrics.testRunsUsed;
         const web = result.metrics.webRequestsUsed;
+        const quality = result.metrics.qualityScore !== undefined ? result.metrics.qualityScore : 'N/A';
         const time = result.metrics.duration.toFixed(1) + 's';
 
-        report += `| ${result.scenarioId} | ${status} | ${cmd} | ${tests} | ${web} | ${time} |\n`;
+        report += `| ${result.scenarioId} | ${status} | ${cmd} | ${tests} | ${web} | ${quality} | ${time} |\n`;
     }
 
     // Failures detail

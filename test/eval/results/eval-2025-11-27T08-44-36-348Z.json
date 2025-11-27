@@ -1,0 +1,77 @@
+[
+  {
+    "scenarioId": "html_israeli_flag",
+    "success": true,
+    "terminalStatus": "dry_run",
+    "metrics": {
+      "steps": 0,
+      "commandsUsed": 0,
+      "testRunsUsed": 0,
+      "webRequestsUsed": 0,
+      "duration": 0,
+      "terminalStatus": "dry_run"
+    },
+    "violations": [],
+    "runReportPath": ""
+  },
+  {
+    "scenarioId": "node_simple_function",
+    "success": true,
+    "terminalStatus": "dry_run",
+    "metrics": {
+      "steps": 0,
+      "commandsUsed": 0,
+      "testRunsUsed": 0,
+      "webRequestsUsed": 0,
+      "duration": 0,
+      "terminalStatus": "dry_run"
+    },
+    "violations": [],
+    "runReportPath": ""
+  },
+  {
+    "scenarioId": "python_tkinter_gui",
+    "success": true,
+    "terminalStatus": "dry_run",
+    "metrics": {
+      "steps": 0,
+      "commandsUsed": 0,
+      "testRunsUsed": 0,
+      "webRequestsUsed": 0,
+      "duration": 0,
+      "terminalStatus": "dry_run"
+    },
+    "violations": [],
+    "runReportPath": ""
+  },
+  {
+    "scenarioId": "sdd_bootstrap",
+    "success": true,
+    "terminalStatus": "dry_run",
+    "metrics": {
+      "steps": 0,
+      "commandsUsed": 0,
+      "testRunsUsed": 0,
+      "webRequestsUsed": 0,
+      "duration": 0,
+      "terminalStatus": "dry_run"
+    },
+    "violations": [],
+    "runReportPath": ""
+  },
+  {
+    "scenarioId": "typescript_add_types",
+    "success": true,
+    "terminalStatus": "dry_run",
+    "metrics": {
+      "steps": 0,
+      "commandsUsed": 0,
+      "testRunsUsed": 0,
+      "webRequestsUsed": 0,
+      "duration": 0,
+      "terminalStatus": "dry_run"
+    },
+    "violations": [],
+    "runReportPath": ""
+  }
+]

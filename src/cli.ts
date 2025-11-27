@@ -321,7 +321,8 @@ program
                 sddExists = false;
             }
 
-            // Bootstrap if needed
+            // Bootstrap if needed, or derive goal from project.md
+            let effectiveGoal = options.goal;
             if (!sddExists) {
                 if (options.goal) {
                     log.info('SDD directory not found. Bootstrapping from goal...');
@@ -331,6 +332,15 @@ program
                     console.error('Error: .sdd directory not found and no --goal provided.');
                     console.error('Please provide a --goal to bootstrap the project, or run inside an existing SDD project.');
                     process.exit(1);
+                }
+            } else if (!effectiveGoal) {
+                // SDD exists but no --goal: use project.md as goal context
+                const projectMdPath = path.join(sddDir, 'project.md');
+                try {
+                    effectiveGoal = await fs.readFile(projectMdPath, 'utf-8');
+                    log.info('Using project.md as goal context');
+                } catch {
+                    log.warn('No --goal and project.md not found');
                 }
             }
 
@@ -373,7 +383,7 @@ program
             }
 
             // Initialize State
-            const taskScope = estimateTaskScope(options.goal, ticketContent, architectMd);
+            const taskScope = estimateTaskScope(effectiveGoal, ticketContent, architectMd);
 
             // Ticket Requirement Check (Ticket 46)
             // If scope is not tiny, and we are in an SDD project, and no ticket is provided/found...
@@ -383,12 +393,12 @@ program
                 const openTickets = await fs.readdir(ticketsDir).catch(() => []).then(files => files.filter(f => f.endsWith('.md')));
 
                 if (openTickets.length === 0) {
-                    log.info('Medium/Large task requires tickets. Auto-generating...', { taskScope, goal: options.goal });
+                    log.info('Medium/Large task requires tickets. Auto-generating...', { taskScope, goal: effectiveGoal });
                     console_log.warning('Medium/Large task detected with no tickets');
                     console_log.info('Auto-generating tickets via SDD Orchestrator...');
 
                     try {
-                        await runSddOrchestration(cfg, rootDir, options.goal);
+                        await runSddOrchestration(cfg, rootDir, effectiveGoal);
 
                         // Re-scan for tickets
                         const newTickets = await fs.readdir(ticketsDir).catch(() => []).then(files => files.filter(f => f.endsWith('.md')));
@@ -411,9 +421,9 @@ program
             const sddSummaries = await buildSddSummaries(cfg, rootDir);
 
             const initialState: Partial<AgentState> = {
-                messages: options.goal ? [{ role: 'user', content: options.goal }] : [],
+                messages: effectiveGoal ? [{ role: 'user', content: effectiveGoal }] : [],
                 sdd: {
-                    goal: options.goal,
+                    goal: effectiveGoal,
                     project: projectMd,
                     architect: architectMd,
                     bestPractices: bestPracticesMd,

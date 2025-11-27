@@ -7,7 +7,7 @@ import { runEvalScenario, generateEvalReport, type EvalScenario } from './framew
  * Load all scenario definitions from JSON files
  */
 async function loadScenarios(): Promise<EvalScenario[]> {
-    const scenariosDir = path.join(import.meta.dirname || __dirname, 'scenarios');
+    const scenariosDir = path.join(import.meta.dirname || __dirname, 'benchmarks');
     const files = await fs.readdir(scenariosDir);
     const jsonFiles = files.filter(f => f.endsWith('.json'));
 
@@ -40,7 +40,7 @@ async function main() {
         : allScenarios;
 
     if (scenarios.length === 0) {
-        console.error(`❌ No scenarios found${scenarioId ? ` matching: ${scenarioId}` : ''}`);
+        console.error(`❌ No benchmarks found${scenarioId ? ` matching: ${scenarioId}` : ''}`);
         process.exit(1);
     }
 

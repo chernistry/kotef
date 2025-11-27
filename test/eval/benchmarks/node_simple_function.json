@@ -13,5 +13,9 @@
         "maxTestRuns": 4,
         "maxWebRequests": 8,
         "maxSteps": 20
+    },
+    "qualityCheck": {
+        "command": "npx eslint src/utils.js",
+        "maxLintErrors": 0
     }
 }
