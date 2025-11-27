@@ -18,6 +18,17 @@ import { estimateTaskScope } from './agent/task_scope.js';
 import { ensureGitRepo, commitTicketRun, extractTicketTitle } from './tools/git.js';
 import { appendAdr, syncAssumptions } from './agent/utils/adr.js';
 import { computeFlowMetrics } from './agent/utils/flow_metrics.js';
+import { homedir } from 'node:os';
+
+/**
+ * Expand tilde (~) in paths to home directory
+ */
+function expandTilde(filepath: string): string {
+    if (filepath.startsWith('~/') || filepath === '~') {
+        return filepath.replace('~', homedir());
+    }
+    return filepath;
+}
 
 /**
  * Find the next open ticket with the lowest number
@@ -280,7 +291,7 @@ program
     .option('--nogit', 'Disable git integration', false)
     .action(async (options) => {
         const runId = randomUUID();
-        const rootDir = path.resolve(options.root);
+        const rootDir = path.resolve(expandTilde(options.root));
 
         // Load config with overrides
         const envConfig = loadConfig();
@@ -574,7 +585,7 @@ program
     .option('--auto-approve', 'Skip interactive approval', false)
     .option('--nogit', 'Disable git integration', false)
     .action(async (options) => {
-        const rootDir = path.resolve(options.root);
+        const rootDir = path.resolve(expandTilde(options.root));
         const envConfig = loadConfig();
         const cfg: KotefConfig = {
             ...envConfig,

@@ -199,44 +199,71 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
         .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
         .replace('{{TICKET_TEMPLATE}}', ticketTemplate);
 
-    // 2. Call LLM
-    const messages: ChatMessage[] = [
-        { role: 'system', content: 'You are an expert Project Manager.' },
-        { role: 'user', content: prompt }
-    ];
-
-    const response = await callChat(config, messages, {
-        model: config.modelFast,
-        temperature: 0,
-        maxTokens: 2000,
-        response_format: { type: 'json_object' }
-    });
-    let content = response.messages[response.messages.length - 1].content || '{}';
-
+    // 2. Call LLM with retry
+    const maxRetries = 3;
     let tickets: { filename: string; content: string }[] = [];
-    try {
-        let raw = content.trim();
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const messages: ChatMessage[] = [
+                { role: 'system', content: 'You are an expert Project Manager. Always respond with valid JSON.' },
+                { role: 'user', content: prompt }
+            ];
 
-        // Strip markdown fences if provider ignored response_format and wrapped JSON.
-        if (raw.startsWith('```')) {
-            const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
-            if (fenceMatch && fenceMatch[1]) {
-                raw = fenceMatch[1].trim();
+            const response = await callChat(config, messages, {
+                model: config.modelFast,
+                temperature: 0,
+                maxTokens: 2000,
+                response_format: { type: 'json_object' }
+            });
+            let content = response.messages[response.messages.length - 1].content || '{}';
+
+            // Try to parse
+            let raw = content.trim();
+
+            // Strip markdown fences if provider ignored response_format and wrapped JSON.
+            if (raw.startsWith('```')) {
+                const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
+                if (fenceMatch && fenceMatch[1]) {
+                    raw = fenceMatch[1].trim();
+                }
+            }
+
+            // Try direct parse first
+            try {
+                const parsed = JSON.parse(raw);
+                tickets = parsed.tickets || [];
+                if (tickets.length > 0) break; // Success!
+            } catch {
+                // Try jsonrepair
+                try {
+                    const repaired = jsonrepair(raw);
+                    const parsed = JSON.parse(repaired);
+                    tickets = parsed.tickets || [];
+                    if (tickets.length > 0) break; // Success!
+                } catch (repairError) {
+                    console.error(`Attempt ${attempt}/${maxRetries} failed to parse tickets JSON:`, repairError);
+                    if (attempt === maxRetries) {
+                        // Last attempt - try to extract any JSON-like structure
+                        const jsonMatch = raw.match(/\{[\s\S]*"tickets"[\s\S]*\[[\s\S]*\]/);
+                        if (jsonMatch) {
+                            try {
+                                const extracted = jsonMatch[0] + '}';
+                                const parsed = JSON.parse(extracted);
+                                tickets = parsed.tickets || [];
+                            } catch {
+                                // Give up
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(`Attempt ${attempt}/${maxRetries} - LLM call failed:`, e);
+            if (attempt === maxRetries) {
+                console.error('All retry attempts exhausted');
             }
         }
-
-        try {
-            const parsed = JSON.parse(raw);
-            tickets = parsed.tickets || [];
-        } catch {
-            // Last resort: jsonrepair
-            const repaired = jsonrepair(raw);
-            const parsed = JSON.parse(repaired);
-            tickets = parsed.tickets || [];
-        }
-    } catch (e) {
-        console.error('Failed to parse tickets JSON:', e);
-        // We will fall back to a single coarse-grained ticket below.
     }
 
     // Fallback: if no tickets were produced, create a single coarse-grained ticket

@@ -69,17 +69,35 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         }
 
         const tryParseDecision = (raw: string) => {
-            const trimmed = raw.trim();
+            let trimmed = raw.trim();
             if (!trimmed) {
                 throw new Error('Empty planner response');
             }
+            
+            // Strip markdown fences
+            if (trimmed.startsWith('```')) {
+                const fenceMatch = trimmed.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
+                if (fenceMatch && fenceMatch[1]) {
+                    trimmed = fenceMatch[1].trim();
+                }
+            }
+            
             try {
                 return JSON.parse(trimmed);
             } catch (firstErr) {
                 try {
                     const repaired = jsonrepair(trimmed);
                     return JSON.parse(repaired);
-                } catch {
+                } catch (repairErr) {
+                    // Last resort: try to extract JSON object
+                    const jsonMatch = trimmed.match(/\{[\s\S]*"next"[\s\S]*\}/);
+                    if (jsonMatch) {
+                        try {
+                            return JSON.parse(jsonMatch[0]);
+                        } catch {
+                            // Give up
+                        }
+                    }
                     throw firstErr;
                 }
             }

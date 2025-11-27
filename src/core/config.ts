@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
 import path from 'path';
+import os from 'os';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -74,12 +75,23 @@ export const KotefConfigSchema = z.object({
 
 export type KotefConfig = z.infer<typeof KotefConfigSchema>;
 
+function expandPath(p: string): string {
+    if (p.startsWith('~/') || p === '~') {
+        return path.join(os.homedir(), p.slice(1));
+    }
+    return p;
+}
+
 export function loadConfig(env = process.env, argv = process.argv): KotefConfig {
     const args = argv.slice(2);
     const rootDirIndex = args.indexOf('--root');
-    const rootDir = rootDirIndex !== -1 ? args[rootDirIndex + 1] : env.KOTEF_ROOT_DIR || process.cwd();
+    const rootDirRaw = rootDirIndex !== -1 ? args[rootDirIndex + 1] : env.KOTEF_ROOT_DIR || process.cwd();
+    const rootDir = expandPath(rootDirRaw);
 
-    const dryRun = env.KOTEF_DRY_RUN !== 'false'; // Default to true
+    // Check for explicit execute flags to disable dry-run
+    const explicitExecute = args.includes('--execute') || args.includes('--no-dry-run');
+    // Default to true (dry-run) unless explicitly disabled via flag or env var
+    const dryRun = explicitExecute ? false : (env.KOTEF_DRY_RUN !== 'false');
 
     // Parse and validate MAX_CODER_TURNS
     const maxCoderTurnsEnv = parseInt(env.MAX_CODER_TURNS || '0', 10);
