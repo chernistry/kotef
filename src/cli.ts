@@ -408,12 +408,33 @@ program
                             throw new Error('Orchestrator finished but no tickets were found.');
                         }
                         console_log.success(`Generated ${newTickets.length} tickets`);
+
+                        // Auto-select the first generated ticket
+                        const nextTicket = await findNextTicket(rootDir);
+                        if (nextTicket) {
+                            ticketId = nextTicket.id;
+                            ticketPath = nextTicket.path;
+                            ticketContent = await fs.readFile(ticketPath, 'utf-8');
+                            console_log.info(`Auto-selected ticket: ${ticketId}`);
+                            log.info('Auto-selected generated ticket', { ticketId });
+                        }
+
                         console_log.info('Proceeding with execution...');
                     } catch (err) {
                         log.error('Failed to auto-generate tickets', { error: (err as Error).message });
                         console.error(chalk.red('\n❌ Error: Failed to auto-generate tickets.'));
                         console.error(chalk.white(`   Details: ${(err as Error).message}`));
                         process.exit(1);
+                    }
+                } else {
+                    // Tickets exist but none selected - Auto-select the next one
+                    const nextTicket = await findNextTicket(rootDir);
+                    if (nextTicket) {
+                        ticketId = nextTicket.id;
+                        ticketPath = nextTicket.path;
+                        ticketContent = await fs.readFile(ticketPath, 'utf-8');
+                        console_log.info(`Auto-selected ticket: ${ticketId}`);
+                        log.info('Auto-selected existing ticket', { ticketId });
                     }
                 }
             }
@@ -499,9 +520,32 @@ program
 
                     if (!shouldContinue) {
                         const rl = readline.createInterface({ input, output });
-                        const answer = await rl.question(chalk.yellow('Continue to next ticket? (y/N): '));
-                        rl.close();
-                        shouldContinue = answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
+
+                        console.log(chalk.yellow('Continue to next ticket? (Y/n) ') + chalk.gray('[Auto-yes in 5s]'));
+
+                        const timeoutMs = 5000;
+                        let timer: NodeJS.Timeout;
+
+                        const timeoutPromise = new Promise<string>((resolve) => {
+                            timer = setTimeout(() => {
+                                console.log(chalk.gray('\nAuto-continuing...'));
+                                rl.close();
+                                resolve('y');
+                            }, timeoutMs);
+                        });
+
+                        const answerPromise = rl.question(chalk.yellow('> '));
+
+                        try {
+                            const answer = await Promise.race([answerPromise, timeoutPromise]);
+                            clearTimeout(timer!);
+                            shouldContinue = answer.toLowerCase() !== 'n' && answer.toLowerCase() !== 'no';
+                        } catch (e) {
+                            // If rl is closed by timeout, answerPromise might reject/close
+                            shouldContinue = true;
+                        } finally {
+                            rl.close();
+                        }
                     }
 
                     if (shouldContinue) {
