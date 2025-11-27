@@ -20,6 +20,23 @@ export interface ClarifiedGoal {
     constraints: string[];
 }
 
+export interface WorkStep {
+    id: string;
+    owner: 'planner' | 'coder' | 'researcher' | 'verifier';
+    action: string;
+    detail: string;
+    targets?: string[];
+    evidence?: string[];
+    risk?: 'low' | 'medium' | 'high';
+    budget_estimate?: 'low' | 'medium' | 'high' | number;
+}
+
+export interface BudgetAllocation {
+    total_tokens?: number;
+    total_steps?: number;
+    per_step?: Record<string, number>;
+}
+
 export interface SddContext {
     /** Optional natural-language goal that triggered this run. */
     goal?: string;
@@ -148,6 +165,8 @@ export interface AgentState {
         clarifiedIntent: string;
     };
     clarified_goal?: ClarifiedGoal;
+    work_plan?: WorkStep[];
+    budget_allocation?: BudgetAllocation;
 
     // Phase Tracking (Ticket 56)
     currentPhase?: AgentPhase;

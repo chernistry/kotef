@@ -116,8 +116,33 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
           "detail": { "type": "string" },
           "targets": { "type": "array", "items": { "type": "string" } },
           "evidence": { "type": "array", "items": { "type": "string" } },
-          "risk": { "type": "string", "enum": ["low", "medium", "high"] }
+          "targets": { "type": "array", "items": { "type": "string" } },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+          "budget_estimate": { "type": "string", "enum": ["low", "medium", "high"], "description": "Estimated complexity/cost" }
         }
+      }
+    },
+    "work_plan": {
+      "type": "array",
+      "description": "Granular work plan with budget estimates.",
+      "items": {
+        "type": "object",
+        "required": ["id", "owner", "action", "detail"],
+        "properties": {
+          "id": { "type": "string" },
+          "owner": { "type": "string", "enum": ["planner", "coder", "researcher", "verifier"] },
+          "action": { "type": "string" },
+          "detail": { "type": "string" },
+          "budget_estimate": { "type": "string", "enum": ["low", "medium", "high"] }
+        }
+      }
+    },
+    "budget_allocation": {
+      "type": "object",
+      "properties": {
+        "total_steps": { "type": "number" },
+        "per_step": { "type": "object", "additionalProperties": { "type": "number" } }
       }
     },
     "needs": {

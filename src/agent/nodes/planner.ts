@@ -664,7 +664,9 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             designDecisions: decision.designDecisions,
             assumptions: decision.assumptions,
             ...phaseUpdates,
-            clarified_goal: decision.clarified_goal
+            clarified_goal: decision.clarified_goal,
+            work_plan: decision.work_plan,
+            budget_allocation: decision.budget_allocation
         };
     };
 }
