@@ -23,7 +23,10 @@ export type RuntimePromptName =
     | 'orchestrator_tickets'
     | 'sdd_summary_project'
     | 'sdd_summary_architect'
-    | 'sdd_summary_best_practices';
+    | 'sdd_summary_best_practices'
+    | 'planner_loop_warning'
+    | 'planner_error_empty'
+    | 'planner_error_invalid_json';
 
 const RUNTIME_PROMPTS = new Set<RuntimePromptName>([
     'meta_agent',
@@ -40,7 +43,10 @@ const RUNTIME_PROMPTS = new Set<RuntimePromptName>([
     'orchestrator_tickets',
     'sdd_summary_project',
     'sdd_summary_architect',
-    'sdd_summary_best_practices'
+    'sdd_summary_best_practices',
+    'planner_loop_warning',
+    'planner_error_empty',
+    'planner_error_invalid_json'
 ]);
 
 async function readPromptFile(promptName: string): Promise<string> {

@@ -213,6 +213,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         const fileChangeCount = Object.keys(state.fileChanges || {}).length;
         if (fileChangeCount !== (currentLoopCounters.lastFileChangeCount ?? 0)) {
             loopCounters.planner_to_coder = 0;
+            loopCounters.planner_to_verifier = 0;
             loopCounters.lastFileChangeCount = fileChangeCount;
         }
 
@@ -435,15 +436,11 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         ];
 
         // Ticket 65: Loop Intervention
-        if (loopCounters.planner_to_verifier > 2) {
+        if (loopCounters.planner_to_verifier >= 2) {
+            const warning = await loadRuntimePrompt('planner_loop_warning');
             baseMessages.push({
                 role: 'system',
-                content: `WARNING: You have sent the agent to verification ${loopCounters.planner_to_verifier} times consecutively. 
-If tests are not running, the Verifier might be stuck in a build loop. 
-Consider:
-1. Explicitly checking if tests are configured correctly.
-2. If build passes but no tests run, assume build success is partial progress and move to next step or ask human.
-3. Do NOT send to verifier again unless you are sure it will run new commands.`
+                content: warning
             });
         }
 
@@ -490,7 +487,7 @@ Consider:
                     ...workingMessages,
                     {
                         role: 'user',
-                        content: 'Previous reply was empty.## Verification\n- If `syntax_check` fails, this is a CRITICAL issue. Fix syntax errors (e.g. duplicate imports, unclosed brackets) immediately.\n- If tests fail, analyze the output.\n- If tests pass, verify against the goal.'
+                        content: await loadRuntimePrompt('planner_error_empty')
                     }
                 ];
                 continue;
@@ -525,7 +522,7 @@ Consider:
                     assistantMsg,
                     {
                         role: 'user',
-                        content: 'Your previous response was invalid JSON. Reply again with ONLY the JSON object that matches the schema.'
+                        content: await loadRuntimePrompt('planner_error_invalid_json')
                     }
                 ];
             }

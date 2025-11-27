@@ -72,6 +72,7 @@ Note: SDD inputs are summaries. If you need full context, use `read_file` on `.s
    - Respect budget signals from state (commands, tests, web requests). Avoid plans that would obviously exceed them.
    - Use `LOOP_COUNTERS`, `FAILURE_HISTORY`, and `FUNCTIONAL_OK` to avoid planner↔researcher / planner↔verifier / planner↔coder loops with no progress.
    - If you detect that repeating a hop would not add value (same errors, same research, no new file changes), prefer `next="snitch"` with `terminalStatus="aborted_stuck"` over looping.
+   - **Anti-Looping Rule**: If `planner_to_verifier > 0` and `FILE_CHANGES` has not changed since the last verification, you are in a useless loop. Do NOT verify again. Fix the code (`coder`) or stop (`snitch`).
 
 # Execution profiles & Scope
 - **`strict`**: production-like, heavy checks. Use for core architecture or safety-critical code.
