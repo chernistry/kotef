@@ -9,6 +9,7 @@ import { deriveFunctionalStatus } from '../utils/functional_checks.js';
 import { makeSnapshot, assessProgress } from '../utils/progress_controller.js';
 import { transitionPhase } from '../utils/phase_tracker.js';
 import { getHotspots } from '../../tools/git.js';
+import { analyzeImpact } from '../utils/impact.js';
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -100,6 +101,18 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                 } catch (err) {
                     log.warn('Failed to load git hotspots', { error: (err as Error).message });
                 }
+            }
+        }
+
+        // Impact Analysis (Ticket 60)
+        if (!state.impactMap && state.sdd.goal) {
+            try {
+                const analysis = await analyzeImpact(state.sdd.goal, cfg.rootDir || process.cwd(), state.gitHotspots);
+                state.impactMap = analysis.impactMap;
+                state.riskMap = analysis.riskMap;
+                log.info('Impact analysis completed', { risk: state.riskMap.level, files: state.impactMap.files.length });
+            } catch (err) {
+                log.warn('Failed to analyze impact', { error: (err as Error).message });
             }
         }
 
@@ -359,7 +372,9 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{RISK_REGISTER_SUMMARY}}': riskSummary,
             '{{FLOW_METRICS_SUMMARY}}': await loadFlowMetricsSummary(cfg.rootDir),
             '{{GIT_HOTSPOTS}}': formatHotspots(state.gitHotspots),
-            '{{CONTEXT_SCAN}}': state.contextScan ? JSON.stringify(state.contextScan, null, 2) : 'Not available'
+            '{{CONTEXT_SCAN}}': state.contextScan ? JSON.stringify(state.contextScan, null, 2) : 'Not available',
+            '{{IMPACT_MAP}}': state.impactMap ? JSON.stringify(state.impactMap, null, 2) : 'Not available',
+            '{{RISK_MAP}}': state.riskMap ? JSON.stringify(state.riskMap, null, 2) : 'Not available'
         };
 
         let systemPrompt = plannerPromptTemplate;

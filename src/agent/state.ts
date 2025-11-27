@@ -117,6 +117,17 @@ export interface AgentState {
     /** Flag indicating if code index has been built for this run. */
     codeIndexBuilt?: boolean;
 
+    // Impact & Risk Analysis (Ticket 60)
+    impactMap?: {
+        files: string[];
+        modules: string[];
+    };
+    riskMap?: {
+        level: 'low' | 'medium' | 'high';
+        factors: string[];
+        hotspots: string[];
+    };
+
     // Context Shaping (Ticket 59)
     contextScan?: {
         cwd: string;

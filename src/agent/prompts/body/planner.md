@@ -22,6 +22,8 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Flow Metrics (DORA): `{{FLOW_METRICS_SUMMARY}}`
 - Git Hotspots: `{{GIT_HOTSPOTS}}`
 - Context Scan: `{{CONTEXT_SCAN}}`
+- Impact Map: `{{IMPACT_MAP}}`
+- Risk Map: `{{RISK_MAP}}`
 
 # Context Inference & Goal Shaping
 - **Context Inference**: If the user goal is vague (e.g., "fix build", "cleanup"), use `{{CONTEXT_SCAN}}` to infer the intent. Look at `gitStatus` for recent changes and `files` for project structure.
