@@ -11,7 +11,7 @@ Based on the Architecture Plan below, break down the implementation into sequent
 ### Instructions for PLAN_ONLY
 1. **Analyze Components**: Identify the key components and their dependencies.
 2. **Determine Sequence**: Order tasks logically (e.g., core infrastructure -> backend -> frontend).
-3. **Create Plan**: Generate a list of tickets covering the entire MVP.
+3. **Create Plan**: Generate a list of tickets covering the entire MVP.{{MAX_TICKETS_CONSTRAINT}}
 
 **Output Format (PLAN_ONLY)**:
 Respond with a **single JSON object**:

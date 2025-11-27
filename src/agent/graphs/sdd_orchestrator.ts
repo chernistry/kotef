@@ -349,6 +349,12 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
     const ticketTemplate = loadBrainTemplate('ticket');
     const promptTemplate = await loadRuntimePrompt('orchestrator_tickets');
 
+    // Determine maxTickets constraint
+    const maxTickets = config.maxTickets;
+    const maxTicketsText = maxTickets
+        ? `\n4. **Limit**: Generate EXACTLY ${maxTickets} ticket${maxTickets > 1 ? 's' : ''}. Do not generate more than ${maxTickets}.`
+        : '';
+
     // --- PHASE 1: PLANNING ---
     console.log('Phase 1: Planning tickets...');
     const planPrompt = promptTemplate
@@ -356,7 +362,8 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
         .replace('{{MODE}}', 'PLAN_ONLY')
         .replace('{{TICKET_TEMPLATE}}', '') // Not needed for planning
         .replace('{{TICKET_TITLE}}', '')
-        .replace('{{TICKET_SUMMARY}}', '');
+        .replace('{{TICKET_SUMMARY}}', '')
+        .replace('{{MAX_TICKETS_CONSTRAINT}}', maxTicketsText);
 
     let plannedTickets: { filename: string; title: string; summary: string }[] = [];
     const maxRetries = 3;
@@ -410,6 +417,12 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
             title: 'Main Goal',
             summary: 'Fallback ticket capturing the main goal.'
         }];
+    }
+
+    // Enforce maxTickets limit if set
+    if (maxTickets && plannedTickets.length > maxTickets) {
+        console.log(`Truncating ${plannedTickets.length} planned tickets to ${maxTickets} (maxTickets limit)`);
+        plannedTickets = plannedTickets.slice(0, maxTickets);
     }
 
     console.log(`Phase 1 complete. Planned ${plannedTickets.length} tickets.`);

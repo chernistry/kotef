@@ -327,6 +327,7 @@ program
     .option('--auto-approve', 'Skip interactive approval', false)
     .option('--continue', 'Auto-continue to next ticket after completion', false)
     .option('--nogit', 'Disable git integration', false)
+    .option('--max-tickets <count>', 'Maximum number of tickets to generate (default: no limit)')
     .action(async (options) => {
         const runId = randomUUID();
         const rootDir = path.resolve(expandTilde(options.root));
@@ -340,7 +341,8 @@ program
             offlineMode: options.offline || envConfig.offlineMode,
             maxRunSeconds: options.maxTime ? parseInt(options.maxTime) : envConfig.maxRunSeconds,
             maxTokensPerRun: options.maxTokens ? parseInt(options.maxTokens) : envConfig.maxTokensPerRun,
-            maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns
+            maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns,
+            maxTickets: options.maxTickets ? parseInt(options.maxTickets) : envConfig.maxTickets
         };
 
         const log = createLogger(runId);
@@ -691,6 +693,7 @@ program
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .option('--auto-approve', 'Skip interactive approval', false)
     .option('--nogit', 'Disable git integration', false)
+    .option('--max-tickets <count>', 'Maximum number of tickets to generate (default: no limit)')
     .action(async (options) => {
         const rootDir = path.resolve(expandTilde(options.root));
         const envConfig = loadConfig();

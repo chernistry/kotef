@@ -93,6 +93,9 @@ export const KotefConfigSchema = z.object({
     /** Ticket 65: SDD Summary Config */
     sddSummaryInputChars: z.number().optional(),
     sddSummaryMaxTokens: z.number().optional(),
+
+    /** Max number of tickets to generate during SDD orchestration (default: undefined = no limit) */
+    maxTickets: z.number().int().min(1).optional(),
 });
 
 export type KotefConfig = z.infer<typeof KotefConfigSchema>;
@@ -173,6 +176,9 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
         // Ticket 65: SDD Summary Config
         sddSummaryInputChars: parseInt(env.KOTEF_SDD_SUMMARY_INPUT_CHARS || '0', 10) || undefined,
         sddSummaryMaxTokens: parseInt(env.KOTEF_SDD_SUMMARY_MAX_TOKENS || '0', 10) || undefined,
+
+        // Max tickets for SDD orchestration
+        maxTickets: parseInt(env.KOTEF_MAX_TICKETS || '0', 10) || undefined,
     };
 
     const parsed = KotefConfigSchema.parse(config);
