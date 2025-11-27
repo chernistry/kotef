@@ -10,6 +10,7 @@ import { makeSnapshot, assessProgress } from '../utils/progress_controller.js';
 import { transitionPhase } from '../utils/phase_tracker.js';
 import { getHotspots } from '../../tools/git.js';
 import { analyzeImpact } from '../utils/impact.js';
+import { appendAdr, syncAssumptions } from '../utils/adr.js';
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -601,6 +602,24 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                     totalSteps: currentSteps,
                     progressHistory
                 };
+            }
+        }
+
+        // Persist ADRs and Assumptions (Ticket 61)
+        if (decision.designDecisions && decision.designDecisions.length > 0) {
+            for (const d of decision.designDecisions) {
+                try {
+                    await appendAdr(path.join(cfg.rootDir, '.sdd'), d, log);
+                } catch (e) {
+                    log.error('Failed to append ADR', { error: (e as Error).message });
+                }
+            }
+        }
+        if (decision.assumptions && decision.assumptions.length > 0) {
+            try {
+                await syncAssumptions(path.join(cfg.rootDir, '.sdd'), decision.assumptions, log);
+            } catch (e) {
+                log.error('Failed to sync assumptions', { error: (e as Error).message });
             }
         }
 

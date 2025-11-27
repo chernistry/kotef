@@ -77,8 +77,9 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
 ```json
 {
   "type": "object",
-  "required": ["next", "reason"],
+  "required": ["next", "reason", "solution_sketch"],
   "properties": {
+    "solution_sketch": { "type": "string", "description": "High-level description of the approach before breaking it down." },
     "next": {
       "type": "string",
       "enum": ["researcher", "coder", "verifier", "done", "snitch", "ask_human"]
@@ -165,7 +166,7 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
 ```
 
 # Architectural Decisions & Assumptions
-- **ADRs**: If you make a significant structural decision (e.g. choosing a library, defining a new module pattern), record it in `designDecisions`.
+- **ADRs**: If `IMPACT_MAP` implies structural change (new modules, DB schema, new deps), you **MUST** write an ADR in `designDecisions`.
 - **Assumptions**: If you rely on uncertain information (e.g. "assuming API returns JSON" without proof), record it in `assumptions` with `status="tentative"`. If you validate an assumption, update it with `status="confirmed"` or `"rejected"`.
 
 - **Use Diagnostics**: If `{{DIAGNOSTICS}}` shows compile errors (Source: 'build' or 'lsp') or test failures, your plan MUST address them.

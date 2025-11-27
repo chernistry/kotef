@@ -8,6 +8,7 @@ import { kiroCoderNode } from './nodes/kiro_coder.js';
 import { verifierNode } from './nodes/verifier.js';
 import { snitchNode } from './nodes/snitch.js';
 import { ticketCloserNode } from './nodes/ticket_closer.js';
+import { retrospectiveNode } from './nodes/retrospective.js';
 
 import { callChat } from '../core/llm.js';
 
@@ -125,6 +126,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
     graph.addNode("verifier" as any, verifierNode(cfg));
     graph.addNode("snitch" as any, snitchNode(cfg));
     graph.addNode("ticket_closer" as any, ticketCloserNode(cfg));
+    graph.addNode("retrospective" as any, retrospectiveNode(cfg, chatFn));
 
     // Add edges
     graph.addEdge(START, "planner" as any);
@@ -179,7 +181,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             verifier: "verifier" as any,
             snitch: "snitch" as any,
             ticket_closer: "ticket_closer" as any,
-            end: END
+            retrospective: "retrospective" as any
         }
     );
 
@@ -200,17 +202,20 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             return ticketPath ? 'ticket_closer' : 'end';
         },
         {
-            end: END,
+            retrospective: "retrospective" as any,
             planner: "planner" as any,
             ticket_closer: "ticket_closer" as any
         }
     );
 
-    // Ticket closer (if any) then terminates the run
-    graph.addEdge("ticket_closer" as any, END);
+    // Ticket closer -> Retrospective
+    graph.addEdge("ticket_closer" as any, "retrospective" as any);
 
-    // Snitch terminates the run after logging an issue
-    graph.addEdge("snitch" as any, END);
+    // Snitch -> Retrospective
+    graph.addEdge("snitch" as any, "retrospective" as any);
+
+    // Retrospective -> END
+    graph.addEdge("retrospective" as any, END);
 
     return graph.compile();
 }
