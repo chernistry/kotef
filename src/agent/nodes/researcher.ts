@@ -3,6 +3,8 @@ import { KotefConfig } from '../../core/config.js';
 import { deepResearch } from '../../tools/deep_research.js';
 import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
+import { analyzeImpact } from '../utils/impact.js';
+import { scanContext } from './planner.js';
 
 function getTaskTypeHint(text: string): 'reference' | 'debug' | 'architecture' | 'research' {
     const lower = text.toLowerCase();
@@ -44,8 +46,25 @@ export function researcherNode(cfg: KotefConfig) {
             '{{SDD_BEST_PRACTICES}}': safe(state.sdd.bestPractices),
             '{{RESEARCH_NEEDS}}': safe(state.plan?.needs?.research_queries),
             '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
-            '{{TASK_SCOPE}}': state.taskScope || 'normal'
+            '{{TASK_SCOPE}}': state.taskScope || 'normal',
+            '{{FILE_LIST}}': safe(state.contextScan?.files || []),
+            '{{IMPACT_HINT}}': '' // Will be populated below
         };
+
+        // Run heuristic impact analysis
+        try {
+            // Ensure context scan is available
+            if (!state.contextScan) {
+                state.contextScan = await scanContext(cfg.rootDir || process.cwd());
+                replacements['{{FILE_LIST}}'] = safe(state.contextScan.files);
+            }
+
+            const goalToAnalyze = state.clarified_goal?.functional_outcomes?.join('\n') || state.sdd.goal || '';
+            const analysis = await analyzeImpact(goalToAnalyze, cfg.rootDir || process.cwd(), state.gitHotspots);
+            replacements['{{IMPACT_HINT}}'] = safe(analysis);
+        } catch (e) {
+            log.warn('Impact analysis hint failed', { error: e });
+        }
 
         let systemPrompt = promptTemplate;
         for (const [token, value] of Object.entries(replacements)) {
@@ -153,7 +172,9 @@ export function researcherNode(cfg: KotefConfig) {
                 });
                 return {
                     researchResults: result.findings,
-                    researchQuality: result.quality || undefined
+                    researchQuality: result.quality || undefined,
+                    impactMap: plan.impact_map,
+                    riskMap: plan.risk_map
                 };
             } else {
                 // Shallow search for all queries
@@ -168,7 +189,9 @@ export function researcherNode(cfg: KotefConfig) {
                     })));
                 }
                 return {
-                    researchResults: allFindings
+                    researchResults: allFindings,
+                    impactMap: plan.impact_map,
+                    riskMap: plan.risk_map
                 };
             }
         } catch (error) {

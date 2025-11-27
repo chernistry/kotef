@@ -105,16 +105,11 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             }
         }
 
-        // Impact Analysis (Ticket 60)
+        // Impact Analysis (Ticket 60) - Moved to Researcher (Ticket 02)
+        // Planner will rely on state.impactMap populated by researcher.
         if (!state.impactMap && state.sdd.goal) {
-            try {
-                const analysis = await analyzeImpact(state.sdd.goal, cfg.rootDir || process.cwd(), state.gitHotspots);
-                state.impactMap = analysis.impactMap;
-                state.riskMap = analysis.riskMap;
-                log.info('Impact analysis completed', { risk: state.riskMap.level, files: state.impactMap.files.length });
-            } catch (err) {
-                log.warn('Failed to analyze impact', { error: (err as Error).message });
-            }
+            // Optional: we could trigger a researcher call here if missing,
+            // but the planner logic below handles "missing info" -> "researcher" transition naturally.
         }
 
         // Context Scan (Ticket 59)
