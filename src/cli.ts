@@ -4,13 +4,14 @@ import { Command } from 'commander';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import readline from 'node:readline/promises';
+import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import chalk from 'chalk';
 import MarkdownIt from 'markdown-it';
 
 import { loadConfig, KotefConfig } from './core/config.js';
 import { createLogger } from './core/logger.js';
+import { console_log } from './core/console.js';
 import { buildKotefGraph } from './agent/graph.js';
 import { bootstrapSddForProject } from './agent/bootstrap.js';
 import { buildSddSummaries } from './agent/sdd_summary.js';
@@ -383,8 +384,8 @@ program
 
                 if (openTickets.length === 0) {
                     log.info('Medium/Large task requires tickets. Auto-generating...', { taskScope, goal: options.goal });
-                    console.log(chalk.yellow('\n⚠️  Medium/Large task detected with no tickets.'));
-                    console.log(chalk.blue('   Auto-generating tickets via SDD Orchestrator...'));
+                    console_log.warning('Medium/Large task detected with no tickets');
+                    console_log.info('Auto-generating tickets via SDD Orchestrator...');
 
                     try {
                         await runSddOrchestration(cfg, rootDir, options.goal);
@@ -394,8 +395,8 @@ program
                         if (newTickets.length === 0) {
                             throw new Error('Orchestrator finished but no tickets were found.');
                         }
-                        console.log(chalk.green(`\n✅ Successfully generated ${newTickets.length} tickets.`));
-                        console.log(chalk.white('   Proceeding with execution...\n'));
+                        console_log.success(`Generated ${newTickets.length} tickets`);
+                        console_log.info('Proceeding with execution...');
                     } catch (err) {
                         log.error('Failed to auto-generate tickets', { error: (err as Error).message });
                         console.error(chalk.red('\n❌ Error: Failed to auto-generate tickets.'));

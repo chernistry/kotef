@@ -1,3 +1,5 @@
+import { formatLogForConsole } from './log_formatter.js';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface LogFields {
@@ -14,6 +16,12 @@ export type Logger = {
     debug: (message: string, fields?: LogFields) => void;
 };
 
+let prettyConsoleEnabled = process.env.KOTEF_PRETTY_LOGS !== 'false';
+
+export function setPrettyConsole(enabled: boolean) {
+    prettyConsoleEnabled = enabled;
+}
+
 export function createLogger(runId: string): Logger {
     const log = (level: LogLevel, message: string, fields: LogFields = {}) => {
         const entry = {
@@ -23,6 +31,17 @@ export function createLogger(runId: string): Logger {
             runId,
             ...fields,
         };
+        
+        // Pretty console output for user
+        if (prettyConsoleEnabled) {
+            try {
+                formatLogForConsole(entry);
+            } catch {
+                // Fallback to JSON if formatter fails
+            }
+        }
+        
+        // Always write JSON to stdout for log files
         console.log(JSON.stringify(entry));
     };
 
