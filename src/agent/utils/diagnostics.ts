@@ -1,7 +1,7 @@
 import { AgentState } from '../state.js';
 
 export interface DiagnosticsEntry {
-    source: 'test' | 'build' | 'lint' | 'lsp' | 'runtime';
+    source: 'test' | 'build' | 'lint' | 'lsp' | 'runtime' | 'runtime_log';
     file?: string;
     location?: { line: number; column?: number };
     message: string;

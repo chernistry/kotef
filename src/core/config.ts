@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -18,7 +19,7 @@ export const KotefConfigSchema = z.object({
     modelStrong: z.string().default("gpt-4.1.1"),
 
     searchApiKey: z.string().optional(),
-    dryRun: z.boolean().default(true),
+    dryRun: z.boolean().default(false),
 
     /** Soft budget for a single run; used for guardrails, not hard guarantees. */
     maxTokensPerRun: z.number().default(10000),
@@ -88,10 +89,10 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
     const rootDirRaw = rootDirIndex !== -1 ? args[rootDirIndex + 1] : env.KOTEF_ROOT_DIR || process.cwd();
     const rootDir = expandPath(rootDirRaw);
 
-    // Check for explicit execute flags to disable dry-run
-    const explicitExecute = args.includes('--execute') || args.includes('--no-dry-run');
-    // Default to true (dry-run) unless explicitly disabled via flag or env var
-    const dryRun = explicitExecute ? false : (env.KOTEF_DRY_RUN !== 'false');
+    // Ticket 57: Default dryRun to false (git enabled by default).
+    // Allow opting OUT via --dry-run flag or env var.
+    const explicitDryRun = args.includes('--dry-run');
+    const dryRun = explicitDryRun || (env.KOTEF_DRY_RUN === 'true');
 
     // Parse and validate MAX_CODER_TURNS
     const maxCoderTurnsEnv = parseInt(env.MAX_CODER_TURNS || '0', 10);

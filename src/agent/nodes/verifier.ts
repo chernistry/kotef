@@ -11,6 +11,7 @@ export function verifierNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('verifier');
         log.info('Verifier node started');
+        const verificationStart = Date.now();
 
         // 1. Detect commands if not already in state
         let detected = state.detectedCommands;
@@ -205,6 +206,47 @@ export function verifierNode(cfg: KotefConfig) {
                 }
             } catch (e: any) {
                 log.warn('Failed to run LSP diagnostics', { error: e.message || String(e) });
+            }
+        }
+
+        // Ticket 56: Runtime Log Verification for Services
+        // If we ran a service command, check logs for runtime errors
+        const ranServiceCommand = commandsToRun.some(cmd => detected.serviceCommands?.includes(cmd));
+        if (ranServiceCommand) {
+            try {
+                const { scanLogsForErrors } = await import('../utils/logs.js');
+                // Default to checking logs/run.log (kotef's own capture) and maybe project logs
+                // For now, we assume kotef captures stdout/stderr to logs/run.log or similar if configured,
+                // BUT actually kotef CLI captures to a file.
+                // Also check for common project log files.
+                const logPaths = ['logs/run.log', 'run.log', 'app.log', 'debug.log', 'error.log'];
+
+                log.info('Scanning runtime logs for service errors...', { logPaths });
+                const logErrors = await scanLogsForErrors(cfg.rootDir, {
+                    logPaths,
+                    sinceMs: verificationStart
+                });
+
+                if (logErrors.length > 0) {
+                    log.warn(`Found ${logErrors.length} runtime errors in logs`, { errors: logErrors.slice(0, 3) });
+
+                    const logDiagnostics: import('../utils/diagnostics.js').DiagnosticsEntry[] = logErrors.map(e => ({
+                        source: 'runtime_log',
+                        file: e.file,
+                        message: e.message,
+                        severity: 'error',
+                        firstSeenAt: e.timestamp || Date.now(),
+                        lastSeenAt: e.timestamp || Date.now(),
+                        occurrenceCount: 1
+                    }));
+
+                    currentDiagnostics = mergeDiagnostics(currentDiagnostics, logDiagnostics);
+
+                    // Fail verification if runtime errors are found
+                    allPassed = false;
+                }
+            } catch (e) {
+                log.warn('Failed to scan runtime logs', { error: e });
             }
         }
 

@@ -13,6 +13,7 @@ export interface DetectedCommands {
     lintCommand?: string;   // e.g. "npm run lint", "pylint"
     diagnosticCommand?: string; // best single command for "error-first" diagnostics
     syntaxCheckCommand?: string; // NEW: Lightweight syntax check
+    serviceCommands?: string[]; // NEW: Commands that likely start a long-lived service
 }
 
 /**
@@ -23,6 +24,7 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
     const rootDir = cfg.rootDir || process.cwd();
 
     let syntaxCheckCommand: string | undefined;
+    const serviceCommands: string[] = [];
 
     // 1. Check for Node.js / Vite
     try {
@@ -51,6 +53,12 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
             syntaxCheckCommand = resolveExecCommand(pm, 'tsc --noEmit');
         }
 
+        // Detect service commands
+        if (scripts.dev) serviceCommands.push(resolveScriptCommand(pm, 'dev'));
+        if (scripts.start) serviceCommands.push(resolveScriptCommand(pm, 'start'));
+        if (scripts.serve) serviceCommands.push(resolveScriptCommand(pm, 'serve'));
+        if (scripts.watch) serviceCommands.push(resolveScriptCommand(pm, 'watch'));
+
         // Error-first diagnostic preference:
         // 1) build (compilation errors)
         // 2) primary test
@@ -68,7 +76,8 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
             buildCommand,
             lintCommand,
             diagnosticCommand,
-            syntaxCheckCommand
+            syntaxCheckCommand,
+            serviceCommands
         };
     } catch (e) {
         // Not a Node project or invalid package.json
@@ -81,7 +90,7 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
 
     if (hasPyProject || hasRequirements || pyFiles.length > 0) {
         // Try to find main app file for smoke test
-        let mainApp = pyFiles.find(f => f === 'app.py' || f === 'main.py' || f === 'manage.py');
+        let mainApp = pyFiles.find(f => f === 'app.py' || f === 'main.py' || f === 'manage.py' || f === 'bot.py');
 
         const primaryTest = 'pytest'; // default assumption
         const smokeTest = mainApp ? `python ${mainApp}` : undefined;
@@ -89,6 +98,24 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
 
         // Simple heuristic: compile all files in current directory
         syntaxCheckCommand = 'python3 -m compileall . -q';
+
+        // Detect service commands
+        if (mainApp) {
+            serviceCommands.push(`python ${mainApp}`);
+            serviceCommands.push(`python3 ${mainApp}`);
+        }
+        // Check for common frameworks
+        const reqContent = hasRequirements ? await fs.readFile(path.join(rootDir, 'requirements.txt'), 'utf-8').catch(() => '') : '';
+        if (reqContent.includes('uvicorn') || reqContent.includes('fastapi')) {
+            serviceCommands.push('uvicorn app:app --reload');
+            serviceCommands.push('uvicorn main:app --reload');
+        }
+        if (reqContent.includes('flask')) {
+            serviceCommands.push('flask run');
+        }
+        if (reqContent.includes('django')) {
+            serviceCommands.push('python manage.py runserver');
+        }
 
         // Diagnostics: prefer tests, then a generic compile step if tests are missing.
         const diagnosticCommand = primaryTest || 'python -m compileall .';
@@ -99,14 +126,15 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
             smokeTest,
             lintCommand,
             diagnosticCommand,
-            syntaxCheckCommand
+            syntaxCheckCommand,
+            serviceCommands
         };
     }
 
     // 3. Check for Swift
     const hasPackageSwift = await fileExists(rootDir, 'Package.swift');
     const swiftFiles = await listFiles({ rootDir }, '**/*.swift');
-    
+
     if (hasPackageSwift || swiftFiles.length > 0) {
         const primaryTest = 'swift test';
         const buildCommand = 'swift build';
@@ -130,12 +158,18 @@ export async function detectCommands(cfg: KotefConfig): Promise<DetectedCommands
         const buildCommand = 'go build';
         const diagnosticCommand = primaryTest || buildCommand;
 
+        if (await fileExists(rootDir, 'main.go')) {
+            serviceCommands.push('go run main.go');
+            serviceCommands.push('go run .');
+        }
+
         return {
             stack: 'go',
             primaryTest,
             smokeTest,
             buildCommand,
-            diagnosticCommand
+            diagnosticCommand,
+            serviceCommands
         };
     }
 
