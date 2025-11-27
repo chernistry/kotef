@@ -7,6 +7,7 @@ import { coderNode } from './nodes/coder.js';
 import { kiroCoderNode } from './nodes/kiro_coder.js';
 import { verifierNode } from './nodes/verifier.js';
 import { snitchNode } from './nodes/snitch.js';
+import { janitorNode } from './nodes/janitor.js';
 import { ticketCloserNode } from './nodes/ticket_closer.js';
 import { retrospectiveNode } from './nodes/retrospective.js';
 
@@ -124,6 +125,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
 
     graph.addNode("coder" as any, coderImpl);
     graph.addNode("verifier" as any, verifierNode(cfg));
+    graph.addNode("janitor" as any, janitorNode(cfg));
     graph.addNode("snitch" as any, snitchNode(cfg));
     graph.addNode("ticket_closer" as any, ticketCloserNode(cfg));
     graph.addNode("retrospective" as any, retrospectiveNode(cfg, chatFn));
@@ -164,6 +166,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
 
             if (next === 'coder') return 'coder';
             if (next === 'verifier') return 'verifier';
+            if (next === 'janitor') return 'janitor';
             if (next === 'done') {
                 const ticketPath = (state.sdd as any)?.ticketPath;
                 return ticketPath ? 'ticket_closer' : 'end';
@@ -179,6 +182,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             researcher: "researcher" as any,
             coder: "coder" as any,
             verifier: "verifier" as any,
+            janitor: "janitor" as any,
             snitch: "snitch" as any,
             ticket_closer: "ticket_closer" as any,
             retrospective: "retrospective" as any,
@@ -199,12 +203,33 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             if (!state.done) {
                 return 'planner';
             }
-            const ticketPath = (state.sdd as any)?.ticketPath;
-            return ticketPath ? 'ticket_closer' : 'end';
+            // If done, go back to planner so it can decide to go to janitor
+            // OR we can go directly to janitor if we want to force it.
+            // The spec says "Update planner.md to transition to this state".
+            // So Verifier -> Planner -> Janitor.
+            return 'planner';
         },
         {
             retrospective: "retrospective" as any,
             planner: "planner" as any,
+            ticket_closer: "ticket_closer" as any,
+            end: END
+        }
+    );
+
+    // Janitor -> TicketCloser or End
+    graph.addConditionalEdges(
+        "janitor" as any,
+        (state) => {
+            const next = (state.plan as any)?.next;
+            if (next === 'ticket_closer') return 'ticket_closer';
+            if (next === 'done') {
+                const ticketPath = (state.sdd as any)?.ticketPath;
+                return ticketPath ? 'ticket_closer' : 'end';
+            }
+            return 'end';
+        },
+        {
             ticket_closer: "ticket_closer" as any,
             end: END
         }

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { researcherNode } from '../../src/agent/nodes/researcher';
-import { AgentState } from '../../src/agent/state';
-import { KotefConfig } from '../../src/core/config';
-import * as impactUtils from '../../src/agent/utils/impact';
+import { researcherNode } from '../../src/agent/nodes/researcher.js';
+import { AgentState } from '../../src/agent/state.js';
+import { KotefConfig } from '../../src/core/config.js';
+import { analyzeImpact } from '../../src/agent/utils/impact.js';
 
 // Mock dependencies
-vi.mock('../../src/core/llm', () => ({
+vi.mock('../../src/core/llm.js', () => ({
     callChat: vi.fn().mockResolvedValue({
         messages: [{
             content: JSON.stringify({
@@ -61,7 +61,7 @@ describe('Analyze Phase', () => {
 
         const result = await researcher(initialState);
 
-        expect(impactUtils.analyzeImpact).toHaveBeenCalled();
+        expect(analyzeImpact).toHaveBeenCalled();
         expect(result.impactMap).toBeDefined();
         expect(result.impactMap?.files).toContain('src/test.ts');
         expect(result.riskMap).toBeDefined();

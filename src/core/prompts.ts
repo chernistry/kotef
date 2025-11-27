@@ -19,6 +19,7 @@ export type RuntimePromptName =
     | 'research_relevance_evaluator'
     | 'search_query_optimizer'
     | 'kiro_coder'
+    | 'janitor'
     | 'orchestrator_tickets'
     | 'sdd_summary_project'
     | 'sdd_summary_architect'
@@ -35,6 +36,7 @@ const RUNTIME_PROMPTS = new Set<RuntimePromptName>([
     'research_relevance_evaluator',
     'search_query_optimizer',
     'kiro_coder',
+    'janitor',
     'orchestrator_tickets',
     'sdd_summary_project',
     'sdd_summary_architect',

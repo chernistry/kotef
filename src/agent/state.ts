@@ -198,6 +198,7 @@ export interface LoopCounters {
     planner_to_researcher: number;
     planner_to_verifier: number;
     planner_to_coder: number;
+    planner_to_janitor?: number;
     /** Lightweight fingerprints for progress detection across planner hops. */
     lastResearchSignature?: string;
     lastFileChangeCount?: number;

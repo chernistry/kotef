@@ -513,6 +513,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         if (nextNode === 'researcher') loopCounters.planner_to_researcher = (loopCounters.planner_to_researcher || 0) + 1;
         if (nextNode === 'verifier') loopCounters.planner_to_verifier = (loopCounters.planner_to_verifier || 0) + 1;
         if (nextNode === 'coder') loopCounters.planner_to_coder = (loopCounters.planner_to_coder || 0) + 1;
+        // Janitor is usually a one-off, but track it just in case
+        if (nextNode === 'janitor') loopCounters.planner_to_janitor = (loopCounters.planner_to_janitor || 0) + 1;
 
         // Enforce loop limits
         if (nextNode === 'researcher' && loopCounters.planner_to_researcher > MAX_LOOP_EDGE) {
@@ -625,6 +627,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         if (decision.next === 'researcher') nextPhase = 'analyze_system_state';
         else if (decision.next === 'coder') nextPhase = 'implement';
         else if (decision.next === 'verifier') nextPhase = 'verify';
+        else if (decision.next === 'janitor') nextPhase = 'refactor';
         else if (decision.next === 'done') nextPhase = 'retro';
         else if (decision.next === 'snitch') nextPhase = 'retro'; // Snitch usually ends or pauses, treat as retro/stop
 

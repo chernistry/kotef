@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { plannerNode } from '../../src/agent/nodes/planner';
-import { AgentState } from '../../src/agent/state';
-import { KotefConfig } from '../../src/core/config';
+import { plannerNode } from '../../src/agent/nodes/planner.js';
+import { AgentState } from '../../src/agent/state.js';
+import { KotefConfig } from '../../src/core/config.js';
 
 describe('Work Planning Phase', () => {
     it('should parse work_plan and budget_allocation from planner response', async () => {

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { plannerNode } from '../../src/agent/nodes/planner';
-import { AgentState } from '../../src/agent/state';
-import { KotefConfig } from '../../src/core/config';
-import * as adrUtils from '../../src/agent/utils/adr';
+import { plannerNode } from '../../src/agent/nodes/planner.js';
+import { AgentState } from '../../src/agent/state.js';
+import { KotefConfig } from '../../src/core/config.js';
+import { appendAdr } from '../../src/agent/utils/adr.js';
 
 // Mock dependencies
 vi.mock('../../src/agent/utils/adr', () => ({
@@ -54,8 +54,9 @@ describe('Design Phase', () => {
 
         const result = await planner(initialState);
 
-        expect(adrUtils.appendAdr).toHaveBeenCalled();
+        expect(appendAdr).toHaveBeenCalled();
         expect(result.designDecisions).toBeDefined();
         expect(result.designDecisions?.[0].title).toBe('Use Postgres');
     });
 });
+

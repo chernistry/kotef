@@ -92,7 +92,7 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
     "solution_sketch": { "type": "string", "description": "High-level description of the approach before breaking it down." },
     "next": {
       "type": "string",
-      "enum": ["researcher", "coder", "verifier", "done", "snitch", "ask_human"]
+      "enum": ["researcher", "coder", "verifier", "janitor", "done", "snitch", "ask_human"]
     },
     "terminalStatus": {
       "type": "string",
@@ -223,6 +223,7 @@ Respond with a single JSON object (no markdown, no prose). It **must** validate 
 - Choose `researcher` when SDD or current knowledge is insufficient; include concrete queries in `needs.research_queries`.
 - Choose `coder` when the work is clear and bounded; include target files in `needs.files`.
 - Choose `verifier` after code changes; list exact test commands in `needs.tests`. When the goal involves builds/tests, prefer an **error-first** step: suggest a single diagnostic command (e.g. `npm run build`, `npm test`, `pytest`) that coder can run via `run_diagnostic`.
+- Choose `janitor` after `verifier` passes (or is partially successful) but before `done`. This allows for a final cleanup phase to create tech debt tickets for any remaining issues.
 - Choose `done` only when the Definition of Done is satisfied.
   - If goal is met but unrelated global tests fail (and profile is NOT strict), use `terminalStatus: "done_partial"` and explain in `reason`.
   - Specifically, if `FUNCTIONAL_OK` is `"true"` and you are in `fast`/`yolo` profile, consider `done_partial` when remaining failures are non‑critical (e.g. lint/coverage) and would be too expensive to fix within budgets.
