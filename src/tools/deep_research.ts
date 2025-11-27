@@ -373,18 +373,19 @@ export async function deepResearch(
 
         attempts.push({ query: currentQuery, findings, quality, rawSearchResults: searchResults, rawPagesSample });
 
-        // Check if good enough
-        if (quality && quality.relevance >= 0.7 && quality.coverage >= 0.6) {
+        // Check if good enough (raised thresholds for better quality)
+        if (quality && quality.relevance >= 0.8 && quality.coverage >= 0.75 && findings.length >= 3) {
             log.info('Research quality met thresholds', { quality });
             break;
         }
 
-        // Diminishing returns check
-        if (attempt > 0 && attempts[attempt - 1].quality) {
+        // Diminishing returns check (lowered threshold to allow more exploration)
+        if (attempt > 1 && attempts[attempt - 1].quality && quality) {
             const prev = attempts[attempt - 1].quality!;
-            const current = quality!;
+            const current = quality;
             const improvement = (current.relevance - prev.relevance) + (current.coverage - prev.coverage);
-            if (improvement < 0.05) {
+            // Only stop if we're regressing or making very minimal progress AND already have decent quality
+            if (improvement < 0.02 && current.relevance >= 0.7) {
                 log.info('Stopping due to diminishing returns', { improvement, attempt });
                 break;
             }
@@ -392,15 +393,20 @@ export async function deepResearch(
 
         if (attempt === maxAttempts - 1) break;
 
-        // Refine query
-        if (quality?.shouldRetry !== false) {
+        // Refine query - always retry if quality is poor OR shouldRetry flag is true
+        const shouldRetryResearch = quality?.shouldRetry !== false || (quality && (quality.relevance < 0.7 || quality.coverage < 0.7));
+
+        if (shouldRetryResearch) {
             const refined = await refineResearchQuery(cfg, goal, currentQuery, searchResultsSummary, quality);
             if (refined && refined !== currentQuery) {
                 currentQuery = refined;
-                log.info('Refined query', { newQuery: currentQuery });
+                log.info('Refined query for better quality', { newQuery: currentQuery, currentQuality: quality });
                 continue;
             }
         }
+
+        // If we can't refine but quality is still poor, stop trying
+        log.info('Cannot refine query further, stopping', { quality });
         break;
     }
 

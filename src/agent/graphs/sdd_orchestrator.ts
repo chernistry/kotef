@@ -152,48 +152,62 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
     ];
 
     const model = config.sddBrainModel || config.modelStrong || config.modelFast;
-    const maxTokens = config.sddBestPracticesMaxTokens ?? 3500;
+    const baseTokens = config.sddBestPracticesMaxTokens ?? 4000; // Increased base from 3500
 
-    let response = await callChat(config, messages, {
-        model,
-        temperature: 0,
-        maxTokens
-    });
-    let content = response.messages[response.messages.length - 1].content || '';
+    // Progressive token strategy
+    const tokenLimits = [baseTokens, 6000, 10000];
+    const maxRetries = 3;
 
-    // Validation & Retry
-    let validation = validateBestPracticesDoc(content);
-    if (!validation.ok) {
-        console.warn('Best practices doc validation failed:', validation);
-        // Simple retry if truncated
-        if (validation.truncated) {
-            console.log('Retrying best_practices.md generation due to truncation...');
-            messages.push({ role: 'assistant', content });
-            messages.push({ role: 'user', content: 'The previous output was truncated. Please continue from where you left off, or regenerate the missing sections.' });
+    let content = '';
+    let validation: any = { ok: false };
 
-            // For simplicity in this MVP, we'll just ask for a full regeneration with a slightly stronger hint if possible, 
-            // but "continue" is harder to stitch. Let's try a full regeneration with a "be concise" hint if it was length-related?
-            // Actually, let's just try one more time with the same prompt but maybe a higher token limit if allowed? 
-            // For now, let's just log and proceed, or maybe try one regeneration.
+    for (let retryAttempt = 0; retryAttempt < maxRetries; retryAttempt++) {
+        const currentTokenLimit = tokenLimits[Math.min(retryAttempt, tokenLimits.length - 1)];
 
-            // Let's try a regeneration with an explicit instruction to be complete.
-            messages.pop(); // remove assistant
-            messages.pop(); // remove user
-            messages.push({ role: 'user', content: prompt + '\n\nIMPORTANT: Ensure the document is complete and not truncated. If you are running out of tokens, summarize less critical sections.' });
+        if (retryAttempt > 0) {
+            console.log(`Retrying best_practices.md generation (attempt ${retryAttempt + 1}/${maxRetries}) with ${currentTokenLimit} tokens...`);
+        }
 
-            response = await callChat(config, messages, {
-                model,
-                temperature: 0,
-                maxTokens: Math.min(maxTokens * 1.2, 16000) // Bump limit slightly if possible
+        // Prepare messages for this attempt
+        const attemptMessages = [...messages];
+        if (retryAttempt > 0) {
+            attemptMessages.push({
+                role: 'user',
+                content: prompt + '\n\nIMPORTANT: Ensure the document is complete and includes ALL required sections:\n' +
+                    '1. Best Practices & Research (heading)\n' +
+                    '2. Overview\n' +
+                    '3. Detailed Guidelines\n' +
+                    '4. Conflicting Practices & Alternatives\n' +
+                    '5. References\n\n' +
+                    'If you are running out of tokens, prioritize completeness over verbosity.'
             });
-            content = response.messages[response.messages.length - 1].content || '';
-            validation = validateBestPracticesDoc(content);
+        }
+
+        const response = await callChat(config, attemptMessages, {
+            model,
+            temperature: 0,
+            maxTokens: currentTokenLimit
+        });
+
+        content = response.messages[response.messages.length - 1].content || '';
+        validation = validateBestPracticesDoc(content);
+
+        console.log(`  ${validation.ok ? '✓' : '⚠'} Validation ${validation.ok ? 'passed' : 'failed'}${validation.truncated ? ' (truncated)' : ''}`);
+
+        if (validation.ok) {
+            break; // Success!
+        }
+
+        if (!validation.truncated && retryAttempt < maxRetries - 1) {
+            // If not truncated but still invalid (missing sections), log and retry
+            console.warn('  ⚠ Validation failed for best_practices.md');
+            console.log(JSON.stringify({ missingSections: validation.missingSections, warnings: validation.warnings }));
         }
     }
 
     if (!validation.ok) {
-        console.warn('Best practices doc is still potentially incomplete after retry:', validation);
-        content += '\n\n> [!WARNING]\n> This document may be incomplete or truncated. Please review manually.';
+        console.error('❌ Best practices doc failed validation after all retries:', validation);
+        throw new Error(`Failed to generate valid best_practices.md after ${maxRetries} attempts. Missing sections: ${validation.missingSections?.join(', ') || 'unknown'}`);
     }
 
     // 4. Write file
