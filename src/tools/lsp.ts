@@ -23,6 +23,15 @@ export async function runTsLspDiagnosticsViaServer(
     rootDir: string,
     files?: string[]
 ): Promise<LspDiagnostic[]> {
+    // Guard: Ensure we are in a TS/JS project before starting the heavy server
+    try {
+        await fs.access(path.join(rootDir, 'tsconfig.json')).catch(() =>
+            fs.access(path.join(rootDir, 'package.json'))
+        );
+    } catch {
+        return []; // Not a TS/JS project
+    }
+
     try {
         const handle = await startServer({ rootDir, timeout: 30000 });
         try {

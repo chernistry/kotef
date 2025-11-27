@@ -166,6 +166,12 @@ export function verifierNode(cfg: KotefConfig) {
             isJsProject &&
             (executionProfile === 'strict' || (executionProfile === 'fast' && hasFileChanges))
         ) {
+            log.info('LSP condition met', {
+                enableTsLspDiagnostics: cfg.enableTsLspDiagnostics,
+                isJsProject,
+                executionProfile,
+                hasFileChanges
+            });
             try {
                 const { runTsLspDiagnosticsViaServer } = await import('../../tools/lsp.js');
 
@@ -331,23 +337,36 @@ export function verifierNode(cfg: KotefConfig) {
         ];
 
         let decision: any;
-        try {
-            const response = await import('../../core/llm.js').then(m => m.callChat(cfg, messages as any, {
-                model: cfg.modelFast,
-                response_format: { type: 'json_object' } as any
-            }));
-            const content = response.messages[response.messages.length - 1].content || '{}';
-            decision = JSON.parse(content);
-        } catch (e) {
-            log.error('Verifier LLM failed or response invalid', { error: e });
-            // Fail-closed fallback
-            decision = {
-                status: allPassed ? 'blocked' : 'failed', // Even if passed, if LLM fails, we block to be safe? Or maybe just 'blocked'.
-                summary: `Verifier internal error: ${e instanceof Error ? e.message : String(e)}. Diagnostics: ${diagnosticsSummary}`,
-                next: 'planner',
-                notes: 'Fallback due to LLM error'
-            };
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+            try {
+                attempts++;
+                const response = await import('../../core/llm.js').then(m => m.callChat(cfg, messages as any, {
+                    model: cfg.modelFast,
+                    response_format: { type: 'json_object' } as any
+                }));
+                const content = response.messages[response.messages.length - 1].content || '{}';
+                decision = JSON.parse(content);
+                break; // Success
+            } catch (e) {
+                log.warn(`Verifier LLM attempt ${attempts} failed`, { error: e });
+                if (attempts >= maxAttempts) {
+                    log.error('Verifier LLM failed after retries', { error: e });
+                    // Fail-closed fallback
+                    decision = {
+                        status: allPassed ? 'blocked' : 'failed',
+                        summary: `Verifier internal error: ${e instanceof Error ? e.message : String(e)}. Diagnostics: ${diagnosticsSummary}`,
+                        next: 'planner',
+                        notes: 'Fallback due to LLM error'
+                    };
+                }
+                // Wait briefly before retry
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         }
+
 
         // Enforce fail-closed semantics (Ticket 31)
         if (decision.next === 'done') {

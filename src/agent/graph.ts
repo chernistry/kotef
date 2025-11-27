@@ -181,7 +181,8 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             verifier: "verifier" as any,
             snitch: "snitch" as any,
             ticket_closer: "ticket_closer" as any,
-            retrospective: "retrospective" as any
+            retrospective: "retrospective" as any,
+            end: END
         }
     );
 
@@ -204,7 +205,8 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
         {
             retrospective: "retrospective" as any,
             planner: "planner" as any,
-            ticket_closer: "ticket_closer" as any
+            ticket_closer: "ticket_closer" as any,
+            end: END
         }
     );
 
