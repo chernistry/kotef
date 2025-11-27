@@ -63,6 +63,9 @@ export const KotefConfigSchema = z.object({
     /** Coder implementation: 'internal' (default) or 'kiro' */
     coderMode: z.enum(['internal', 'kiro']).default('internal'),
 
+    /** Ticket builder LLM: 'openai' (uses CHAT_LLM_PROVIDER) or 'kiro' */
+    ticketBuilderLlm: z.enum(['openai', 'kiro']).default('openai'),
+
     /** Timeout for Kiro agent sessions in ms (default: 5 minutes) */
     kiroSessionTimeout: z.number().default(300000),
 
@@ -144,6 +147,7 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
 
         // Coder mode config
         coderMode: (env.KOTEF_CODER_MODE || 'internal') as 'internal' | 'kiro',
+        ticketBuilderLlm: (env.KOTEF_TICKET_BUILDER_LLM || 'openai') as 'openai' | 'kiro',
         kiroSessionTimeout: parseInt(env.KIRO_SESSION_TIMEOUT || '300000', 10),
 
         // Git integration config

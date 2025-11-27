@@ -51,14 +51,14 @@ For {{TECH_STACK}}:
   - widespread but now‑discouraged practices (e.g., patterns that conflict with current security/scale/maintainability expectations),
   - legacy patterns people still copy from old blog posts that should be avoided in new code.
 
-### 3. Architecture Patterns (2–4 for {{DOMAIN}} with {{TECH_STACK}})
+## 3. Architecture Patterns (2–4 for {{DOMAIN}} with {{TECH_STACK}})
 Pattern A — [NAME] (MVP)
 - When to use; Steps; Pros/Cons; Optional later features
 
 Pattern B — [NAME] (Scale‑up)
 - When to use; Migration from A
 
-### 3.1 Conflicting Practices & Alternatives
+## 4. Conflicting Practices & Alternatives
 - List concrete areas where reputable sources disagree (e.g., sync vs async I/O, ORMs vs SQL, service boundaries, caching strategy).
 - For each conflict, summarize:
   - Options (A/B/…)
@@ -119,7 +119,7 @@ Repeat the structure from 4.
   - what minimal remediation looks like,
   - how an agent like kotef should treat it (e.g., when to create a separate “janitor” ticket).
 
-### 17. Evidence & Citations
+## 5. References
 - List sources inline near claims; add links; include “Last updated” dates when possible.
 
 ### 18. Verification

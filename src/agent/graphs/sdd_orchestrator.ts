@@ -9,6 +9,22 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { validateBestPracticesDoc, validateArchitectDoc } from '../utils/sdd_validation.js';
 
+/**
+ * Call LLM for ticket building - switches between OpenAI and Kiro based on config
+ */
+async function callTicketLlm(
+    config: KotefConfig,
+    messages: ChatMessage[],
+    options: { model?: string; temperature?: number; maxTokens?: number; response_format?: { type: 'json_object' | 'text' } }
+): Promise<{ messages: ChatMessage[] }> {
+    if (config.ticketBuilderLlm === 'kiro') {
+        const { KiroConversationBackend } = await import('../../core/kiro_conversation_backend.js');
+        const kiro = new KiroConversationBackend();
+        return kiro.callChat(config, messages, options);
+    }
+    return callChat(config, messages, options);
+}
+
 export interface SddOrchestratorState {
     goal: string;
     rootDir: string;
@@ -173,10 +189,10 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
     ];
 
     const model = config.sddBrainModel || config.modelStrong || config.modelFast;
-    const baseTokens = config.sddBestPracticesMaxTokens ?? 4000; // Increased base from 3500
+    const baseTokens = config.sddBestPracticesMaxTokens ?? 10000; // Increased from 4000
 
-    // Progressive token strategy
-    const tokenLimits = [baseTokens, 6000, 10000];
+    // Progressive token strategy: 10k -> 20k -> 30k
+    const tokenLimits = [10000, 20000, 30000];
     const maxRetries = 3;
 
     let content = '';
@@ -196,10 +212,11 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
                 role: 'user',
                 content: prompt + '\n\nIMPORTANT: Ensure the document is complete and includes ALL required sections:\n' +
                     '1. Best Practices & Research (heading)\n' +
-                    '2. Overview\n' +
-                    '3. Detailed Guidelines\n' +
-                    '4. Conflicting Practices & Alternatives\n' +
-                    '5. References\n\n' +
+                    '2. 1. TL;DR\n' +
+                    '3. 2. Landscape\n' +
+                    '4. 3. Architecture Patterns\n' +
+                    '5. 4. Conflicting Practices & Alternatives\n' +
+                    '6. 5. References\n\n' +
                     'If you are running out of tokens, prioritize completeness over verbosity.'
             });
         }
@@ -351,7 +368,7 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
                 { role: 'user', content: planPrompt }
             ];
 
-            const response = await callChat(config, messages, {
+            const response = await callTicketLlm(config, messages, {
                 model: config.sddBrainModel || config.modelFast,
                 temperature: 0,
                 maxTokens: 2000,
@@ -420,7 +437,7 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
                     { role: 'user', content: genPrompt }
                 ];
 
-                const response = await callChat(config, messages, {
+                const response = await callTicketLlm(config, messages, {
                     model: config.sddBrainModel || config.modelFast,
                     temperature: 0,
                     maxTokens: config.sddTicketsMaxTokens ?? 2000,
