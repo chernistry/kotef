@@ -15,17 +15,44 @@ interface Learning {
     confidence: 'high' | 'medium' | 'low';
 }
 
+interface RunMetrics {
+    terminalStatus: string;
+    totalSteps: number;
+    loopCounters: {
+        planner_to_researcher?: number;
+        planner_to_verifier?: number;
+        planner_to_coder?: number;
+        planner_to_janitor?: number;
+    };
+    errorCount: number;
+    fileChanges: number;
+    timestamp: string;
+}
+
 export function retrospectiveNode(cfg: KotefConfig, chatFn: typeof callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         log.info('Running retrospective analysis');
 
-        // Skip if no progress history
-        if (!state.progressHistory || state.progressHistory.length === 0) {
-            log.info('No progress history, skipping retrospective');
-            return {};
-        }
-
         try {
+            // Collect metrics
+            const metrics: RunMetrics = {
+                terminalStatus: state.terminalStatus || 'unknown',
+                totalSteps: state.totalSteps || 0,
+                loopCounters: state.loopCounters || {},
+                errorCount: state.failureHistory?.length || 0,
+                fileChanges: Object.keys(state.fileChanges || {}).length,
+                timestamp: new Date().toISOString()
+            };
+
+            // Log metrics to file
+            await logMetrics(cfg.rootDir, metrics);
+
+            // Skip learning analysis if no progress history
+            if (!state.progressHistory || state.progressHistory.length === 0) {
+                log.info('No progress history, skipping learning analysis');
+                return {};
+            }
+
             // Load prompt
             const promptTemplate = await loadPrompt('retrospective');
 
@@ -34,10 +61,20 @@ export function retrospectiveNode(cfg: KotefConfig, chatFn: typeof callChat) {
                 .map((p, i) => `${i + 1}. Node: ${p.node}, Files: ${p.fileChangeCount}`)
                 .join('\n');
 
+            const testResultsSummary = state.testResults
+                ? JSON.stringify(state.testResults, null, 2).slice(0, 500)
+                : 'No test results';
+
+            const diagnosticsSummary = state.diagnosticsSummary || 'No diagnostics';
+
             const prompt = promptTemplate
                 .replace('{{TERMINAL_STATUS}}', state.terminalStatus || 'unknown')
                 .replace('{{PROGRESS_HISTORY}}', progressSummary)
-                .replace('{{LOOP_COUNTERS}}', JSON.stringify(state.loopCounters || {}, null, 2));
+                .replace('{{LOOP_COUNTERS}}', JSON.stringify(state.loopCounters || {}, null, 2))
+                .replace('{{GOAL}}', state.sdd?.goal || 'No goal specified')
+                .replace('{{TEST_RESULTS}}', testResultsSummary)
+                .replace('{{DIAGNOSTICS}}', diagnosticsSummary)
+                .replace('{{FILE_CHANGES}}', metrics.fileChanges.toString());
 
             // Call LLM
             const response = await chatFn(cfg, [
@@ -76,32 +113,8 @@ export function retrospectiveNode(cfg: KotefConfig, chatFn: typeof callChat) {
                 return {};
             }
 
-            // Append to best_practices.md
-            const sddDir = path.join(cfg.rootDir, '.sdd');
-            const bestPracticesPath = path.join(sddDir, 'best_practices.md');
-
-            let content_bp = '';
-            try {
-                content_bp = await fs.readFile(bestPracticesPath, 'utf-8');
-            } catch {
-                // File doesn't exist, create header
-                content_bp = '# Best Practices\n\n';
-            }
-
-            // Check if "Automated Learnings" section exists
-            if (!content_bp.includes('## Automated Learnings')) {
-                content_bp += '\n## Automated Learnings\n\n';
-            }
-
-            // Append learnings
-            const timestamp = new Date().toISOString().split('T')[0];
-            for (const learning of highConfidence) {
-                const entry = `- **[${timestamp}]** (${learning.category}): ${learning.insight}\n`;
-                content_bp += entry;
-            }
-
-            await fs.writeFile(bestPracticesPath, content_bp, 'utf-8');
-            log.info(`Recorded ${highConfidence.length} learnings to best_practices.md`);
+            // Write to learning_log.md (safer than polluting best_practices.md)
+            await appendLearnings(cfg.rootDir, highConfidence);
 
             return {};
         } catch (e) {
@@ -109,4 +122,44 @@ export function retrospectiveNode(cfg: KotefConfig, chatFn: typeof callChat) {
             return {};
         }
     };
+}
+
+async function logMetrics(rootDir: string, metrics: RunMetrics): Promise<void> {
+    const metricsDir = path.join(rootDir, '.sdd', 'metrics');
+
+    try {
+        await fs.mkdir(metricsDir, { recursive: true });
+    } catch {
+        // Directory might already exist
+    }
+
+    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+    const filename = `run-${timestamp}.json`;
+    const metricsPath = path.join(metricsDir, filename);
+
+    await fs.writeFile(metricsPath, JSON.stringify(metrics, null, 2), 'utf-8');
+    log.info(`Logged metrics to ${filename}`);
+}
+
+async function appendLearnings(rootDir: string, learnings: Learning[]): Promise<void> {
+    const sddDir = path.join(rootDir, '.sdd');
+    const learningLogPath = path.join(sddDir, 'learning_log.md');
+
+    let content = '';
+    try {
+        content = await fs.readFile(learningLogPath, 'utf-8');
+    } catch {
+        // File doesn't exist, create header
+        content = '# Learning Log\n\nAutomated learnings from agent retrospectives.\n\n';
+    }
+
+    // Append learnings with timestamp
+    const timestamp = new Date().toISOString().split('T')[0];
+    for (const learning of learnings) {
+        const entry = `- **[${timestamp}]** (${learning.category}): ${learning.insight}\n`;
+        content += entry;
+    }
+
+    await fs.writeFile(learningLogPath, content, 'utf-8');
+    log.info(`Recorded ${learnings.length} learnings to learning_log.md`);
 }

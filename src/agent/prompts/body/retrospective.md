@@ -3,9 +3,26 @@
 You are performing a retrospective analysis of an agent run that just completed.
 
 ## Inputs
-- Terminal Status: `{{TERMINAL_STATUS}}`
-- Progress History: `{{PROGRESS_HISTORY}}`
-- Loop Counters: `{{LOOP_COUNTERS}}`
+- **Goal**: `{{GOAL}}`
+- **Terminal Status**: `{{TERMINAL_STATUS}}`
+- **Total Steps**: {{TOTAL_STEPS}}
+- **File Changes**: {{FILE_CHANGES}} files modified
+- **Progress History**: 
+```
+{{PROGRESS_HISTORY}}
+```
+- **Loop Counters**: 
+```json
+{{LOOP_COUNTERS}}
+```
+- **Test Results Summary**: 
+```
+{{TEST_RESULTS}}
+```
+- **Diagnostics Summary**: 
+```
+{{DIAGNOSTICS}}
+```
 
 ## Task
 Analyze the run and identify:
@@ -29,3 +46,4 @@ Respond with valid JSON:
 ```
 
 Only include learnings with `confidence: "high"`. If no high-confidence learnings, return `{"learnings": []}`.
+
