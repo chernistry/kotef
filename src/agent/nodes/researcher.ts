@@ -145,6 +145,17 @@ export function researcherNode(cfg: KotefConfig) {
         const primaryQuery = queries[0];
         log.info('Executing research', { primaryQuery, count: queries.length, profile, taskScope, taskTypeHint, useDeep });
 
+        // Ticket 66: Offline Mode Handling
+        if (cfg.offlineMode) {
+            log.info('Offline mode enabled: skipping web research.');
+            return {
+                researchResults: {
+                    note: 'Offline mode: Web research skipped. Relying on internal knowledge and context.',
+                    queries_skipped: queries
+                }
+            };
+        }
+
         try {
             if (useDeep && taskScope !== 'tiny') {
                 // If we already have research for this query and quality says "no retry",

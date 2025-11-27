@@ -420,7 +420,8 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{GIT_HOTSPOTS}}': formatHotspots(state.gitHotspots),
             '{{CONTEXT_SCAN}}': state.contextScan ? JSON.stringify(state.contextScan, null, 2) : 'Not available',
             '{{IMPACT_MAP}}': state.impactMap ? JSON.stringify(state.impactMap, null, 2) : 'Not available',
-            '{{RISK_MAP}}': state.riskMap ? JSON.stringify(state.riskMap, null, 2) : 'Not available'
+            '{{RISK_MAP}}': state.riskMap ? JSON.stringify(state.riskMap, null, 2) : 'Not available',
+            '{{OFFLINE_MODE}}': cfg.offlineMode ? 'true' : 'false'
         };
 
         let systemPrompt = plannerPromptTemplate;
