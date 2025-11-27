@@ -36,8 +36,8 @@ export async function startServer(opts: LspServerOptions): Promise<LspClientHand
 
     log.info('Starting TypeScript Language Server', { rootDir });
 
-    // Spawn typescript-language-server with --stdio
-    const process = spawn('typescript-language-server', ['--stdio'], {
+    // Spawn typescript-language-server with --stdio using npx to ensure availability
+    const process = spawn('npx', ['typescript-language-server', '--stdio'], {
         cwd: rootDir,
         stdio: ['pipe', 'pipe', 'pipe']
     });

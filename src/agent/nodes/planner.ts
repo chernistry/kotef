@@ -15,6 +15,9 @@ import { appendAdr, syncAssumptions } from '../utils/adr.js';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { execa } from 'execa';
+import readline from 'readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
+import chalk from 'chalk';
 
 export async function scanContext(rootDir: string): Promise<NonNullable<AgentState['contextScan']>> {
     const cwd = rootDir;
@@ -274,19 +277,66 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         const progressHistory = [...(state.progressHistory || []), snapshot];
         const progressCheck = assessProgress(progressHistory);
 
+        let nextProgressHistory = progressHistory;
+
         if (progressCheck.status === 'stuck_candidate') {
             log.warn('Agent appears stuck', { reason: progressCheck.reason });
-            return {
-                terminalStatus: 'aborted_stuck',
-                plan: {
-                    next: 'snitch',
-                    reason: `${progressCheck.reason}`,
-                    profile: state.runProfile,
-                    plan: []
-                },
-                done: true,
-                progressHistory
-            };
+
+            let shouldRecover = false;
+
+            // Interactive recovery if TTY
+            if (process.stdin.isTTY) {
+                const rl = readline.createInterface({ input, output });
+                console.log(chalk.yellow('\n⚠️  Agent appears stuck: ') + chalk.gray(progressCheck.reason));
+                console.log(chalk.yellow('Recover and continue? (Y/n) ') + chalk.gray('[Auto-yes in 5s]'));
+
+                const timeoutMs = 5000;
+                let timer: NodeJS.Timeout;
+
+                const timeoutPromise = new Promise<string>((resolve) => {
+                    timer = setTimeout(() => {
+                        console.log(chalk.gray('\nAuto-recovering...'));
+                        rl.close();
+                        resolve('y');
+                    }, timeoutMs);
+                });
+
+                const answerPromise = rl.question(chalk.yellow('> '));
+
+                try {
+                    const answer = await Promise.race([answerPromise, timeoutPromise]);
+                    clearTimeout(timer!);
+                    shouldRecover = answer.toLowerCase() !== 'n' && answer.toLowerCase() !== 'no';
+                } catch (e) {
+                    shouldRecover = true;
+                } finally {
+                    rl.close();
+                }
+            }
+
+            if (shouldRecover) {
+                log.info('User forced recovery from stuck state');
+                // Reset progress history to clear the stuck state
+                // We keep the current snapshot as the new "start"
+                nextProgressHistory = [snapshot];
+
+                // Inject a message to the LLM to inform it of the forced recovery
+                // This is done by modifying baseMessages later, but we need to pass a flag or modify state.messages?
+                // Actually, we can just append a system message to the prompt context for this turn.
+                // But `baseMessages` is constructed later. We can add a flag here.
+            } else {
+                return {
+                    terminalStatus: 'aborted_stuck',
+                    plan: {
+                        next: 'snitch',
+                        reason: `${progressCheck.reason}`,
+                        profile: state.runProfile,
+                        plan: []
+                    },
+                    done: true,
+                    progressHistory
+                };
+            }
         }
 
         if (currentSteps >= MAX_STEPS) {
@@ -382,6 +432,19 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             { role: 'system', content: systemPrompt },
             ...state.messages
         ];
+
+        // Ticket 65: Loop Intervention
+        if (loopCounters.planner_to_verifier > 2) {
+            baseMessages.push({
+                role: 'system',
+                content: `WARNING: You have sent the agent to verification ${loopCounters.planner_to_verifier} times consecutively. 
+If tests are not running, the Verifier might be stuck in a build loop. 
+Consider:
+1. Explicitly checking if tests are configured correctly.
+2. If build passes but no tests run, assume build success is partial progress and move to next step or ask human.
+3. Do NOT send to verifier again unless you are sure it will run new commands.`
+            });
+        }
 
         baseMessages.push({
             role: 'user',
@@ -660,7 +723,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             runProfile: resolvedProfile,
             loopCounters,
             totalSteps: currentSteps,
-            progressHistory,
+            progressHistory: nextProgressHistory,
             // Set terminal status if done
             ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success', done: true } : {}),
             // Ticket 50: Pass through ADRs and assumptions

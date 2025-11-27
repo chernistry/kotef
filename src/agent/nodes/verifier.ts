@@ -41,6 +41,9 @@ export function verifierNode(cfg: KotefConfig) {
         }
 
         // Priority 2: Profile-based tests
+        // Priority 2: Profile-based tests
+        // Fix for Planner-Verifier loop: Chain commands instead of exclusive OR
+
         if (executionProfile === 'strict') {
             if (detected.primaryTest) commandsToRun.push(detected.primaryTest);
             if (detected.buildCommand) commandsToRun.push(detected.buildCommand);
@@ -49,24 +52,38 @@ export function verifierNode(cfg: KotefConfig) {
             // Align with error-first strategy: prefer the same diagnostic command coder used.
             if (detected.diagnosticCommand) {
                 commandsToRun.push(detected.diagnosticCommand);
-            } else if (forceBuild && detected.buildCommand) {
+            }
+
+            // If build is forced or likely needed, add it
+            if (forceBuild && detected.buildCommand && !commandsToRun.includes(detected.buildCommand)) {
                 commandsToRun.push(detected.buildCommand);
-            } else if (detected.primaryTest) {
-                commandsToRun.push(detected.primaryTest);
-            } else if (detected.smokeTest) {
-                commandsToRun.push(detected.smokeTest);
+            }
+
+            // ALWAYS try to run a test if we haven't yet (unless diagnostic IS the test)
+            // This prevents "build only" loops
+            const hasTest = commandsToRun.some(c => c.includes('test') || c === detected.primaryTest || c === detected.smokeTest);
+            if (!hasTest) {
+                if (detected.primaryTest) commandsToRun.push(detected.primaryTest);
+                else if (detected.smokeTest) commandsToRun.push(detected.smokeTest);
             }
         } else {
             // smoke / yolo
             if (!isTinyTask && detected?.diagnosticCommand) {
                 commandsToRun.push(detected.diagnosticCommand);
-            } else if (forceBuild && detected?.buildCommand) {
+            }
+
+            if (forceBuild && detected?.buildCommand && !commandsToRun.includes(detected.buildCommand)) {
                 commandsToRun.push(detected.buildCommand);
-            } else if (detected?.smokeTest) {
-                commandsToRun.push(detected.smokeTest);
-            } else if (detected?.primaryTest && !isTinyTask) {
-                // Fallback to primary if no smoke test, but skip for tiny tasks if it looks heavy
-                commandsToRun.push(detected.primaryTest);
+            }
+
+            // Ensure we run *something* that verifies functionality
+            const hasTest = commandsToRun.some(c => c.includes('test') || c === detected.primaryTest || c === detected.smokeTest);
+            if (!hasTest) {
+                if (detected?.smokeTest) {
+                    commandsToRun.push(detected.smokeTest);
+                } else if (detected?.primaryTest && !isTinyTask) {
+                    commandsToRun.push(detected.primaryTest);
+                }
             }
         }
 
