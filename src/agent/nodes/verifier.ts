@@ -1,6 +1,7 @@
 import { AgentState } from '../state.js';
 import { KotefConfig } from '../../core/config.js';
 import { createLogger } from '../../core/logger.js';
+import { execa } from 'execa';
 
 import { runCommand } from '../../tools/test_runner.js';
 import { resolveExecutionProfile, PROFILE_POLICIES } from '../profiles.js';
@@ -304,6 +305,26 @@ export function verifierNode(cfg: KotefConfig) {
         } else {
             sameErrorCount = 0;
             lastTestSignature = undefined;
+
+            // Ticket 67: Continuous Git Checkpoint (Commit on Green)
+            if (cfg.gitEnabled) {
+                try {
+                    const cwd = cfg.rootDir || process.cwd();
+                    // Stage all changes
+                    await execa('git', ['add', '.'], { cwd });
+
+                    // Check for changes
+                    const { stdout: status } = await execa('git', ['status', '--porcelain'], { cwd });
+
+                    if (status.trim()) {
+                        const commitMsg = 'chore: auto-checkpoint - verification passed';
+                        await execa('git', ['commit', '-m', commitMsg], { cwd });
+                        log.info('Created git checkpoint', { commitMsg });
+                    }
+                } catch (gitErr: any) {
+                    log.warn('Failed to create git checkpoint', { error: gitErr.message });
+                }
+            }
         }
 
         // Compute diagnostics summary
