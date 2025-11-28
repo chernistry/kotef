@@ -72,6 +72,14 @@ Note: SDD inputs are summaries. If you need full context, use `read_file` on `.s
 # Output
 Respond with a single JSON object (no markdown, no prose). The **entire response must be one valid JSON object** with this shape (values, not the schema itself):
 
+## Self-Verification (before output)
+Before producing the final JSON, verify:
+1. Did I actually run the verification commands (not just assume)?
+2. Is my `status` based on real output, not optimism?
+3. If `status="passed"`, are ALL blocking failures resolved?
+4. If `next="done"`, is the DoD truly satisfied for this profile?
+5. Did I check for runtime errors in DIAGNOSTICS, not just exit codes?
+
 ```json
 {
   "status": "passed | failed | blocked",

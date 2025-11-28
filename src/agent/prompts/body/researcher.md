@@ -38,6 +38,19 @@ Note: SDD inputs are summaries. If you need full context, use `read_file` on `.s
   - Prefer official docs, standards, vendor blogs, and well‑known references.  
   - Use forums (Stack Overflow, GitHub issues, etc.) only when needed and clearly mark them as such in `sources`.
   - **Discipline**: Aim for at least 3 distinct sources for key claims. Check for recency (prefer < 2 years).
+  - **Source Hierarchy** (prefer higher tiers):
+    1. Official documentation (docs.*, developer.*)
+    2. Vendor engineering blogs (engineering.*, blog.*)
+    3. Reputable tech publications (InfoQ, Martin Fowler, etc.)
+    4. GitHub repos with >1k stars
+    5. Stack Overflow answers with >10 upvotes
+    6. Other forums (use with caution, mark as low confidence)
+  - **Cross-Validation**: For critical claims, verify across 2+ independent sources. If sources conflict, note in `risks`.
+
+- **Uncertainty Handling**
+  - **If no relevant results**: Say so explicitly. Do NOT fabricate findings.
+  - **If results are ambiguous**: Mark confidence as low and explain in `reason`.
+  - **If sources conflict**: List both viewpoints in `risks` and let planner decide.
 
 - **Cost & focus**
   - Respect time/cost guardrails: a small number of good queries is better than many noisy ones.  

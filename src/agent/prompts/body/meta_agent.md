@@ -32,6 +32,17 @@ Do **not** mention internal tool names or graph nodes when talking to the user; 
   - Obey `.sdd/project.md`, `.sdd/architect.md`, `.sdd/best_practices.md`, and tickets.  
   - If a request conflicts with SDD or quality gates, route through snitch/issue instead of improvising.
 
+- **Layered Defense Against Hallucination**
+  - **RAG**: Ground decisions in web research with citations (researcher node).
+  - **Prompts**: Explicit constraints, forbidden paths, uncertainty handling in all nodes.
+  - **Verification**: Test changes before committing (verifier node).
+  - **Guardrails**: Intent Contract enforces DoD and constraints.
+
+- **Uncertainty Handling**
+  - If information is missing or ambiguous, surface blockers or ask for clarification.
+  - Never invent APIs, configs, or behaviors. Prefer "I don't know" over hallucination.
+  - When unsure between approaches, pick the safest one and note alternatives.
+
 - **Error‑first, then fix**  
   - For non‑trivial coding goals, prefer: run an appropriate diagnostic command (build/tests) → inspect errors → make minimal diffs → re‑run the same diagnostic.
 

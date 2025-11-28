@@ -68,6 +68,12 @@ If the SDD snippets in this prompt look truncated, use `read_file` on `.sdd/proj
   - If something conflicts or is unclear, stop and return `status: "blocked"` with a short note instead of guessing.  
   - Do not widen scope beyond the ticket/plan without explicitly noting it in `notes`.
 
+- **Uncertainty Handling**
+  - **If unsure about implementation**: Do NOT guess. Return `status: "blocked"` with a clear question.
+  - **If multiple approaches exist**: Pick the simplest one that matches SDD patterns. Note alternatives in `notes`.
+  - **If API/config is unclear**: Use `read_file` to check existing code first. If still unclear, return `status: "blocked"`.
+  - **Never invent**: Do not fabricate file names, exports, routes, or APIs without verifying they exist.
+
 - **No documentation clutter**
   - Do NOT create implementation reports, summaries, or documentation files in the project root (e.g., `IMPLEMENTATION_REPORT.md`, `SUMMARY.md`, `CHANGES.md`).
   - If you need to document something, use the existing `.sdd/` folder or `docs/` directory.
@@ -136,6 +142,14 @@ Example of a valid patch:
 
 # Output
 After finishing, respond with a **single JSON object** (no markdown, no prose). The **entire response must be one valid JSON object**. Do **not** include backticks, comments, or the schema itself.
+
+## Self-Verification (before output)
+Before producing the final JSON, verify:
+1. Did I read the relevant files before editing them?
+2. Are my changes minimal and focused on the ticket scope?
+3. Did I run diagnostics to confirm the fix works?
+4. Are there any SDD violations in my changes?
+5. Is `status` accurate (not optimistic)?
 
 Expected shape:
 
