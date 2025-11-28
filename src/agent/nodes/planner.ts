@@ -11,6 +11,14 @@ import { transitionPhase } from '../utils/phase_tracker.js';
 import { getHotspots } from '../../tools/git.js';
 import { analyzeImpact } from '../utils/impact.js';
 import { appendAdr, syncAssumptions } from '../utils/adr.js';
+import {
+    buildIntentContract,
+    loadKotefConfig,
+    summarizeIntent,
+    saveIntentContract,
+    loadCachedIntentContract,
+    IntentContract
+} from '../utils/intent_contract.js';
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -73,6 +81,43 @@ function initializeBudget(profile: ExecutionProfile, scope: TaskScope): BudgetSt
     return budgets[key] || budgets['fast-normal'];
 }
 
+/**
+ * Check if goal is satisfied and we can exit early (Ticket 01)
+ */
+function checkEarlyExit(state: AgentState, intent: IntentContract): { done: boolean; partial: boolean; reason: string } {
+    if (!intent) return { done: false, partial: false, reason: 'No intent contract' };
+
+    // Check if all DoD commands passed
+    const dodPassed = intent.dodChecks.length === 0 || intent.dodChecks.every(check => {
+        const probe = state.functionalChecks?.find(fc =>
+            fc.command.includes(check) || check.includes(fc.command)
+        );
+        return probe && probe.exitCode === 0;
+    });
+
+    // Check no critical diagnostics (source is 'build' or 'test')
+    const noCriticalErrors = !state.diagnosticsLog?.some(
+        d => d.source === 'build' || d.source === 'test'
+    );
+
+    // Check tests passed
+    const testsPassed = state.testResults?.passed === true;
+
+    if (dodPassed && noCriticalErrors && testsPassed) {
+        return { done: true, partial: false, reason: 'All DoD checks passed, no critical errors, tests green' };
+    }
+
+    // Partial success: DoD passed but has warnings (non-strict only)
+    if (dodPassed && state.runProfile !== 'strict') {
+        const functionalOk = deriveFunctionalStatus(state.functionalChecks);
+        if (functionalOk) {
+            return { done: true, partial: true, reason: 'DoD passed, functional OK, but has warnings/non-critical issues' };
+        }
+    }
+
+    return { done: false, partial: false, reason: 'DoD not yet satisfied' };
+}
+
 export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('planner');
@@ -123,6 +168,43 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             } catch (err) {
                 log.warn('Failed to scan context', { error: (err as Error).message });
             }
+        }
+
+        // Intent Contract (Ticket 01) - Build once, reuse across nodes
+        let intentContract = state.intentContract;
+        if (!intentContract) {
+            // Try to load from cache first
+            intentContract = await loadCachedIntentContract(cfg.rootDir, state.sdd.goal);
+            if (!intentContract) {
+                // Build new intent contract
+                const kotefText = await loadKotefConfig(cfg.rootDir);
+                intentContract = buildIntentContract({
+                    goal: state.sdd.goal,
+                    ticketMarkdown: state.sdd.ticket,
+                    shapedGoal: state.shapedGoal,
+                    clarifiedGoal: state.clarified_goal,
+                    kotefText
+                });
+                // Persist for cross-run reuse
+                try {
+                    await saveIntentContract(cfg.rootDir, intentContract);
+                } catch (e) {
+                    log.warn('Failed to save intent contract', { error: (e as Error).message });
+                }
+            }
+            log.info('Intent contract built', { appetite: intentContract.appetite, constraints: intentContract.constraints.length });
+        }
+
+        // Early Exit Check (Ticket 01) - Before LLM call
+        const earlyExitResult = checkEarlyExit(state, intentContract);
+        if (earlyExitResult.done) {
+            log.info('Early exit triggered', { reason: earlyExitResult.reason });
+            return {
+                terminalStatus: earlyExitResult.partial ? 'done_partial' : 'done_success',
+                plan: { next: 'done', reason: earlyExitResult.reason, profile: state.runProfile, plan: [] },
+                done: true,
+                intentContract
+            };
         }
 
         const tryParseDecision = (raw: string) => {
@@ -423,7 +505,9 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{CONTEXT_SCAN}}': state.contextScan ? JSON.stringify(state.contextScan, null, 2) : 'Not available',
             '{{IMPACT_MAP}}': state.impactMap ? JSON.stringify(state.impactMap, null, 2) : 'Not available',
             '{{RISK_MAP}}': state.riskMap ? JSON.stringify(state.riskMap, null, 2) : 'Not available',
-            '{{OFFLINE_MODE}}': cfg.offlineMode ? 'true' : 'false'
+            '{{OFFLINE_MODE}}': cfg.offlineMode ? 'true' : 'false',
+            // Intent Contract (Ticket 01)
+            '{{INTENT_CONTRACT}}': intentContract ? summarizeIntent(intentContract) : 'Not available'
         };
 
         let systemPrompt = plannerPromptTemplate;
@@ -578,6 +662,50 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
         // Janitor is usually a one-off, but track it just in case
         if (nextNode === 'janitor') loopCounters.planner_to_janitor = (loopCounters.planner_to_janitor || 0) + 1;
 
+        // Constraint Enforcement (Ticket 01)
+        if (intentContract && intentContract.constraints.length > 0) {
+            const planText = JSON.stringify(decision.plan || []).toLowerCase();
+            const reasonText = (decision.reason || '').toLowerCase();
+            for (const constraint of intentContract.constraints) {
+                // Extract the forbidden action from constraint
+                const forbidden = constraint.replace(/^(DO NOT|MUST NOT|Never|Forbidden:)\s*/i, '').toLowerCase().trim();
+                if (forbidden && (planText.includes(forbidden) || reasonText.includes(forbidden))) {
+                    log.warn('Constraint violation detected', { constraint, forbidden });
+                    decision.next = 'snitch';
+                    decision.reason = `Violates constraint: ${constraint}`;
+                    decision.terminalStatus = 'aborted_constraint';
+                    return {
+                        terminalStatus: 'aborted_constraint',
+                        plan: decision,
+                        messages: [assistantMsg],
+                        runProfile: resolvedProfile,
+                        loopCounters,
+                        totalSteps: currentSteps,
+                        progressHistory: nextProgressHistory,
+                        intentContract
+                    };
+                }
+            }
+
+            // Check appetite violation
+            if (intentContract.appetite === 'Small' && decision.plan?.length > 5) {
+                log.warn('Appetite violation: plan too broad for Small appetite', { planLength: decision.plan.length });
+                decision.next = 'snitch';
+                decision.reason = `Plan has ${decision.plan.length} steps but appetite is Small (max 5)`;
+                decision.terminalStatus = 'aborted_constraint';
+                return {
+                    terminalStatus: 'aborted_constraint',
+                    plan: decision,
+                    messages: [assistantMsg],
+                    runProfile: resolvedProfile,
+                    loopCounters,
+                    totalSteps: currentSteps,
+                    progressHistory: nextProgressHistory,
+                    intentContract
+                };
+            }
+        }
+
         // Enforce loop limits
         if (nextNode === 'researcher' && loopCounters.planner_to_researcher > MAX_LOOP_EDGE) {
             decision.next = 'snitch';
@@ -723,6 +851,7 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             loopCounters,
             totalSteps: currentSteps,
             progressHistory: nextProgressHistory,
+            intentContract, // Ticket 01
             // Set terminal status if done
             ...(decision.next === 'done' ? { terminalStatus: decision.terminalStatus || 'done_success', done: true } : {}),
             // Ticket 50: Pass through ADRs and assumptions

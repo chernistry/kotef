@@ -1,8 +1,11 @@
 import type { ChatMessage } from '../core/llm.js';
 import { FetchedPage } from '../tools/fetch_page.js';
 import { DetectedCommands } from './utils/verification.js';
+import type { IntentContract } from './utils/intent_contract.js';
 
 export type TaskScope = 'tiny' | 'normal' | 'large';
+
+export type { IntentContract };
 
 export interface FunctionalCheck {
     command: string;
@@ -171,6 +174,9 @@ export interface AgentState {
     // Phase Tracking (Ticket 56)
     currentPhase?: AgentPhase;
     phaseHistory?: PhaseHistoryEntry[];
+
+    // Intent Contract (Ticket 01)
+    intentContract?: IntentContract;
 }
 
 export type AgentPhase =
