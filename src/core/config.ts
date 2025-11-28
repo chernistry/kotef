@@ -98,7 +98,7 @@ export const KotefConfigSchema = z.object({
     maxTickets: z.number().int().min(1).optional(),
 
     /** Ticket 02: Use consolidated prompts for SDD orchestration (reduces LLM calls) */
-    useConsolidatedPrompts: z.boolean().default(false),
+    useConsolidatedPrompts: z.boolean().default(true),
 });
 
 export type KotefConfig = z.infer<typeof KotefConfigSchema>;
