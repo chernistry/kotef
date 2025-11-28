@@ -45,6 +45,12 @@ _heb. 'kotef' (קוטף) — 'one who picks/harvests' (wordplay with 'katef' כ�
 
 **Kotef's unique value:** It's not trying to be an IDE. It's a **brain** that does the thinking (research, architecture, planning) so you can focus on reviewing and shipping.
 
+**Layered defense against hallucinations:**
+- RAG: Grounds decisions in fresh web research with citations
+- Prompts: Explicit constraints, forbidden paths, uncertainty handling
+- Verification: Tests changes before committing
+- Guardrails: Intent Contract enforces DoD and constraints
+
 ---
 
 ## 🚀 Quick Start

@@ -555,6 +555,18 @@ graph TD
 
     These runtime prompts are part of the architecture contract: they **must** stay aligned with the node implementations in `src/agent/nodes/*.ts` (fields, enums, and stop conditions) and with SDD rules (`.sdd/best_practices.md`). When evolving them, treat them like code: keep JSON contracts stable or versioned, and update tests under `test/core/prompts.test.ts` and `test/agent/prompt_contracts.test.ts`.
 
+-   **Prompt Engineering Principles**:
+    -   **Layered Defense**: Kotef uses multiple layers to prevent hallucinations:
+        1. RAG: Grounds decisions in fresh web research with citations
+        2. Prompts: Explicit constraints, forbidden paths, uncertainty handling ("If unsure, say so")
+        3. Verification: Tests changes before committing
+        4. Guardrails: Intent Contract enforces DoD and constraints
+    -   **Prompt-as-Code**: Prompts are versioned, tested, and documented like code. Changes require re-running prompt tests.
+    -   **Cross-Model Awareness**: Prompts avoid model-specific quirks; prefer clear, logical instructions that work across GPT-4/5, Claude, Gemini.
+    -   **Self-Consistency**: For critical decisions, generate multiple reasoning paths and compare (implemented in verifier's retry logic).
+    -   **Uncertainty Handling**: Prompts explicitly allow "I don't know" responses; prefer refusal over hallucination.
+    -   **Schema Constraints**: JSON-only outputs with strict schemas reduce hallucination surface.
+
 -   **Prompt design references**:
     -   External inspiration is drawn from modern coding agents (Cursor, Claude Code, Same.dev, OpenAI Codex-style prompts) stored under `prompts/CL4R1T4S/*` and `prompts/cursor/*`.
     -   Kotef intentionally adapts patterns from these prompts (error-first debugging, diff-first edits, JSON-only tools, budget-aware planning) while avoiding environment-specific assumptions.
