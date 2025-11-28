@@ -1,5 +1,7 @@
 # Best Practices Research Template (Improved)
 
+> **DEPRECATED (Ticket 02)**: This template is superseded by `understand_and_design.md` when `useConsolidatedPrompts` is enabled. Kept for backward compatibility.
+
 Instruction for AI: produce a practical, evidence‑backed best practices guide tailored to this project and stack.
 
 ---

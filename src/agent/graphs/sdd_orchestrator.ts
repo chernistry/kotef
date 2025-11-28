@@ -40,6 +40,188 @@ export interface ProjectMetadata {
     projectDescription: string;
 }
 
+/**
+ * Consolidated SDD flow: Research + Architect in one LLM call (Ticket 02)
+ */
+async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
+    console.log('Running Consolidated SDD: Understand & Design...');
+    const { goal, rootDir, config } = state;
+    const metadata = await loadProjectMetadata(rootDir, goal);
+
+    // 1. Run web-backed deep research
+    console.log(`Starting deep research for goal: "${goal}"`);
+    let findings: DeepResearchFinding[] = [];
+    try {
+        const result = await deepResearch(config, goal, {
+            originalGoal: goal,
+            maxAttempts: 3,
+            techStackHint: metadata.techStack
+        });
+        findings = result.findings;
+        console.log(`Deep research completed. Found ${findings.length} findings.`);
+    } catch (e) {
+        console.warn('Deep research failed, proceeding with model-only:', e);
+    }
+
+    const findingsContext = findings.length === 0
+        ? 'No external web findings available. Use conservative defaults.'
+        : findings.map((f, idx) => {
+            const sources = f.citations.map(c => `- ${c.url}`).join('\n');
+            return `(${idx + 1}) ${f.statement}\nSources:\n${sources}`;
+        }).join('\n\n');
+
+    // 2. Render consolidated prompt
+    const prompt = renderBrainTemplate('understand_and_design', {
+        projectName: path.basename(rootDir),
+        domain: metadata.domain,
+        techStack: metadata.techStack,
+        projectDescription: metadata.projectDescription,
+        year: new Date().getFullYear(),
+        goal,
+        additionalContext: findingsContext
+    });
+
+    // 3. Single LLM call for both documents
+    const messages: ChatMessage[] = [
+        { role: 'system', content: 'You are an expert software researcher and architect. Respond with valid JSON only.' },
+        { role: 'user', content: prompt }
+    ];
+
+    const model = config.sddBrainModel || config.modelStrong || config.modelFast;
+    const maxTokens = (config.sddBestPracticesMaxTokens ?? 10000) + (config.sddArchitectMaxTokens ?? 4000);
+
+    const response = await callChat(config, messages, {
+        model,
+        temperature: 0,
+        maxTokens,
+        response_format: { type: 'json_object' } as any
+    });
+
+    const content = response.messages[response.messages.length - 1].content || '{}';
+
+    // 4. Parse JSON response
+    let parsed: { bestPractices?: string; architect?: string };
+    try {
+        let raw = content.trim();
+        if (raw.startsWith('```')) {
+            const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
+            if (fenceMatch?.[1]) raw = fenceMatch[1].trim();
+        }
+        parsed = JSON.parse(raw);
+    } catch {
+        try {
+            parsed = JSON.parse(jsonrepair(content));
+        } catch (e) {
+            console.error('Failed to parse consolidated response:', e);
+            throw new Error('Failed to parse understand_and_design response');
+        }
+    }
+
+    // 5. Write files
+    const sddDir = path.join(rootDir, '.sdd');
+    await fs.mkdir(sddDir, { recursive: true });
+
+    if (parsed.bestPractices) {
+        await fs.writeFile(path.join(sddDir, 'best_practices.md'), parsed.bestPractices);
+        console.log('✓ Generated best_practices.md');
+    }
+    if (parsed.architect) {
+        await fs.writeFile(path.join(sddDir, 'architect.md'), parsed.architect);
+        console.log('✓ Generated architect.md');
+    }
+
+    return {
+        researchContent: parsed.bestPractices || '',
+        architectContent: parsed.architect || ''
+    };
+}
+
+/**
+ * Consolidated ticket generation: All tickets in one LLM call (Ticket 02)
+ */
+async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
+    console.log('Running Consolidated SDD: Plan Work (batch tickets)...');
+    const { goal, rootDir, config, architectContent } = state;
+
+    // Build code map (simple file listing)
+    let codeMap = '';
+    try {
+        const { execa } = await import('execa');
+        const { stdout } = await execa('find', ['.', '-maxdepth', '3', '-type', 'f', '-name', '*.ts', '-o', '-name', '*.js'], { cwd: rootDir });
+        codeMap = stdout.split('\n').filter(Boolean).slice(0, 50).join('\n');
+    } catch {
+        codeMap = '(code map unavailable)';
+    }
+
+    const maxTicketsText = config.maxTickets
+        ? `Generate EXACTLY ${config.maxTickets} tickets. No more.`
+        : '';
+
+    const prompt = renderBrainTemplate('plan_work', {
+        projectName: path.basename(rootDir),
+        domain: '',
+        techStack: '',
+        year: new Date().getFullYear(),
+        goal,
+        additionalContext: `Code Map:\n${codeMap}\n\nMax Tickets Constraint: ${maxTicketsText}`
+    })
+        .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
+        .replace('{{CODE_MAP}}', codeMap)
+        .replace('{{MAX_TICKETS_CONSTRAINT}}', maxTicketsText);
+
+    const messages: ChatMessage[] = [
+        { role: 'system', content: 'You are an expert Project Manager. Respond with valid JSON only.' },
+        { role: 'user', content: prompt }
+    ];
+
+    const response = await callTicketLlm(config, messages, {
+        model: config.sddBrainModel || config.modelFast,
+        temperature: 0,
+        maxTokens: config.sddTicketsMaxTokens ?? 8000,
+        response_format: { type: 'json_object' }
+    });
+
+    const content = response.messages[response.messages.length - 1].content || '{}';
+
+    // Parse response
+    let tickets: { filename: string; title: string; content: string }[] = [];
+    try {
+        let raw = content.trim();
+        if (raw.startsWith('```')) {
+            const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
+            if (fenceMatch?.[1]) raw = fenceMatch[1].trim();
+        }
+        const parsed = JSON.parse(raw);
+        tickets = parsed.tickets || [];
+    } catch {
+        try {
+            const parsed = JSON.parse(jsonrepair(content));
+            tickets = parsed.tickets || [];
+        } catch (e) {
+            console.error('Failed to parse plan_work response:', e);
+        }
+    }
+
+    // Enforce maxTickets
+    if (config.maxTickets && tickets.length > config.maxTickets) {
+        tickets = tickets.slice(0, config.maxTickets);
+    }
+
+    // Write tickets
+    const ticketsDir = path.join(rootDir, '.sdd/backlog/tickets/open');
+    await fs.mkdir(ticketsDir, { recursive: true });
+    const createdFiles: string[] = [];
+
+    for (const ticket of tickets) {
+        const filePath = path.join(ticketsDir, ticket.filename);
+        await fs.writeFile(filePath, ticket.content);
+        createdFiles.push(ticket.filename);
+        console.log(`✓ Created ticket: ${ticket.filename}`);
+    }
+
+    return { ticketsCreated: createdFiles };
+}
+
 export async function loadProjectMetadata(rootDir: string, goal: string): Promise<ProjectMetadata> {
     const sddProjectPath = path.join(rootDir, '.sdd', 'project.md');
 
@@ -500,7 +682,7 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
     return { ticketsCreated: createdFiles };
 }
 
-// Define the graph
+// Define the original (legacy) graph
 const workflow = new StateGraph<SddOrchestratorState>({
     channels: {
         goal: { value: (x: string, y: string) => y ?? x, default: () => '' },
@@ -521,6 +703,25 @@ const workflow = new StateGraph<SddOrchestratorState>({
 
 const app = workflow.compile();
 
+// Define the consolidated graph (Ticket 02)
+const consolidatedWorkflow = new StateGraph<SddOrchestratorState>({
+    channels: {
+        goal: { value: (x: string, y: string) => y ?? x, default: () => '' },
+        rootDir: { value: (x: string, y: string) => y ?? x, default: () => '' },
+        config: { value: (x: KotefConfig, y: KotefConfig) => y ?? x, default: () => ({} as any) },
+        researchContent: { value: (x: string, y: string) => y ?? x, default: () => '' },
+        architectContent: { value: (x: string, y: string) => y ?? x, default: () => '' },
+        ticketsCreated: { value: (x: string[], y: string[]) => y ?? x, default: () => [] }
+    }
+})
+    .addNode('sdd_understand_and_design', sddUnderstandAndDesign)
+    .addNode('sdd_plan_work', sddPlanWork)
+    .addEdge(START, 'sdd_understand_and_design')
+    .addEdge('sdd_understand_and_design', 'sdd_plan_work')
+    .addEdge('sdd_plan_work', END);
+
+const consolidatedApp = consolidatedWorkflow.compile();
+
 export async function runSddOrchestration(
     cfg: KotefConfig,
     rootDir: string,
@@ -528,11 +729,21 @@ export async function runSddOrchestration(
 ): Promise<void> {
     console.log(`Starting SDD Orchestration for goal: "${goal}"`);
 
-    await app.invoke({
-        goal,
-        rootDir,
-        config: cfg
-    });
+    // Use consolidated prompts if enabled (Ticket 02)
+    if (cfg.useConsolidatedPrompts) {
+        console.log('Using consolidated prompts (2 LLM calls instead of 4+)');
+        await consolidatedApp.invoke({
+            goal,
+            rootDir,
+            config: cfg
+        });
+    } else {
+        await app.invoke({
+            goal,
+            rootDir,
+            config: cfg
+        });
+    }
 
     console.log('SDD Orchestration completed.');
 }

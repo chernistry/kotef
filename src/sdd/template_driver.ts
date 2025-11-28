@@ -12,7 +12,9 @@ export type BrainTemplateKind =
     | 'agent'
     | 'ticket'
     | 'architect_delta'
-    | 'bootstrap_project';
+    | 'bootstrap_project'
+    | 'understand_and_design'  // Consolidated: research + architect
+    | 'plan_work';             // Consolidated: batch ticket generation
 
 export interface SddPromptContext {
     projectName: string;
@@ -35,7 +37,9 @@ const TEMPLATE_FILES: Record<BrainTemplateKind, string> = {
     agent: 'agent_template.md',
     ticket: 'ticket_template.md',
     architect_delta: 'architect_delta_template.md',
-    bootstrap_project: 'bootstrap_project.md'
+    bootstrap_project: 'bootstrap_project.md',
+    understand_and_design: 'understand_and_design.md',
+    plan_work: 'plan_work.md'
 };
 
 export function loadBrainTemplate(kind: BrainTemplateKind): string {

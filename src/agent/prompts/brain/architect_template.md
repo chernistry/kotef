@@ -1,5 +1,7 @@
 # Architect Prompt Template
 
+> **DEPRECATED (Ticket 02)**: This template is superseded by `understand_and_design.md` when `useConsolidatedPrompts` is enabled. Kept for backward compatibility.
+
 Instruction for AI: based on the project description and best practices, prepare an implementation‑ready architecture specification.
 
 Context:
