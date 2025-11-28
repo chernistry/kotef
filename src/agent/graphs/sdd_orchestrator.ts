@@ -311,6 +311,17 @@ async function sddResearch(state: SddOrchestratorState): Promise<Partial<SddOrch
             }, null, 2));
             console.log(`Persisted raw research context to ${contextFile}`);
         }
+
+        // Ticket 03: Write to normalized research cache for runtime reuse
+        const { saveResearchCache } = await import('../utils/research_cache.js');
+        await saveResearchCache(rootDir, {
+            goal,
+            query: goal,
+            findings,
+            quality: result.quality,
+            updatedAt: Date.now()
+        });
+        console.log('Saved research to cache for runtime reuse');
     } catch (e) {
         console.warn('Deep research failed, falling back to model-only research:', e);
         findings = [];

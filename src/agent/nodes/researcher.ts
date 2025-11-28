@@ -5,6 +5,7 @@ import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
 import { analyzeImpact } from '../utils/impact.js';
 import { scanContext } from './planner.js';
+import { loadResearchCache, matchGoalToCache } from '../utils/research_cache.js';
 
 function getTaskTypeHint(text: string): 'reference' | 'debug' | 'architecture' | 'research' {
     const lower = text.toLowerCase();
@@ -24,6 +25,35 @@ export function researcherNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('researcher');
         log.info('Researcher node started');
+
+        // Ticket 03: Check research cache before hitting web
+        const goal = state.sdd.goal || '';
+        const cachedEntries = await loadResearchCache(cfg.rootDir || process.cwd());
+        if (cachedEntries) {
+            const match = matchGoalToCache(goal, cachedEntries);
+            if (match && match.findings.length > 0) {
+                log.info('Reusing SDD research from cache', { cachedGoal: match.goal, findingsCount: match.findings.length });
+                return {
+                    researchResults: {
+                        source: 'sdd',
+                        findings: match.findings
+                    },
+                    researchQuality: match.quality ? {
+                        lastQuery: match.query,
+                        relevance: match.quality.relevance,
+                        confidence: match.quality.confidence,
+                        coverage: match.quality.coverage,
+                        support: match.quality.support,
+                        recency: match.quality.recency,
+                        diversity: match.quality.diversity,
+                        hasConflicts: match.quality.hasConflicts,
+                        shouldRetry: false,
+                        reasons: `Reused from SDD cache (goal: "${match.goal}")`,
+                        attemptCount: 0
+                    } : undefined
+                };
+            }
+        }
 
         const safe = (value: unknown) => {
             if (value === undefined || value === null) return '';
