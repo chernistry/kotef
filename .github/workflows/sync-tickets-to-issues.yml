@@ -1,0 +1,86 @@
+name: Sync SDD Tickets to GitHub Issues
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.sdd/backlog/tickets/open/**'
+      - '.sdd/backlog/tickets/closed/**'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync tickets to issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          LABEL="sdd-ticket"
+          OPEN_DIR=".sdd/backlog/tickets/open"
+          CLOSED_DIR=".sdd/backlog/tickets/closed"
+
+          # Ensure label exists
+          gh label create "$LABEL" --description "Auto-synced from SDD ticket" --color "0052CC" 2>/dev/null || true
+
+          # Get existing issues with our label
+          existing_issues=$(gh issue list --label "$LABEL" --state all --json number,title,state --limit 100)
+
+          # Process open tickets
+          if [ -d "$OPEN_DIR" ]; then
+            for ticket in "$OPEN_DIR"/*.md; do
+              [ -f "$ticket" ] || continue
+              
+              filename=$(basename "$ticket" .md)
+              # Extract title from first H1
+              title=$(head -20 "$ticket" | grep -m1 "^# " | sed 's/^# //' | sed 's/^Ticket: //')
+              [ -z "$title" ] && title="$filename"
+              
+              # Check if issue exists (by filename in title prefix)
+              issue_num=$(echo "$existing_issues" | jq -r --arg fn "$filename" '.[] | select(.title | startswith("[" + $fn + "]")) | .number' | head -1)
+              
+              if [ -z "$issue_num" ]; then
+                # Create new issue
+                body=$(cat "$ticket")
+                echo "Creating issue for: $filename"
+                gh issue create --title "[$filename] $title" --body "$body" --label "$LABEL"
+              else
+                # Reopen if closed
+                state=$(echo "$existing_issues" | jq -r --arg num "$issue_num" '.[] | select(.number == ($num | tonumber)) | .state')
+                if [ "$state" = "CLOSED" ]; then
+                  echo "Reopening issue #$issue_num (ticket back in open)"
+                  gh issue reopen "$issue_num" --comment "Ticket moved back to open/"
+                fi
+              fi
+            done
+          fi
+
+          # Close issues for tickets moved to closed/
+          echo "$existing_issues" | jq -c '.[] | select(.state == "OPEN")' | while read -r issue; do
+            num=$(echo "$issue" | jq -r '.number')
+            title=$(echo "$issue" | jq -r '.title')
+            # Extract filename from title [filename]
+            filename=$(echo "$title" | sed -n 's/^\[\([^]]*\)\].*/\1/p')
+            
+            [ -z "$filename" ] && continue
+            
+            # If not in open/ anymore, close it
+            if [ ! -f "$OPEN_DIR/$filename.md" ]; then
+              if [ -f "$CLOSED_DIR/$filename.md" ]; then
+                echo "Closing issue #$num (ticket moved to closed/)"
+                gh issue close "$num" --comment "Ticket closed: moved to closed/"
+              else
+                echo "Closing issue #$num (ticket removed)"
+                gh issue close "$num" --comment "Ticket removed from backlog"
+              fi
+            fi
+          done
+
+          echo "Sync complete"

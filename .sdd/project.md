@@ -325,10 +325,9 @@ kotef/
   README.md                  # top‑level documentation for running kotef
 ```
 
-Next steps after this spec update:
-- Use `brain/bin/sdd-prompts` + `01_research` to generate `.sdd/best_practices.md` for kotef, explicitly including insights from  
-  `/Users/sasha/IdeaProjects/allthedocs/learning/research/ai_engineering/agentic_systems_building_best_practices.md`.
-- Use `02_architect` to produce `architect.md` and seed `backlog/tickets/open` with:
-  - initial implementation tickets for `src/core/llm.ts`, `src/tools/web_search.ts`, `src/tools/deep_research.ts`,
-  - design/implementation of the LangGraph coding graph and meta‑agent,
-  - evaluation and metrics tickets for measuring kotef’s performance.
+
+Current status (2025-11-28):
+- SDD artifacts generated: `best_practices.md`, `architect.md`, initial tickets
+- Architecture review completed, issues documented in `architect.md` section 12
+- Tickets prioritized based on dependency analysis
+- Next: implement tickets in order from `.sdd/backlog/tickets/open/`

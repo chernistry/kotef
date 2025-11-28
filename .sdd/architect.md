@@ -609,14 +609,16 @@ graph TD
 
 ## 8. Implementation Plan (Tickets)
 
-See `.sdd/backlog/tickets/open/` for detailed tickets.
+See `.sdd/backlog/tickets/open/` for detailed tickets. Implementation priority:
 
-1.  **01-scaffold-core**: Project setup, config, LLM adapter.
-2.  **02-tools-fs**: Safe file system tools.
-3.  **03-tools-search**: Web search & deep research.
-4.  **04-agent-graph**: LangGraph orchestration.
-5.  **05-cli-entrypoint**: CLI & logging.
-6.  **06-evaluation**: E2E tests & CI.
+1.  **Intent Contract & Config**: Foundational — captures goal, constraints, DoD; enables early exit
+2.  **Prompt Consolidation**: Reduce prompt fragmentation from 10+ to 2-3 comprehensive prompts
+3.  **Research Caching**: Cache and reuse SDD research results at runtime
+4.  **Project Memory**: Flat JSON memory for cross-run learning
+5.  **Executor Interface**: Clean abstraction for code execution backends
+6.  **Context Handoff**: Rich context passing to external coders (constraints, research)
+7.  **Code-Aware Tickets**: Ticket generation that understands existing code structure
+8.  **Graph Fast Path**: Skip verification cycles for trivial changes
 
 ## 9. Decision Log (ADRs)
 
@@ -805,7 +807,34 @@ Where:
 - **Risk**: Users may deploy "functionally done" code without addressing remaining issues.
   - **Mitigation**: Run reports clearly document remaining issues. CI pipelines can enforce `strict` profile for merge/deploy.
 
-## 12. Progress & Stop Rules
+## 12. Known Architectural Issues (2025-11-28)
+
+This section documents known issues identified during architecture review.
+
+### Critical Issues
+1. **Constraint Ignoring**: Agent ignores explicit user constraints ("DO NOT REDESIGN") because goal constraints are not parsed and propagated through the prompt chain.
+2. **Context Loss at Handoff**: When delegating to Kiro CLI, most of the accumulated context (research results, impact analysis, risk map) is lost.
+3. **Prompt Fragmentation**: Too many small prompts cause context drift; each prompt sees only a slice of the full picture.
+
+### Medium Priority Issues
+4. **Research Duplication**: SDD Orchestrator runs deepResearch(), then runtime agent runs it again for the same goal.
+5. **Excessive Cycles**: Rigid graph forces coder→verifier→planner cycle even for trivial changes.
+6. **No Cross-Run Memory**: Each run starts fresh; no learning from past successes/failures.
+7. **Tickets Ignore Existing Code**: Ticket generation doesn't receive projectSummary or codeIndex.
+
+### Architectural Debt
+8. **Synchronous Operations**: No parallelization of independent operations (e.g., multiple search queries).
+9. **Fixed Truncation**: Context truncation uses fixed limits regardless of model capacity or task relevance.
+10. **Coarse Budget System**: Hard limits without graceful degradation.
+
+### Planned Improvements
+- Add "intent parser" node before SDD orchestration
+- Consolidate prompts into fewer, more comprehensive ones
+- Pass full context to external coders
+- Implement cross-run memory/caching
+- Add dynamic context selection based on task relevance
+
+## 13. Progress & Stop Rules
 
 ### Philosophy
 Kotef implements a **supervisor-level progress controller** that tracks global progress across the entire run and detects stuck states. This prevents infinite loops and provides clear feedback when the agent cannot make further progress.
