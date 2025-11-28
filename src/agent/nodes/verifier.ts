@@ -7,6 +7,7 @@ import { runCommand } from '../../tools/test_runner.js';
 import { resolveExecutionProfile, PROFILE_POLICIES } from '../profiles.js';
 import { detectCommands, DetectedCommands } from '../utils/verification.js';
 import { recordFunctionalProbe, deriveFunctionalStatus } from '../utils/functional_checks.js';
+import { canUseFastPath } from '../utils/fast_path.js';
 
 export function verifierNode(cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
@@ -377,6 +378,31 @@ export function verifierNode(cfg: KotefConfig) {
         let decision: any;
         let attempts = 0;
         const maxAttempts = 3;
+
+        // Ticket 08: Fast path for simple changes
+        const stateForFastPath = {
+            ...state,
+            testResults: results,
+            diagnosticsLog: currentDiagnostics
+        };
+        if (allPassed && canUseFastPath(stateForFastPath)) {
+            log.info('Fast path: skipping planner re-evaluation', {
+                profile: executionProfile,
+                filesChanged: Object.keys(state.fileChanges || {}).length
+            });
+            return {
+                detectedCommands: detected,
+                testResults: results,
+                failureHistory,
+                lastTestSignature,
+                sameErrorCount,
+                done: true,
+                terminalStatus: 'done_success',
+                functionalChecks: state.functionalChecks,
+                diagnosticsLog: currentDiagnostics,
+                diagnosticsSummary
+            };
+        }
 
         while (attempts < maxAttempts) {
             try {
