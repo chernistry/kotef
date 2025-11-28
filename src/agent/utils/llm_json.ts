@@ -230,8 +230,11 @@ function repairCommonIssues(s: string): string {
   // 3. Single quotes → double quotes (for simple cases)
   // Key pattern: 'key': → "key":
   s = s.replace(/'([a-zA-Z_]\w*)'(\s*:)/g, '"$1"$2');
+
   // Value pattern: : 'value' → : "value" (simple strings without nested quotes)
-  s = s.replace(/:\s*'([^']*?)'/g, ': "$1"');
+  // CAUTION: This is risky for content containing code/markdown.
+  // We only apply it if the value doesn't look like it contains quotes or newlines
+  // s = s.replace(/:\s*'([^']*?)'/g, ': "$1"'); // DISABLED due to risk of mangling content
 
   // 4. Unquoted keys → quoted keys
   // Pattern: { key: or , key: → { "key": or , "key":
@@ -366,8 +369,14 @@ function schemaAwareParse(json: string, knownKeys: string[]): any {
       // But for strings we just constructed a valid JSON string
       result[current.key] = JSON.parse(rawValue);
     } catch (e) {
-      // Fallback: just use the string if it failed
-      result[current.key] = rawValue;
+      // Fallback: try jsonrepair on the raw value (useful for arrays/objects)
+      try {
+        const fixed = jsonrepair(rawValue);
+        result[current.key] = JSON.parse(fixed);
+      } catch (e2) {
+        // Final fallback: just use the string
+        result[current.key] = rawValue;
+      }
     }
   }
 

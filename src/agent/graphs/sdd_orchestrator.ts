@@ -176,6 +176,10 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
 /**
  * Consolidated ticket generation: All tickets in one LLM call (Ticket 02)
  */
+/**
+ * Consolidated ticket generation: All tickets in one LLM call (Ticket 02)
+ * Refactored to use XML-based "pseudo-tool" output for robustness across backends.
+ */
 async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
     debugLog('Running Consolidated SDD: Plan Work (batch tickets)...');
     const { goal, rootDir, config, architectContent } = state;
@@ -231,29 +235,59 @@ async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrch
         .replace('{{MAX_TICKETS_CONSTRAINT}}', maxTicketsText);
 
     const messages: ChatMessage[] = [
-        { role: 'system', content: 'You are an expert Project Manager. Respond with valid JSON only.' },
+        {
+            role: 'system',
+            content: `You are an expert Project Manager.
+You must output tickets using the following XML format:
+
+<ticket filename="01-example-task.md" title="Example Task Title">
+# Ticket: 01 Example Task Title
+... content ...
+</ticket>
+
+<ticket filename="02-another-task.md" title="Another Task">
+...
+</ticket>
+
+Do NOT use JSON. Do NOT use markdown code blocks for the XML tags. Just output the raw XML tags.`
+        },
         { role: 'user', content: prompt }
     ];
 
     const response = await callTicketLlm(config, messages, {
         model: config.sddBrainModel || config.modelFast,
         temperature: 0,
-        maxTokens: config.sddTicketsMaxTokens ?? 8000,
-        response_format: { type: 'json_object' }
+        maxTokens: config.sddTicketsMaxTokens ?? 8000
+        // response_format: { type: 'json_object' } // REMOVED: Using XML text output
     });
 
-    const content = response.messages[response.messages.length - 1].content || '{}';
+    const content = response.messages[response.messages.length - 1].content || '';
 
-    // Parse response
+    // Parse XML response
     let tickets: { filename: string; title: string; content: string }[] = [];
-    const parseResult = parseLlmJson<{ tickets?: { filename: string; title: string; content: string }[] }>(content);
-    if (parseResult.ok === true) {
-        tickets = parseResult.value.tickets || [];
-    } else {
-        console.error('Failed to parse plan_work response:', parseResult.error.message, `(${parseResult.error.kind})`);
+    const ticketRegex = /<ticket\s+filename="([^"]+)"\s+title="([^"]+)">([\s\S]*?)<\/ticket>/g;
+
+    let match;
+    while ((match = ticketRegex.exec(content)) !== null) {
+        tickets.push({
+            filename: match[1],
+            title: match[2],
+            content: match[3].trim()
+        });
+    }
+
+    if (tickets.length === 0) {
+        console.error('Failed to parse tickets from XML response.');
         if (config.debug) {
             console.error('[DEBUG] Raw LLM response:', content);
-            console.error('[DEBUG] Sanitized content:', parseResult.error.sanitized);
+        }
+        // Fallback: try to find single ticket if regex failed but content looks like a ticket
+        if (content.includes('# Ticket:')) {
+            tickets.push({
+                filename: '01-fallback.md',
+                title: 'Fallback Ticket',
+                content: content
+            });
         }
     }
 

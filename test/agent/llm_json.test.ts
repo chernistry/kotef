@@ -202,4 +202,32 @@ describe('parseLlmJson', () => {
       expect(result.value.architect).toBe('Some architect text');
     }
   });
+  it('handles array of objects with markdown content via schema-aware parsing', () => {
+    // Simulate sddPlanWork output with tickets array
+    const messyInput = `{
+  "tickets": [
+    {
+      "filename": "01.md",
+      "content": "# Ticket 01\\n- Item 1\\n- Code: 'const x = 1;'\\n- Quote: \\"hello\\""
+    },
+    {
+      "filename": "02.md",
+      "content": "# Ticket 02
+- Literal newline here
+- Unescaped quote inside: \\"glass\\": true"
+    }
+  ]
+}`;
+
+    const result = parseLlmJson<{ tickets: any[] }>(messyInput, {
+      knownKeys: ['tickets']
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.tickets).toHaveLength(2);
+      expect(result.value.tickets[0].filename).toBe('01.md');
+      expect(result.value.tickets[1].content).toContain('glass');
+    }
+  });
 });
