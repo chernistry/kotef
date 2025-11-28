@@ -14,7 +14,8 @@ describe('Ticket Lifecycle', () => {
         modelFast: 'mock-model',
         modelStrong: 'mock-model',
         maxTokensPerRun: 1000,
-        dryRun: true
+        dryRun: false,
+        gitEnabled: false
     };
 
     beforeEach(() => {

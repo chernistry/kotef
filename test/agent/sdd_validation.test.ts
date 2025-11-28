@@ -69,29 +69,38 @@ Summary is going to be cut off right here because the model ran out of tokens an
         const content = `
 # Architect Specification
 
-## 1. Overview
-...
+## Hard Constraints
+Domain prohibitions here.
 
-## 2. Hard Constraints & Preconditions
-...
+## Go/No-Go Preconditions
+Prerequisites here.
 
-## 4. Alternatives
-...
+## Goals & Non-Goals
+Goals and non-goals here.
 
-## 5. Architecture Overview
-...
+## Metric Profile & Strategic Risk Map
+Metrics here.
 
-## 6. Component Specifications
-...
+## Alternatives
+Alternative approaches here.
 
-## 7. Code Standards & Conventions
-...
+## Research Conflicts & Resolutions
+Conflicts here.
 
-## 8. Implementation Plan
-...
+## MVP Recommendation
+MVP choice here.
 
-## 9. Decision Log
-...
+## Architecture Overview
+Overview here.
+
+## Components
+Component list here.
+
+## Code Standards & Conventions
+Standards here.
+
+## Implementation Steps
+Steps here.
 `;
         const result = validateArchitectDoc(content);
         expect(result.ok).toBe(true);

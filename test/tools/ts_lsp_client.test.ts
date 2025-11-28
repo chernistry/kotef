@@ -63,8 +63,8 @@ describe('TypeScript LSP Client', () => {
             await expect(promise).resolves.toBeDefined();
 
             expect(spawn).toHaveBeenCalledWith(
-                'typescript-language-server',
-                ['--stdio'],
+                'npx',
+                ['typescript-language-server', '--stdio'],
                 expect.objectContaining({ cwd: '/tmp/project' })
             );
         });

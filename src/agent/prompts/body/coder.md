@@ -68,6 +68,11 @@ If the SDD snippets in this prompt look truncated, use `read_file` on `.sdd/proj
   - If something conflicts or is unclear, stop and return `status: "blocked"` with a short note instead of guessing.  
   - Do not widen scope beyond the ticket/plan without explicitly noting it in `notes`.
 
+- **No documentation clutter**
+  - Do NOT create implementation reports, summaries, or documentation files in the project root (e.g., `IMPLEMENTATION_REPORT.md`, `SUMMARY.md`, `CHANGES.md`).
+  - If you need to document something, use the existing `.sdd/` folder or `docs/` directory.
+  - The only files you should create in the project root are actual code files or standard config files (e.g., `.env.example`, `tsconfig.json`).
+
 - **Error‑first, then fix**  
   1. **Check `{{DIAGNOSTICS}}` first**: If there are compile errors (Source: 'build' or 'lsp') or test failures, FIX THEM BEFORE making new changes.
 2. **Prioritize**:

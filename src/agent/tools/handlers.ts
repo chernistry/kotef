@@ -97,7 +97,7 @@ export const ToolHandlers: Record<string, (args: any, ctx: ToolContext) => Promi
         // Let's assume we pass the check logic or move it.
         // For brevity, I'll implement basic checks.
 
-        if (ctx.commandCount > policy.maxCommands) {
+        if (ctx.commandCount >= policy.maxCommands) {
             return { result: `Skipped: budget exceeded (max ${policy.maxCommands}).`, contextUpdates: {} };
         }
 

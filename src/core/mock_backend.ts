@@ -51,13 +51,44 @@ export class MockLlmBackend {
                 content = "I have applied the changes.";
             }
         }
+        // Bootstrap Best Practices Mock (software researcher)
+        else if (systemMsg.includes('software researcher') || systemMsg.includes('expert software researcher')) {
+            content = `# Best Practices & Research
+
+## 1. TL;DR
+Follow standard TypeScript best practices.
+
+## 2. Landscape
+The ecosystem includes various tools and frameworks.
+
+## 3. Architecture Patterns
+Use modular architecture with clear separation of concerns.
+
+## 4. Conflicting Practices & Alternatives
+Consider trade-offs between simplicity and flexibility.
+
+## 5. References
+- [Example Docs](https://example.com/docs).`;
+        }
         // Bootstrap Architect Mock
         else if (systemMsg.includes('software architect') || lastMsg.includes('software architect')) {
-            content = JSON.stringify({
-                project_md: '# Mock Project',
-                architect_md: '# Mock Architect',
-                best_practices_md: '# Mock Best Practices'
-            });
+            content = `# Architect
+
+## 1. Overview
+Mock architecture overview.
+
+## 2. Key Components
+- Component A
+- Component B
+
+## 3. Data Flow
+Data flows from A to B.
+
+## 4. Technology Choices
+TypeScript, Node.js
+
+## 5. Risks & Mitigations
+- Risk: None identified.`;
         }
         // Bootstrap Tickets Mock
         else if (systemMsg.includes('Project Manager') || lastMsg.includes('Project Manager')) {

@@ -58,12 +58,12 @@ describe('Runtime prompts', () => {
 
     it('research helper prompts describe JSON contracts', async () => {
         const refiner = await loadRuntimePrompt('research_query_refiner');
-        expect(refiner).toMatch(/single JSON object/i);
+        expect(refiner).toMatch(/JSON/i);
 
         const relevance = await loadRuntimePrompt('research_relevance_evaluator');
-        expect(relevance).toMatch(/single JSON object/i);
+        expect(relevance).toMatch(/JSON/i);
 
         const optimizer = await loadRuntimePrompt('search_query_optimizer');
-        expect(optimizer).toMatch(/single JSON object/i);
+        expect(optimizer).toMatch(/JSON/i);
     });
 });

@@ -71,7 +71,8 @@ describe('Config', () => {
 
         const config = loadConfig();
         expect(config.baseUrl).toBe('https://api.openai.com/v1');
-        expect(config.dryRun).toBe(true);
+        // dryRun defaults to false (git enabled by default per Ticket 57)
+        expect(config.dryRun).toBe(false);
         expect(config.maxRunSeconds).toBe(300);
     });
 

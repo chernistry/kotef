@@ -50,6 +50,12 @@ export async function kiroCoderNode(
         updatedFileChanges[file] = 1;
     }
 
+    // Track consecutiveNoOps like internal coder
+    const initialFileCount = Object.keys(state.fileChanges || {}).length;
+    const finalFileCount = Object.keys(updatedFileChanges).length;
+    const hasNewChanges = finalFileCount > initialFileCount;
+    const consecutiveNoOps = hasNewChanges ? 0 : (state.consecutiveNoOps || 0) + 1;
+
     log.info('Kiro coder completed', { filesChanged: result.changedFiles.length });
 
     return {
@@ -60,6 +66,7 @@ export async function kiroCoderNode(
                 role: 'assistant',
                 content: `Kiro executor modified ${result.changedFiles.length} file(s): ${result.changedFiles.join(', ')}`
             }
-        ]
+        ],
+        consecutiveNoOps
     };
 }
