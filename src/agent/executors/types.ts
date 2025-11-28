@@ -15,6 +15,8 @@ export interface ExecutorRequest {
         architect?: string;
         bestPractices?: string;
         projectSummary?: string;
+        riskSummary?: string;
+        impactSummary?: string;
     };
 }
 
