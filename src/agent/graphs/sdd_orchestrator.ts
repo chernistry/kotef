@@ -32,6 +32,11 @@ export interface SddOrchestratorState {
     researchContent?: string;
     architectContent?: string;
     ticketsCreated?: string[];
+    scopeAnalysis?: {
+        appetite: 'Small' | 'Batch' | 'Big';
+        constraints: string[];
+        reasoning: string;
+    };
 }
 
 export interface ProjectMetadata {
@@ -100,7 +105,7 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
     const content = response.messages[response.messages.length - 1].content || '{}';
 
     // 4. Parse JSON response
-    let parsed: { bestPractices?: string; architect?: string };
+    let parsed: { bestPractices?: string; architect?: string; scopeAnalysis?: { appetite: string; constraints: string[]; reasoning: string } };
     try {
         let raw = content.trim();
         if (raw.startsWith('```')) {
@@ -115,6 +120,22 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
             console.error('Failed to parse consolidated response:', e);
             throw new Error('Failed to parse understand_and_design response');
         }
+    }
+
+    // 4.5. Save scopeAnalysis to intent_contract cache for downstream use
+    if (parsed.scopeAnalysis) {
+        console.log(`Scope Analysis: appetite=${parsed.scopeAnalysis.appetite}, constraints=${parsed.scopeAnalysis.constraints?.length || 0}`);
+        const cacheDir = path.join(rootDir, '.sdd', 'cache');
+        await fs.mkdir(cacheDir, { recursive: true });
+        const intentContract = {
+            goal,
+            appetite: parsed.scopeAnalysis.appetite || 'Batch',
+            constraints: parsed.scopeAnalysis.constraints || [],
+            nonGoals: [],
+            dodChecks: [],
+            forbiddenPaths: []
+        };
+        await fs.writeFile(path.join(cacheDir, 'intent_contract.json'), JSON.stringify(intentContract, null, 2));
     }
 
     // 5. Write files
@@ -132,7 +153,12 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
 
     return {
         researchContent: parsed.bestPractices || '',
-        architectContent: parsed.architect || ''
+        architectContent: parsed.architect || '',
+        scopeAnalysis: parsed.scopeAnalysis ? {
+            appetite: parsed.scopeAnalysis.appetite as 'Small' | 'Batch' | 'Big',
+            constraints: parsed.scopeAnalysis.constraints || [],
+            reasoning: parsed.scopeAnalysis.reasoning || ''
+        } : undefined
     };
 }
 
@@ -142,6 +168,16 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
 async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
     console.log('Running Consolidated SDD: Plan Work (batch tickets)...');
     const { goal, rootDir, config, architectContent } = state;
+
+    // Load scopeAnalysis from cache (written by sddUnderstandAndDesign)
+    let scopeAnalysis: { appetite: string; constraints: string[] } | null = null;
+    try {
+        const cachePath = path.join(rootDir, '.sdd', 'cache', 'intent_contract.json');
+        const content = await fs.readFile(cachePath, 'utf-8');
+        scopeAnalysis = JSON.parse(content);
+    } catch {
+        // No scope analysis available
+    }
 
     // Build code map (simple file listing)
     let codeMap = '';
@@ -153,8 +189,22 @@ async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrch
         codeMap = '(code map unavailable)';
     }
 
-    const maxTicketsText = config.maxTickets
-        ? `Generate EXACTLY ${config.maxTickets} tickets. No more.`
+    // Determine max tickets based on appetite
+    let effectiveMaxTickets = config.maxTickets;
+    if (scopeAnalysis?.appetite === 'Small' && (!effectiveMaxTickets || effectiveMaxTickets > 2)) {
+        effectiveMaxTickets = 2;
+        console.log('Scope is Small, limiting to 2 tickets max');
+    } else if (scopeAnalysis?.appetite === 'Batch' && (!effectiveMaxTickets || effectiveMaxTickets > 5)) {
+        effectiveMaxTickets = Math.min(effectiveMaxTickets || 5, 5);
+    }
+
+    const maxTicketsText = effectiveMaxTickets
+        ? `Generate EXACTLY ${effectiveMaxTickets} tickets. No more.`
+        : '';
+
+    // Add scope context to prompt
+    const scopeContext = scopeAnalysis
+        ? `\n\n## Scope Analysis (from goal)\n- Appetite: ${scopeAnalysis.appetite}\n- Constraints: ${scopeAnalysis.constraints?.join(', ') || 'none'}\n\nRESPECT THIS SCOPE. If appetite is Small, generate only minor tweaks, not infrastructure.`
         : '';
 
     const prompt = renderBrainTemplate('plan_work', {
@@ -163,7 +213,7 @@ async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrch
         techStack: '',
         year: new Date().getFullYear(),
         goal,
-        additionalContext: `Code Map:\n${codeMap}\n\nMax Tickets Constraint: ${maxTicketsText}`
+        additionalContext: `Code Map:\n${codeMap}\n\nMax Tickets Constraint: ${maxTicketsText}${scopeContext}`
     })
         .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
         .replace('{{CODE_MAP}}', codeMap)
@@ -741,7 +791,8 @@ const consolidatedWorkflow = new StateGraph<SddOrchestratorState>({
         config: { value: (x: KotefConfig, y: KotefConfig) => y ?? x, default: () => ({} as any) },
         researchContent: { value: (x: string, y: string) => y ?? x, default: () => '' },
         architectContent: { value: (x: string, y: string) => y ?? x, default: () => '' },
-        ticketsCreated: { value: (x: string[], y: string[]) => y ?? x, default: () => [] }
+        ticketsCreated: { value: (x: string[], y: string[]) => y ?? x, default: () => [] },
+        scopeAnalysis: { value: (x: any, y: any) => y ?? x, default: () => undefined }
     }
 })
     .addNode('sdd_understand_and_design', sddUnderstandAndDesign)

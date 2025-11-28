@@ -7,6 +7,25 @@ You are an expert Project Manager. Generate ALL tickets for implementing the arc
 - Architecture: {{ARCHITECT_CONTENT}}
 - Code Map: {{CODE_MAP}}
 
+## CRITICAL: Scope Analysis (DO THIS FIRST)
+
+Before generating tickets, analyze the GOAL for scope signals:
+
+**Detect Appetite:**
+- `Small`: "minor", "small", "tiny", "quick", "tweak", "мелкие", "небольшие", "слегка" → MAX 1-2 tickets, each <1 hour
+- `Batch`: "several", "few", "update", "improve" → MAX 3-5 tickets
+- `Big`: "refactor", "redesign", "rewrite", "major" → Up to 15 tickets
+
+**Detect Constraints:**
+- "DO NOT", "don't", "NOT", "never", "без", "не делай" → Extract and RESPECT these
+- If goal says "DO NOT REDESIGN COMPLETELY" → tickets must be MINOR tweaks, not infrastructure overhauls
+
+**STRICT RULE**: If the goal contains words like "мелкие", "minor", "small", "DO NOT REDESIGN":
+- Do NOT generate infrastructure tickets (design tokens, new components, new systems)
+- Do NOT generate "setup" or "foundation" tickets
+- Generate ONLY small, surgical changes to EXISTING files
+- Each ticket should touch 1-3 files maximum
+
 ## Ticket Template
 Each ticket must follow this structure:
 ```markdown

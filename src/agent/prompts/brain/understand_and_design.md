@@ -17,15 +17,42 @@ You are an expert software researcher and architect. Your task is to produce TWO
 
 ---
 
+## CRITICAL: Scope Analysis (DO THIS FIRST)
+
+Before generating any content, analyze the goal for scope signals:
+
+**Detect Appetite from goal text:**
+- `Small` signals: "minor", "small", "tiny", "quick fix", "tweak", "мелкие", "небольшие", "слегка"
+- `Batch` signals: "several", "few changes", "update", "improve" (without "completely")
+- `Big` signals: "refactor", "redesign", "rewrite", "major", "complete overhaul"
+
+**Detect Constraints from goal text:**
+- Look for: "DO NOT", "don't", "NOT", "never", "without", "без", "не делай", "не меняй"
+- Extract the full constraint phrase (e.g., "DO NOT REDESIGN COMPLETELY")
+
+**Your output MUST respect these signals:**
+- If goal says "minor improvements" → architect.md should describe MINOR changes only
+- If goal says "DO NOT X" → architect.md MUST NOT include X in the plan
+- If appetite is Small → Goals section should have 1-3 small goals, not 10+ screens
+
+---
+
 ## Output Format
 
-Respond with a JSON object containing two fields:
+Respond with a JSON object containing THREE fields:
 ```json
 {
+  "scopeAnalysis": {
+    "appetite": "Small | Batch | Big",
+    "constraints": ["DO NOT X", "без Y"],
+    "reasoning": "Why this appetite and these constraints"
+  },
   "bestPractices": "# Best Practices & Research\n\n## 1. TL;DR\n...",
   "architect": "# Architect Specification\n\n## Hard Constraints\n..."
 }
 ```
+
+**IMPORTANT**: The `scopeAnalysis` MUST be filled FIRST and MUST influence the content of `bestPractices` and `architect`. If appetite is "Small", do NOT generate ambitious multi-screen redesign plans.
 
 ---
 

@@ -1,6 +1,6 @@
 /**
  * Intent Contract: captures goal, constraints, appetite, non-goals, and DoD in one place.
- * Built once per run and reused across nodes. Enables early exit when DoD is satisfied.
+ * Built by LLM during SDD orchestration and cached for runtime use.
  */
 
 import { promises as fs } from 'node:fs';
@@ -17,19 +17,19 @@ export interface IntentContract {
 }
 
 /**
- * Parse constraints from text. Looks for lines starting with constraint keywords.
+ * Parse DoD checks from ticket or goal text
  */
-function parseConstraints(text: string): string[] {
+function parseDodChecks(text: string): string[] {
     if (!text) return [];
-    const lines = text.split('\n');
-    const constraintPatterns = [
-        /^[-*]?\s*(DO NOT|MUST NOT|Never|Forbidden:)/i,
-        /^[-*]?\s*Constraint:/i
-    ];
-    return lines
-        .map(l => l.trim())
-        .filter(l => constraintPatterns.some(p => p.test(l)))
-        .map(l => l.replace(/^[-*]\s*/, '').trim());
+    const dodMatch = text.match(/(?:Definition of Done|DoD|## DoD)[:\s]*\n([\s\S]*?)(?=\n##|$)/i);
+    if (dodMatch) {
+        return dodMatch[1]
+            .split('\n')
+            .map(l => l.replace(/^[-*\[\]x ]+/i, '').trim())
+            .filter(l => l && !l.startsWith('#'));
+    }
+    const checkboxes = text.match(/^[-*]\s*\[[ x]\]\s*.+$/gim);
+    return checkboxes?.map(l => l.replace(/^[-*]\s*\[[ x]\]\s*/, '').trim()) || [];
 }
 
 /**
@@ -45,38 +45,6 @@ function parseForbiddenPaths(kotefText: string): string[] {
         .filter(l => l && !l.startsWith('#'));
 }
 
-/**
- * Parse DoD checks from ticket or goal text
- */
-function parseDodChecks(text: string): string[] {
-    if (!text) return [];
-    // Look for "Definition of Done" or "DoD" section
-    const dodMatch = text.match(/(?:Definition of Done|DoD|## DoD)[:\s]*\n([\s\S]*?)(?=\n##|$)/i);
-    if (dodMatch) {
-        return dodMatch[1]
-            .split('\n')
-            .map(l => l.replace(/^[-*\[\]x ]+/i, '').trim())
-            .filter(l => l && !l.startsWith('#'));
-    }
-    // Fallback: look for checkbox items
-    const checkboxes = text.match(/^[-*]\s*\[[ x]\]\s*.+$/gim);
-    return checkboxes?.map(l => l.replace(/^[-*]\s*\[[ x]\]\s*/, '').trim()) || [];
-}
-
-/**
- * Infer appetite from goal/ticket text
- */
-function inferAppetite(text: string): 'Small' | 'Batch' | 'Big' {
-    const lower = text.toLowerCase();
-    if (lower.includes('refactor') || lower.includes('redesign') || lower.includes('major')) {
-        return 'Big';
-    }
-    if (lower.includes('fix') || lower.includes('typo') || lower.includes('small') || lower.includes('quick')) {
-        return 'Small';
-    }
-    return 'Batch';
-}
-
 export interface BuildIntentParams {
     goal?: string;
     ticketMarkdown?: string;
@@ -86,29 +54,23 @@ export interface BuildIntentParams {
 }
 
 /**
- * Build an IntentContract from available sources
+ * Build an IntentContract from available sources.
+ * Prefers AI-generated scope analysis from cache if available.
  */
 export function buildIntentContract(params: BuildIntentParams): IntentContract {
     const { goal, ticketMarkdown, shapedGoal, clarifiedGoal, kotefText } = params;
 
-    const allText = [goal, ticketMarkdown, kotefText].filter(Boolean).join('\n');
-
-    // Merge constraints from all sources
-    const constraints = [
-        ...parseConstraints(allText),
-        ...(clarifiedGoal?.constraints || [])
-    ];
-
-    // Merge DoD checks
     const dodChecks = [
         ...parseDodChecks(ticketMarkdown || ''),
         ...(clarifiedGoal?.DoD_checks || [])
     ];
 
+    const constraints = clarifiedGoal?.constraints || [];
+
     return {
         goal: goal || shapedGoal?.clarifiedIntent || '',
         ticketId: ticketMarkdown?.match(/^# Ticket:\s*(\S+)/m)?.[1],
-        appetite: shapedGoal?.appetite || inferAppetite(allText),
+        appetite: shapedGoal?.appetite || 'Batch',
         nonGoals: shapedGoal?.nonGoals || [],
         constraints: [...new Set(constraints)],
         dodChecks: [...new Set(dodChecks)],
@@ -162,7 +124,6 @@ export async function loadCachedIntentContract(rootDir: string, currentGoal?: st
     try {
         const content = await fs.readFile(cachePath, 'utf-8');
         const contract = JSON.parse(content) as IntentContract;
-        // Only reuse if goal matches
         if (currentGoal && contract.goal !== currentGoal) {
             return null;
         }
