@@ -807,32 +807,53 @@ Where:
 - **Risk**: Users may deploy "functionally done" code without addressing remaining issues.
   - **Mitigation**: Run reports clearly document remaining issues. CI pipelines can enforce `strict` profile for merge/deploy.
 
-## 12. Known Architectural Issues (2025-11-28)
+## 12. Known Architectural Issues (Updated 2025-11-28)
 
-This section documents known issues identified during architecture review.
+This section documents known issues and their resolution status.
 
-### Critical Issues
-1. **Constraint Ignoring**: Agent ignores explicit user constraints ("DO NOT REDESIGN") because goal constraints are not parsed and propagated through the prompt chain.
-2. **Context Loss at Handoff**: When delegating to Kiro CLI, most of the accumulated context (research results, impact analysis, risk map) is lost.
-3. **Prompt Fragmentation**: Too many small prompts cause context drift; each prompt sees only a slice of the full picture.
+### ✅ Resolved Issues (Tickets 01-08)
 
-### Medium Priority Issues
-4. **Research Duplication**: SDD Orchestrator runs deepResearch(), then runtime agent runs it again for the same goal.
-5. **Excessive Cycles**: Rigid graph forces coder→verifier→planner cycle even for trivial changes.
-6. **No Cross-Run Memory**: Each run starts fresh; no learning from past successes/failures.
-7. **Tickets Ignore Existing Code**: Ticket generation doesn't receive projectSummary or codeIndex.
+1. **~~Constraint Ignoring~~** → Fixed by Intent Contract (Ticket 01)
+   - Goal constraints now parsed and propagated via `IntentContract`
+   - Forbidden paths enforced in executor
 
-### Architectural Debt
-8. **Synchronous Operations**: No parallelization of independent operations (e.g., multiple search queries).
-9. **Fixed Truncation**: Context truncation uses fixed limits regardless of model capacity or task relevance.
-10. **Coarse Budget System**: Hard limits without graceful degradation.
+2. **~~Context Loss at Handoff~~** → Fixed by Kiro Context Handoff (Ticket 06)
+   - Full context (intent, risk, impact) passed to Kiro executor
+   - Guardrails section added to kiro_coder.md prompt
 
-### Planned Improvements
-- Add "intent parser" node before SDD orchestration
-- Consolidate prompts into fewer, more comprehensive ones
-- Pass full context to external coders
-- Implement cross-run memory/caching
-- Add dynamic context selection based on task relevance
+3. **~~Prompt Fragmentation~~** → Fixed by Prompt Consolidation (Ticket 02)
+   - Consolidated prompts reduce 4+ LLM calls to 2
+   - `useConsolidatedPrompts` now defaults to `true`
+
+4. **~~Research Duplication~~** → Fixed by Research Cache (Ticket 03)
+   - SDD research cached in `.sdd/cache/research_cache.json`
+   - Runtime researcher checks cache before web calls
+
+5. **~~Excessive Cycles~~** → Fixed by Fast Path (Ticket 08)
+   - Verifier skips planner re-evaluation for simple changes
+   - Profile-based thresholds (smoke ≤3 files, yolo ≤5 files)
+
+6. **~~No Cross-Run Memory~~** → Fixed by Project Memory (Ticket 04)
+   - Run summaries stored in `.sdd/cache/project_memory.json`
+   - Planner loads previous runs on startup
+
+7. **~~Tickets Ignore Existing Code~~** → Fixed by Code-Aware Tickets (Ticket 07)
+   - `keyModules` detection added to ProjectSummary
+   - `{{CODE_MAP}}` placeholder in ticket generation prompt
+
+### Remaining Architectural Debt
+
+8. **Synchronous Operations**: No parallelization of independent operations
+   - Impact: Slower research when multiple queries needed
+   - Priority: Low (not blocking)
+
+9. **Fixed Truncation**: Context truncation uses fixed limits
+   - Impact: May truncate important context for large projects
+   - Priority: Medium
+
+10. **Coarse Budget System**: Hard limits without graceful degradation
+    - Impact: Abrupt stops instead of graceful completion
+    - Priority: Low
 
 ## 13. Progress & Stop Rules
 

@@ -1,46 +1,58 @@
 <div align="center">
 
-# kotef — AI developer that actually gets things done
+# kotef — Your AI Architect & Tech Lead
 
 _heb. 'kotef' (קוטף) — 'one who picks/harvests' (wordplay with 'katef' כתף — 'a shoulder to support you')_
 
-> "Give me a repo and a goal. I'll figure out the rest. And document everything."
+> "Give me a repo and a goal. I'll research, plan, and document everything — then code it safely."
 
 ![kotef in action](assets/screenshot.png)
 
 </div>
 
-**Tired of AI assistants that hallucinate APIs and break your code?** kotef is different. It's a LangGraph-powered coding agent that's **obsessively methodical** about:
+**Not another AI code editor.** Kotef is an autonomous **SDD Brain** — it researches best practices, creates architecture specs, generates tickets, and only then writes code. Think of it as an Architect + Tech Lead in a CLI.
 
 <table>
 <tr>
-<td>📋</td>
-<td><strong>Reading real specs</strong><br/><sub>not guessing what you want</sub></td>
+<td>🧠</td>
+<td><strong>SDD Brain</strong><br/><sub>Creates project.md, architect.md, best_practices.md, tickets</sub></td>
 </tr>
 <tr>
 <td>🔍</td>
-<td><strong>Fresh research</strong><br/><sub>not cargo-culting 2019 blog posts</sub></td>
+<td><strong>Deep Research</strong><br/><sub>Quality-scored web research with citations</sub></td>
+</tr>
+<tr>
+<td>📋</td>
+<td><strong>Intent Contracts</strong><br/><sub>Explicit constraints, DoD, forbidden paths</sub></td>
 </tr>
 <tr>
 <td>🛡️</td>
-<td><strong>Safe, validated changes</strong><br/><sub>not breaking your entire codebase</sub></td>
+<td><strong>Verification Loop</strong><br/><sub>Tests changes before committing</sub></td>
 </tr>
 </table>
 
-Built on [synapse](https://chernistry.github.io/synapse/) (adaptive governance) and [sddrush](https://github.com/chernistry/sddrush) (spec-driven dev toolkit).
+---
+
+## What makes kotef different
+
+| Other AI Coders | Kotef |
+|-----------------|-------|
+| Jump straight to code | Research → Architecture → Tickets → Code |
+| Hallucinate APIs | Ground decisions in fresh web research |
+| Ignore your patterns | Read and respect your codebase |
+| Leave uncommitted mess | Auto-commit per feature with verification |
+| Forget context between runs | Project memory + research cache |
+
+**Kotef's unique value:** It's not trying to be an IDE. It's a **brain** that does the thinking (research, architecture, planning) so you can focus on reviewing and shipping.
 
 ---
 
-<div align="center">
-
 ## 🚀 Quick Start
-
-</div>
 
 ```bash
 # 1. Configure environment
 cp .env.example .env
-# Edit .env with your API keys (see .env.example for details)
+# Edit .env with your API keys
 
 # 2. Install & build
 npm install && npm run build
@@ -56,59 +68,49 @@ node bin/kotef chat --root /path/to/repo
 
 ---
 
-## Why kotef > other AI coders
-
-<table>
-<tr>
-<td width="50%">
-
-**Other AI assistants:**
-- Hallucinate code based on vague descriptions
-- Break existing code (don't read docs)
-- Use outdated Stack Overflow answers
-- Leave uncommitted mess
-
-</td>
-<td width="50%">
-
-**Kotef:**
-- Reads your codebase, creates proper spec
-- Fresh web research with quality scoring
-- Small, safe steps with validation
-- Auto-commits per feature
-- Learns from mistakes
-
-</td>
-</tr>
-</table>
-
----
-
 ## How it works
 
-**Brain:** Creates `.sdd/` folder with `project.md`, `architect.md`, `best_practices.md` and ticket backlog. This becomes source of truth.
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        SDD BRAIN                            │
+│  Creates .sdd/ folder with:                                 │
+│  • project.md — goals, constraints, DoD                     │
+│  • architect.md — architecture decisions                    │
+│  • best_practices.md — research-backed patterns             │
+│  • backlog/tickets/ — implementation tasks                  │
+│  • KOTEF.md — project-level policies                        │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                      RUNTIME FLOW                           │
+│  planner → researcher → coder → verifier → ticket_closer    │
+│                                                             │
+│  • Intent Contract enforces constraints                     │
+│  • Research cache avoids duplicate web calls                │
+│  • Project memory learns from past runs                     │
+└─────────────────────────────────────────────────────────────┘
+```
 
-**Body:** Flow is `planner → researcher → coder → verifier → snitch/ticket_closer`. Thinks before touching repo, does fresh research, validates changes.
-
-**Tech:** Node.js + TypeScript + LangGraph, deep web research, LSP diagnostics, circuit breakers, git integration, execution profiles (`strict`/`fast`/`smoke`/`yolo`).
+**Tech:** Node.js + TypeScript + LangGraph, deep web research with quality scoring, LSP diagnostics, git integration, execution profiles (`strict`/`fast`/`smoke`/`yolo`).
 
 ---
 
 ## Perfect for
 
-Solo devs shipping features fast • Tech leads delegating implementation • Agile teams handling tickets • Open source maintainers • Indie hackers building MVPs
-
-**Anyone tired of AI that:** guesses wrong, uses deprecated libs, leaves cleanup mess, costs debugging hours.
+- **Solo devs** shipping features fast
+- **Tech leads** delegating implementation
+- **Teams** handling ticket backlogs
+- **Anyone** tired of AI that guesses wrong
 
 ---
 
 ## Contributing
 
-High-impact areas: smarter research, better planning, bulletproof verification, more language support, performance.
+High-impact areas: smarter research, better planning, bulletproof verification.
 
 Found a bug? Open an issue. Have an idea? Start a discussion. Want to code? Check `.sdd/backlog/tickets/`.
 
-See `CONTRIBUTING.md` for details. Full docs in `docs/KB.md` 📚
+See `CONTRIBUTING.md` for details.
 
 ---
 

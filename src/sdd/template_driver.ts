@@ -7,9 +7,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export type BrainTemplateKind =
-    | 'research'
-    | 'architect'
-    | 'agent'
+    | 'research'           // Alias for understand_and_design (legacy)
+    | 'architect'          // Alias for understand_and_design (legacy)
+    | 'agent'              // Alias for understand_and_design (legacy)
     | 'ticket'
     | 'architect_delta'
     | 'bootstrap_project'
@@ -31,10 +31,12 @@ export interface SddPromptContext {
     ticket?: string;
 }
 
+// Map template kinds to files
+// Legacy templates (research, architect, agent) now alias to consolidated understand_and_design
 const TEMPLATE_FILES: Record<BrainTemplateKind, string> = {
-    research: 'research_template.md',
-    architect: 'architect_template.md',
-    agent: 'agent_template.md',
+    research: 'understand_and_design.md',      // Consolidated
+    architect: 'understand_and_design.md',     // Consolidated
+    agent: 'understand_and_design.md',         // Consolidated
     ticket: 'ticket_template.md',
     architect_delta: 'architect_delta_template.md',
     bootstrap_project: 'bootstrap_project.md',
@@ -92,10 +94,6 @@ export function renderBrainTemplate(
     if (ctx.research) rendered = rendered.replace(/{{RESEARCH}}/g, ctx.research);
     if (ctx.architect) rendered = rendered.replace(/{{ARCHITECT}}/g, ctx.architect);
     if (ctx.ticket) rendered = rendered.replace(/{{TICKET}}/g, ctx.ticket);
-
-    // Check for leftover placeholders (optional, but good for debugging)
-    // We won't throw for now as some templates might have optional sections or other placeholders
-    // But we can warn if we see {{...}}
 
     return rendered;
 }

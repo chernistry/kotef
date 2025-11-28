@@ -14,18 +14,21 @@ describe('SDDRush Template Driver', () => {
         ticket: 'Ticket details'
     };
 
-    it('should load research template', () => {
+    // Legacy template names now alias to consolidated understand_and_design
+    it('should load research template (alias for understand_and_design)', () => {
         const template = loadBrainTemplate('research');
         expect(template.length).toBeGreaterThan(0);
         expect(template).toContain('{{PROJECT_NAME}}');
+        expect(template).toContain('Best Practices'); // Consolidated template content
     });
 
-    it('should load architect template', () => {
+    it('should load architect template (alias for understand_and_design)', () => {
         const template = loadBrainTemplate('architect');
         expect(template.length).toBeGreaterThan(0);
+        expect(template).toContain('Architect Specification'); // Consolidated template content
     });
 
-    it('should load agent template', () => {
+    it('should load agent template (alias for understand_and_design)', () => {
         const template = loadBrainTemplate('agent');
         expect(template.length).toBeGreaterThan(0);
     });
@@ -35,20 +38,17 @@ describe('SDDRush Template Driver', () => {
         expect(template.length).toBeGreaterThan(0);
     });
 
-    it('should render research template with context', () => {
-        const rendered = renderBrainTemplate('research', mockContext);
+    it('should render understand_and_design template with context', () => {
+        const rendered = renderBrainTemplate('understand_and_design', mockContext);
         expect(rendered).toContain('TestProject');
         expect(rendered).toContain('TypeScript');
         expect(rendered).toContain('2025');
-        // Check context specific
         expect(rendered).toContain('Fix bugs');
     });
 
-    it('should render architect template with context', () => {
-        const rendered = renderBrainTemplate('architect', mockContext);
-        expect(rendered).toContain('TestProject');
-        // Architect template does not use {{RESEARCH}}, it refers to .sdd/best_practices.md
-        expect(rendered).toContain('.sdd/best_practices.md');
+    it('should render plan_work template with context', () => {
+        const rendered = renderBrainTemplate('plan_work', mockContext);
+        expect(rendered).toContain('Fix bugs'); // Goal is used
     });
 
     it('should throw error for invalid template kind', () => {
