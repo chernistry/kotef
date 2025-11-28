@@ -328,6 +328,7 @@ program
     .option('--continue', 'Auto-continue to next ticket after completion', false)
     .option('--nogit', 'Disable git integration', false)
     .option('--max-tickets <count>', 'Maximum number of tickets to generate (default: no limit)')
+    .option('--debug', 'Enable verbose debug logging', false)
     .action(async (options) => {
         const runId = randomUUID();
         const rootDir = path.resolve(expandTilde(options.root));
@@ -342,7 +343,8 @@ program
             maxRunSeconds: options.maxTime ? parseInt(options.maxTime) : envConfig.maxRunSeconds,
             maxTokensPerRun: options.maxTokens ? parseInt(options.maxTokens) : envConfig.maxTokensPerRun,
             maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns,
-            maxTickets: options.maxTickets ? parseInt(options.maxTickets) : envConfig.maxTickets
+            maxTickets: options.maxTickets ? parseInt(options.maxTickets) : envConfig.maxTickets,
+            debug: options.debug || envConfig.debug
         };
 
         const log = createLogger(runId);
@@ -694,13 +696,15 @@ program
     .option('--auto-approve', 'Skip interactive approval', false)
     .option('--nogit', 'Disable git integration', false)
     .option('--max-tickets <count>', 'Maximum number of tickets to generate (default: no limit)')
+    .option('--debug', 'Enable verbose debug logging', false)
     .action(async (options) => {
         const rootDir = path.resolve(expandTilde(options.root));
         const envConfig = loadConfig();
         const cfg: KotefConfig = {
             ...envConfig,
             rootDir,
-            maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns
+            maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns,
+            debug: options.debug || envConfig.debug
         };
 
         const rl = readline.createInterface({ input, output });

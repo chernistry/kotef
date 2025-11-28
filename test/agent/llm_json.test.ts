@@ -31,14 +31,12 @@ describe('parseLlmJson', () => {
   it('strips truncation markers (⋮)', () => {
     const input = '{"items": [\n  {"a": 1},\n  ⋮\n  {"b": 2}\n]}';
     const result = parseLlmJson<{ items: object[] }>(input);
-    // Should attempt repair after stripping ⋮
     expect(result.ok).toBe(true);
   });
 
   it('strips truncation markers (…)', () => {
     const input = '{"list": [1, 2, …, 10]}';
     const result = parseLlmJson(input);
-    // jsonrepair should handle this
     expect(result.ok).toBe(true);
   });
 
@@ -71,18 +69,14 @@ describe('parseLlmJson', () => {
   });
 
   it('handles text without JSON structure gracefully', () => {
-    // jsonrepair is very aggressive, so even garbage may parse to something
     const input = 'This is not JSON at all, just random text without braces';
     const result = parseLlmJson(input);
-    // Just verify it doesn't throw
     expect(typeof result.ok).toBe('boolean');
   });
 
   it('handles truncated JSON with marker', () => {
-    // After stripping ⋮, jsonrepair may still fix it
     const input = '{"incomplete": ⋮';
     const result = parseLlmJson(input);
-    // Just verify it doesn't throw - jsonrepair is aggressive
     expect(typeof result.ok).toBe('boolean');
   });
 
@@ -100,6 +94,112 @@ describe('parseLlmJson', () => {
     expect(result.ok).toBe(true);
     if (result.ok === true) {
       expect(result.value.clean).toBe(true);
+    }
+  });
+
+  // New tests for hireex-inspired features
+
+  it('converts Python True/False/None to JSON', () => {
+    const input = '{"enabled": True, "disabled": False, "value": None}';
+    const result = parseLlmJson<{ enabled: boolean; disabled: boolean; value: null }>(input);
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.enabled).toBe(true);
+      expect(result.value.disabled).toBe(false);
+      expect(result.value.value).toBe(null);
+    }
+  });
+
+  it('converts single quotes to double quotes', () => {
+    const input = "{'name': 'test', 'count': 5}";
+    const result = parseLlmJson<{ name: string; count: number }>(input);
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.name).toBe('test');
+      expect(result.value.count).toBe(5);
+    }
+  });
+
+  it('quotes unquoted keys', () => {
+    const input = '{name: "test", count: 5}';
+    const result = parseLlmJson<{ name: string; count: number }>(input);
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.name).toBe('test');
+      expect(result.value.count).toBe(5);
+    }
+  });
+
+  it('finds largest JSON object in mixed content', () => {
+    const input = 'Small: {"a":1} and Large: {"tickets": [{"id": 1}, {"id": 2}], "count": 2} end';
+    const result = parseLlmJson<{ tickets: { id: number }[]; count: number }>(input);
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.tickets.length).toBe(2);
+      expect(result.value.count).toBe(2);
+    }
+  });
+
+  it('handles newlines inside string values', () => {
+    const input = '{"text": "line1\nline2\nline3"}';
+    const result = parseLlmJson<{ text: string }>(input);
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.text).toContain('line1');
+    }
+  });
+
+  it('handles nested objects with various issues', () => {
+    const input = `{
+      name: 'test',
+      enabled: True,
+      config: {
+        'nested': 'value',
+        count: 10,
+      },
+    }`;
+    const result = parseLlmJson<{ name: string; enabled: boolean; config: { nested: string; count: number } }>(input);
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.name).toBe('test');
+      expect(result.value.enabled).toBe(true);
+      expect(result.value.config.nested).toBe('value');
+    }
+  });
+
+  it('extracts outer JSON when string values contain mermaid fences', () => {
+    const input = `{
+  "scopeAnalysis": {"appetite": "Small"},
+  "architect": "## Overview\\n\`\`\`mermaid\\ngraph TD\\n    A[Start] --> B[End]\\n\`\`\`\\nMore text"
+}`;
+    const result = parseLlmJson<{ scopeAnalysis: { appetite: string }; architect: string }>(input);
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.scopeAnalysis.appetite).toBe('Small');
+      expect(result.value.architect).toContain('mermaid');
+    }
+  });
+  it('handles markdown with unescaped quotes and newlines via schema-aware parsing', () => {
+    // Simulate the messy input that might come from LLM (literal newlines and unescaped quotes)
+    const messyInput = `{
+  "scopeAnalysis": { "appetite": "Small" },
+  "bestPractices": "# Header
+- Item 1
+- **Pattern A**: (e.g., "glass": backdrop-blur)
+- Item 2",
+  "architect": "Some architect text"
+}`;
+
+    const result = parseLlmJson<{ scopeAnalysis: any; bestPractices: string; architect: string }>(messyInput, {
+      knownKeys: ['scopeAnalysis', 'bestPractices', 'architect']
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.scopeAnalysis.appetite).toBe('Small');
+      expect(result.value.bestPractices).toContain('Pattern A');
+      expect(result.value.bestPractices).toContain('"glass": backdrop-blur');
+      expect(result.value.architect).toBe('Some architect text');
     }
   });
 });

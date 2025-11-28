@@ -97,6 +97,9 @@ export const KotefConfigSchema = z.object({
     /** Max number of tickets to generate during SDD orchestration (default: undefined = no limit) */
     maxTickets: z.number().int().min(1).optional(),
 
+    /** Enable debug mode with verbose logging */
+    debug: z.boolean().default(false),
+
     /** Ticket 02: Use consolidated prompts for SDD orchestration (reduces LLM calls) */
     useConsolidatedPrompts: z.boolean().default(true),
 });
@@ -182,6 +185,9 @@ export function loadConfig(env = process.env, argv = process.argv): KotefConfig 
 
         // Max tickets for SDD orchestration
         maxTickets: parseInt(env.KOTEF_MAX_TICKETS || '0', 10) || undefined,
+
+        // Debug mode
+        debug: env.KOTEF_DEBUG === 'true' || args.includes('--debug'),
     };
 
     const parsed = KotefConfigSchema.parse(config);

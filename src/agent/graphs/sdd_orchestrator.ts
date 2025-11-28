@@ -4,7 +4,7 @@ import { callChat, ChatMessage } from '../../core/llm.js';
 import { renderBrainTemplate, loadBrainTemplate } from '../../sdd/template_driver.js';
 import { deepResearch, DeepResearchFinding } from '../../tools/deep_research.js';
 import { loadPrompt, loadRuntimePrompt } from '../../core/prompts.js';
-import { parseLlmJson } from '../utils/llm_json.js';
+import { parseLlmJson, setLlmJsonDebug } from '../utils/llm_json.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { validateBestPracticesDoc, validateArchitectDoc } from '../utils/sdd_validation.js';
@@ -45,16 +45,28 @@ export interface ProjectMetadata {
     projectDescription: string;
 }
 
+// Debug logging helper - only logs when config.debug is true
+let _debugEnabled = false;
+function setDebugMode(enabled: boolean): void {
+    _debugEnabled = enabled;
+}
+function debugLog(...args: unknown[]): void {
+    if (_debugEnabled) console.log('[DEBUG]', ...args);
+}
+
 /**
  * Consolidated SDD flow: Research + Architect in one LLM call (Ticket 02)
  */
 async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
-    console.log('Running Consolidated SDD: Understand & Design...');
+    debugLog('Running Consolidated SDD: Understand & Design...');
     const { goal, rootDir, config } = state;
+    setDebugMode(config.debug || false);
+    setLlmJsonDebug(config.debug || false);
+
     const metadata = await loadProjectMetadata(rootDir, goal);
 
     // 1. Run web-backed deep research
-    console.log(`Starting deep research for goal: "${goal}"`);
+    debugLog(`Starting deep research for goal: "${goal}"`);
     let findings: DeepResearchFinding[] = [];
     try {
         const result = await deepResearch(config, goal, {
@@ -104,17 +116,26 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
 
     const content = response.messages[response.messages.length - 1].content || '{}';
 
+    // Enable debug logging if config.debug is set
+    setLlmJsonDebug(config.debug || false);
+
     // 4. Parse JSON response
-    const parseResult = parseLlmJson<{ bestPractices?: string; architect?: string; scopeAnalysis?: { appetite: string; constraints: string[]; reasoning: string } }>(content);
+    const parseResult = parseLlmJson<{ bestPractices?: string; architect?: string; scopeAnalysis?: { appetite: string; constraints: string[]; reasoning: string } }>(content, { knownKeys: ['scopeAnalysis', 'bestPractices', 'architect'] });
     if (parseResult.ok === false) {
         console.error('Failed to parse consolidated response:', parseResult.error.message);
+        if (config.debug) {
+            console.error('[DEBUG] Raw LLM response:', content);
+            console.error('[DEBUG] Sanitized content:', parseResult.error.sanitized);
+        } else {
+            console.error('(use --debug to see raw LLM response)');
+        }
         throw new Error(`Failed to parse understand_and_design response: ${parseResult.error.kind}`);
     }
     const parsed = parseResult.value;
 
     // 4.5. Save scopeAnalysis to intent_contract cache for downstream use
     if (parsed.scopeAnalysis) {
-        console.log(`Scope Analysis: appetite=${parsed.scopeAnalysis.appetite}, constraints=${parsed.scopeAnalysis.constraints?.length || 0}`);
+        debugLog(`Scope Analysis: appetite=${parsed.scopeAnalysis.appetite}, constraints=${parsed.scopeAnalysis.constraints?.length || 0}`);
         const cacheDir = path.join(rootDir, '.sdd', 'cache');
         await fs.mkdir(cacheDir, { recursive: true });
         const intentContract = {
@@ -156,7 +177,7 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
  * Consolidated ticket generation: All tickets in one LLM call (Ticket 02)
  */
 async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrchestratorState>> {
-    console.log('Running Consolidated SDD: Plan Work (batch tickets)...');
+    debugLog('Running Consolidated SDD: Plan Work (batch tickets)...');
     const { goal, rootDir, config, architectContent } = state;
 
     // Load scopeAnalysis from cache (written by sddUnderstandAndDesign)
@@ -183,7 +204,7 @@ async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrch
     let effectiveMaxTickets = config.maxTickets;
     if (scopeAnalysis?.appetite === 'Small' && (!effectiveMaxTickets || effectiveMaxTickets > 2)) {
         effectiveMaxTickets = 2;
-        console.log('Scope is Small, limiting to 2 tickets max');
+        debugLog('Scope is Small, limiting to 2 tickets max');
     } else if (scopeAnalysis?.appetite === 'Batch' && (!effectiveMaxTickets || effectiveMaxTickets > 5)) {
         effectiveMaxTickets = Math.min(effectiveMaxTickets || 5, 5);
     }
@@ -230,6 +251,10 @@ async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrch
         tickets = parseResult.value.tickets || [];
     } else {
         console.error('Failed to parse plan_work response:', parseResult.error.message, `(${parseResult.error.kind})`);
+        if (config.debug) {
+            console.error('[DEBUG] Raw LLM response:', content);
+            console.error('[DEBUG] Sanitized content:', parseResult.error.sanitized);
+        }
     }
 
     // Enforce maxTickets
@@ -758,11 +783,14 @@ export async function runSddOrchestration(
     rootDir: string,
     goal: string
 ): Promise<void> {
-    console.log(`Starting SDD Orchestration for goal: "${goal}"`);
+    setDebugMode(cfg.debug || false);
+    setLlmJsonDebug(cfg.debug || false);
+
+    debugLog(`Starting SDD Orchestration for goal: "${goal}"`);
 
     // Use consolidated prompts if enabled (Ticket 02)
     if (cfg.useConsolidatedPrompts) {
-        console.log('Using consolidated prompts (2 LLM calls instead of 4+)');
+        debugLog('Using consolidated prompts (2 LLM calls instead of 4+)');
         await consolidatedApp.invoke({
             goal,
             rootDir,
@@ -776,5 +804,5 @@ export async function runSddOrchestration(
         });
     }
 
-    console.log('SDD Orchestration completed.');
+    debugLog('SDD Orchestration completed.');
 }
