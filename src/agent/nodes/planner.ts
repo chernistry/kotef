@@ -19,6 +19,7 @@ import {
     loadCachedIntentContract,
     IntentContract
 } from '../utils/intent_contract.js';
+import { loadProjectMemory, formatMemoryForPrompt } from '../utils/project_memory.js';
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -193,6 +194,17 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
                 }
             }
             log.info('Intent contract built', { appetite: intentContract.appetite, constraints: intentContract.constraints.length });
+        }
+
+        // Project Memory (Ticket 04) - Load previous run summaries
+        let projectMemoryContext = 'No previous runs recorded.';
+        try {
+            const memory = await loadProjectMemory(cfg.rootDir);
+            if (memory) {
+                projectMemoryContext = formatMemoryForPrompt(memory, 5);
+            }
+        } catch (e) {
+            log.warn('Failed to load project memory', { error: (e as Error).message });
         }
 
         // Early Exit Check (Ticket 01) - Before LLM call
@@ -507,7 +519,9 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{RISK_MAP}}': state.riskMap ? JSON.stringify(state.riskMap, null, 2) : 'Not available',
             '{{OFFLINE_MODE}}': cfg.offlineMode ? 'true' : 'false',
             // Intent Contract (Ticket 01)
-            '{{INTENT_CONTRACT}}': intentContract ? summarizeIntent(intentContract) : 'Not available'
+            '{{INTENT_CONTRACT}}': intentContract ? summarizeIntent(intentContract) : 'Not available',
+            // Project Memory (Ticket 04)
+            '{{PROJECT_MEMORY}}': projectMemoryContext
         };
 
         let systemPrompt = plannerPromptTemplate;

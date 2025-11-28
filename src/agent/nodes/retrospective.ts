@@ -6,6 +6,7 @@ import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import { appendRunSummary } from '../utils/project_memory.js';
 
 const log = createLogger('retrospective');
 
@@ -46,6 +47,26 @@ export function retrospectiveNode(cfg: KotefConfig, chatFn: typeof callChat) {
 
             // Log metrics to file
             await logMetrics(cfg.rootDir, metrics);
+
+            // Ticket 04: Append to project memory
+            const outcome = state.terminalStatus === 'done_success' ? 'success' :
+                           state.terminalStatus === 'done_partial' ? 'partial' : 'failed';
+            const lesson = state.failureHistory?.length
+                ? `Had ${state.failureHistory.length} failures`
+                : outcome === 'success' ? 'Completed without issues' : 'See learning_log.md';
+
+            try {
+                await appendRunSummary(cfg.rootDir, {
+                    timestamp: new Date().toISOString(),
+                    ticketId: state.sdd?.ticketId,
+                    goal: (state.sdd?.goal || 'No goal').slice(0, 100),
+                    outcome,
+                    lesson
+                });
+                log.info('Appended run summary to project memory');
+            } catch (e) {
+                log.warn('Failed to append to project memory', { error: (e as Error).message });
+            }
 
             // Skip learning analysis if no progress history
             if (!state.progressHistory || state.progressHistory.length === 0) {

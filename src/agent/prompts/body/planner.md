@@ -7,6 +7,7 @@ Your goal is to create a step-by-step plan to implement the given ticket.
 - Ticket ID: `{{TICKET_ID}}`
 - Current ticket: `{{TICKET}}`
 - Intent Contract: `{{INTENT_CONTRACT}}`
+- Project Memory: `{{PROJECT_MEMORY}}`
 - SDD project (may be truncated): `{{SDD_PROJECT}}`
 - SDD architect (may be truncated): `{{SDD_ARCHITECT}}`
 - SDD best practices (may be truncated): `{{SDD_BEST_PRACTICES}}`
