@@ -24,36 +24,31 @@ The goal contains TWO types of information:
 1. **Technical subject** — WHAT to search for (libraries, patterns, techniques)
 2. **Instructions/constraints** — HOW the agent should work (NOT search terms)
 
-**DO NOT include in search query:**
-- Adjectives describing work style: "senior designer", "expert", "professional"
-- Scope instructions: "minor", "small", "subtle", "quick", "мелкие"
-- Negative constraints: "DO NOT", "without", "no complete redesign"
-- Quality descriptors: "modern", "clean", "minimalistic" (unless searching for design systems)
+**NEVER include in search query (these are agent instructions, not search terms):**
+- Work style: "senior designer", "expert", "professional", "sr", "как дизайнер"
+- Scope words: "minor", "subtle", "small", "quick", "мелкие", "небольшие", "tweaks", "improvements"
+- Constraints: "DO NOT", "without", "no redesign", "-redesign", "сохрани"
+- Vague adjectives: "modern", "clean", "minimalistic", "аккуратность"
 
-**DO include in search query:**
-- Library/framework names: shadcn/ui, Tailwind CSS, Next.js
-- Technical patterns: "design tokens", "CSS variables", "dark mode"
-- Specific features: "typography scale", "color palette", "spacing system"
-
-## Analysis Steps
-1. **Extract Technical Subject**: What technology/pattern does the user need info about?
-2. **Ignore Instructions**: Filter out "how to work" instructions (they're for the agent, not search)
-3. **Focus on Stack**: Use tech_stack_hint to find relevant documentation
-4. **Keep it Simple**: 3-6 keywords max, no complex boolean operators
+**ONLY include (actual searchable technical terms):**
+- Library names: shadcn/ui, Tailwind CSS, Next.js, Framer Motion
+- Technical concepts: "design tokens", "CSS variables", "color palette", "typography"
+- Specific patterns: "dark mode theming", "component variants", "spacing scale"
 
 ## Examples
 
-**Bad query** (includes instructions):
-`"senior designer" tips "subtle improvements" shadcn/ui -"full redesign"`
+Goal: "сделай дизайн более современным, сохрани минималистичность, поработай как sr дизайнер. DO NOT REDESIGN COMPLETELY"
 
-**Good query** (technical focus):
-`shadcn/ui Tailwind CSS design tokens best practices 2024`
+❌ BAD (includes instructions):
+`subtle modern UI improvements Tailwind CSS shadcn/ui minimalistic design tweaks senior designer tips -redesign`
 
-**Bad query** (too literal):
-`сделай дизайн более современным минималистичность`
+✅ GOOD (technical focus only):
+`shadcn/ui Tailwind CSS theming best practices 2024`
 
-**Good query** (extracted technical need):
-`Tailwind CSS modern design system typography spacing`
+Goal: "fix the login bug quickly, be careful"
+
+❌ BAD: `fix login bug quickly carefully`
+✅ GOOD: `Next.js authentication error handling`
 
 ## Constraints
 <constraints>
