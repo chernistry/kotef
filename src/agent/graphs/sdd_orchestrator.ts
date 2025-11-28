@@ -4,7 +4,7 @@ import { callChat, ChatMessage } from '../../core/llm.js';
 import { renderBrainTemplate, loadBrainTemplate } from '../../sdd/template_driver.js';
 import { deepResearch, DeepResearchFinding } from '../../tools/deep_research.js';
 import { loadPrompt, loadRuntimePrompt } from '../../core/prompts.js';
-import { jsonrepair } from 'jsonrepair';
+import { parseLlmJson } from '../utils/llm_json.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { validateBestPracticesDoc, validateArchitectDoc } from '../utils/sdd_validation.js';
@@ -105,22 +105,12 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
     const content = response.messages[response.messages.length - 1].content || '{}';
 
     // 4. Parse JSON response
-    let parsed: { bestPractices?: string; architect?: string; scopeAnalysis?: { appetite: string; constraints: string[]; reasoning: string } };
-    try {
-        let raw = content.trim();
-        if (raw.startsWith('```')) {
-            const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
-            if (fenceMatch?.[1]) raw = fenceMatch[1].trim();
-        }
-        parsed = JSON.parse(raw);
-    } catch {
-        try {
-            parsed = JSON.parse(jsonrepair(content));
-        } catch (e) {
-            console.error('Failed to parse consolidated response:', e);
-            throw new Error('Failed to parse understand_and_design response');
-        }
+    const parseResult = parseLlmJson<{ bestPractices?: string; architect?: string; scopeAnalysis?: { appetite: string; constraints: string[]; reasoning: string } }>(content);
+    if (parseResult.ok === false) {
+        console.error('Failed to parse consolidated response:', parseResult.error.message);
+        throw new Error(`Failed to parse understand_and_design response: ${parseResult.error.kind}`);
     }
+    const parsed = parseResult.value;
 
     // 4.5. Save scopeAnalysis to intent_contract cache for downstream use
     if (parsed.scopeAnalysis) {
@@ -235,21 +225,11 @@ async function sddPlanWork(state: SddOrchestratorState): Promise<Partial<SddOrch
 
     // Parse response
     let tickets: { filename: string; title: string; content: string }[] = [];
-    try {
-        let raw = content.trim();
-        if (raw.startsWith('```')) {
-            const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
-            if (fenceMatch?.[1]) raw = fenceMatch[1].trim();
-        }
-        const parsed = JSON.parse(raw);
-        tickets = parsed.tickets || [];
-    } catch {
-        try {
-            const parsed = JSON.parse(jsonrepair(content));
-            tickets = parsed.tickets || [];
-        } catch (e) {
-            console.error('Failed to parse plan_work response:', e);
-        }
+    const parseResult = parseLlmJson<{ tickets?: { filename: string; title: string; content: string }[] }>(content);
+    if (parseResult.ok === true) {
+        tickets = parseResult.value.tickets || [];
+    } else {
+        console.error('Failed to parse plan_work response:', parseResult.error.message, `(${parseResult.error.kind})`);
     }
 
     // Enforce maxTickets
@@ -644,25 +624,12 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
             const content = response.messages[response.messages.length - 1].content || '{}';
 
             // Parse logic
-            let raw = content.trim();
-            if (raw.startsWith('```')) {
-                const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
-                if (fenceMatch && fenceMatch[1]) raw = fenceMatch[1].trim();
-            }
-
-            try {
-                const parsed = JSON.parse(raw);
-                plannedTickets = parsed.tickets || [];
+            const parseResult = parseLlmJson<{ tickets?: { filename: string; title: string; summary: string }[] }>(content);
+            if (parseResult.ok === true) {
+                plannedTickets = parseResult.value.tickets || [];
                 if (plannedTickets.length > 0) break;
-            } catch {
-                try {
-                    const repaired = jsonrepair(raw);
-                    const parsed = JSON.parse(repaired);
-                    plannedTickets = parsed.tickets || [];
-                    if (plannedTickets.length > 0) break;
-                } catch (e) {
-                    console.error(`Phase 1 attempt ${attempt} failed parse:`, e);
-                }
+            } else {
+                console.error(`Phase 1 attempt ${attempt} failed parse:`, parseResult.error.message);
             }
         } catch (e) {
             console.error(`Phase 1 attempt ${attempt} failed LLM:`, e);
@@ -720,29 +687,12 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
                 });
                 const content = response.messages[response.messages.length - 1].content || '{}';
 
-                let raw = content.trim();
-                if (raw.startsWith('```')) {
-                    const fenceMatch = raw.match(/^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```$/);
-                    if (fenceMatch && fenceMatch[1]) raw = fenceMatch[1].trim();
-                }
-
-                try {
-                    const parsed = JSON.parse(raw);
-                    if (parsed.content) {
-                        ticketContent = parsed.content;
-                        break;
-                    }
-                } catch {
-                    try {
-                        const repaired = jsonrepair(raw);
-                        const parsed = JSON.parse(repaired);
-                        if (parsed.content) {
-                            ticketContent = parsed.content;
-                            break;
-                        }
-                    } catch (e) {
-                        console.error(`Phase 2 ticket ${ticket.filename} attempt ${attempt} failed parse:`, e);
-                    }
+                const parseResult = parseLlmJson<{ content?: string }>(content);
+                if (parseResult.ok === true && parseResult.value.content) {
+                    ticketContent = parseResult.value.content;
+                    break;
+                } else if (parseResult.ok === false) {
+                    console.error(`Phase 2 ticket ${ticket.filename} attempt ${attempt} failed parse:`, parseResult.error.message);
                 }
             } catch (e) {
                 console.error(`Phase 2 ticket ${ticket.filename} attempt ${attempt} failed LLM:`, e);
