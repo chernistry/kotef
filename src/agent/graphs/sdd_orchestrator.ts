@@ -548,10 +548,27 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
         ? `\n4. **Limit**: Generate EXACTLY ${maxTickets} ticket${maxTickets > 1 ? 's' : ''}. Do not generate more than ${maxTickets}.`
         : '';
 
+    // Ticket 07: Build Code Map from project summary
+    let codeMapText = 'No code map available.';
+    try {
+        const { buildProjectSummary } = await import('../utils/project_summary.js');
+        const summary = await buildProjectSummary(rootDir, config);
+        codeMapText = [
+            `Project type: ${summary.projectType}`,
+            `Languages: ${summary.languages.join(', ')}`,
+            `Frameworks: ${summary.frameworks.join(', ')}`,
+            `Entry points: ${summary.entryPoints.slice(0, 10).join(', ')}`,
+            `Key modules: ${summary.keyModules.slice(0, 15).join(', ')}`
+        ].join('\n');
+    } catch (e) {
+        console.warn('Failed to build code map:', e);
+    }
+
     // --- PHASE 1: PLANNING ---
     console.log('Phase 1: Planning tickets...');
     const planPrompt = promptTemplate
         .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
+        .replace('{{CODE_MAP}}', codeMapText)
         .replace('{{MODE}}', 'PLAN_ONLY')
         .replace('{{TICKET_TEMPLATE}}', '') // Not needed for planning
         .replace('{{TICKET_TITLE}}', '')
@@ -630,10 +647,12 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
 
         const genPrompt = promptTemplate
             .replace('{{ARCHITECT_CONTENT}}', architectContent || '')
+            .replace('{{CODE_MAP}}', codeMapText)
             .replace('{{MODE}}', 'GENERATE_SINGLE')
             .replace('{{TICKET_TEMPLATE}}', ticketTemplate)
             .replace('{{TICKET_TITLE}}', ticket.title)
-            .replace('{{TICKET_SUMMARY}}', ticket.summary);
+            .replace('{{TICKET_SUMMARY}}', ticket.summary)
+            .replace('{{MAX_TICKETS_CONSTRAINT}}', '');
 
         let ticketContent = '';
         for (let attempt = 1; attempt <= maxRetries; attempt++) {

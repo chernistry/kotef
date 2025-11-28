@@ -6,12 +6,19 @@ Based on the Architecture Plan below, break down the implementation into sequent
 {{ARCHITECT_CONTENT}}
 </architecture_plan>
 
+<code_map>
+{{CODE_MAP}}
+</code_map>
+
 ## Mode: {{MODE}}
 
 ### Instructions for PLAN_ONLY
 1. **Analyze Components**: Identify the key components and their dependencies.
-2. **Determine Sequence**: Order tasks logically (e.g., core infrastructure -> backend -> frontend).
-3. **Create Plan**: Generate a list of tickets covering the entire MVP.{{MAX_TICKETS_CONSTRAINT}}
+2. **Check Existing Code**: Review the code_map above. Prefer updating existing modules over creating new ones.
+3. **Determine Sequence**: Order tasks logically (e.g., core infrastructure -> backend -> frontend).
+4. **Create Plan**: Generate a list of tickets covering the entire MVP.{{MAX_TICKETS_CONSTRAINT}}
+
+**IMPORTANT**: When proposing tickets, prefer updating existing modules listed in the code_map over introducing new top-level modules unless there is a clear reason. Reference existing files by path when applicable.
 
 **Output Format (PLAN_ONLY)**:
 Respond with a **single JSON object**:
@@ -34,6 +41,7 @@ Respond with a **single JSON object**:
    - Title: `{{TICKET_TITLE}}`
    - Summary: `{{TICKET_SUMMARY}}`
 3. **Content**: Write the full markdown content using the template below.
+4. **Reference Existing Code**: Use paths from the code_map when specifying affected files.
 
 ### Mandatory Rules for Content
 1. **Testing**: If this ticket implements code, it MUST include a step to run/add tests.
@@ -56,5 +64,3 @@ Respond with a **single JSON object**:
 - NO markdown fences (```json ... ```) in the output.
 - NO introductory text.
 - Valid JSON only.
-
-

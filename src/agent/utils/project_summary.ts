@@ -14,6 +14,7 @@ export interface ProjectSummary {
     configFiles: string[];
     mainFiles: string[];
     entryPoints: string[];
+    keyModules: string[];  // Ticket 07: key modules/services
     projectType: 'frontend' | 'backend' | 'fullstack' | 'library' | 'mixed';
 }
 
@@ -43,7 +44,10 @@ export async function buildProjectSummary(
     const frameworks = await detectFrameworks(rootDir, cfg, files, configFiles);
     const hasTests = files.some(f => isTestFile(f));
 
-    // 5. Determine project type
+    // 5. Detect key modules (Ticket 07)
+    const keyModules = detectKeyModules(files);
+
+    // 6. Determine project type
     const hasFrontend = detectsFrontend(files, frameworks);
     const hasBackend = detectsBackend(files, frameworks, languages);
     const projectType = inferProjectType(hasFrontend, hasBackend, frameworks);
@@ -57,6 +61,7 @@ export async function buildProjectSummary(
         configFiles,
         mainFiles,
         entryPoints,
+        keyModules,
         projectType
     };
 
@@ -325,4 +330,52 @@ function inferProjectType(
     }
 
     return 'mixed';
+}
+
+/**
+ * Detect key modules/services by filesystem patterns (Ticket 07)
+ */
+function detectKeyModules(files: string[]): string[] {
+    const keyPatterns = [
+        /src\/(?:services|lib|core|utils|helpers|modules)\/[^/]+\.[jt]sx?$/i,
+        /src\/(?:api|routes|controllers)\/[^/]+\.[jt]sx?$/i,
+        /src\/(?:features|components|pages)\/[^/]+\/index\.[jt]sx?$/i,
+        /app\/(?:api|routes)\/[^/]+\/route\.[jt]sx?$/i,
+        /pages\/(?:api\/)?[^/]+\.[jt]sx?$/i
+    ];
+
+    const modules = new Set<string>();
+
+    for (const file of files) {
+        // Skip test files and node_modules
+        if (file.includes('node_modules') || isTestFile(file)) continue;
+
+        for (const pattern of keyPatterns) {
+            if (pattern.test(file)) {
+                // Extract module path (e.g., src/services/auth.ts -> src/services/auth)
+                const modulePath = file.replace(/\.[jt]sx?$/, '');
+                modules.add(modulePath);
+                break;
+            }
+        }
+    }
+
+    // Also add directories that contain multiple files (likely modules)
+    const dirCounts = new Map<string, number>();
+    for (const file of files) {
+        if (file.includes('node_modules') || isTestFile(file)) continue;
+        const dir = path.dirname(file);
+        if (dir.includes('/src/') || dir.includes('/app/') || dir.includes('/lib/')) {
+            dirCounts.set(dir, (dirCounts.get(dir) || 0) + 1);
+        }
+    }
+
+    // Add directories with 3+ files as key modules
+    for (const [dir, count] of dirCounts) {
+        if (count >= 3 && !dir.includes('__')) {
+            modules.add(dir);
+        }
+    }
+
+    return Array.from(modules).slice(0, 20).sort();
 }
