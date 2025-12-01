@@ -101,7 +101,7 @@ export class KiroConversationBackend implements LlmBackend {
             // Run Kiro CLI
             const result = await execa(kiroPath, args, {
                 cwd: this.sessionDir,
-                timeout: options.maxTokens ? (options.maxTokens * 100) : 120000,
+                timeout: options.maxTokens ? (options.maxTokens * 100) : 300000,
                 reject: false,
                 env: {
                     ...process.env,

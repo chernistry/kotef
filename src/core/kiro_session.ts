@@ -189,12 +189,15 @@ async function snapshotDirectory(rootDir: string): Promise<FileSnapshot[]> {
             const relativePath = path.relative(rootDir, fullPath);
 
             // Skip node_modules, .git, and other common ignored dirs
+            // Note: .sdd/data/ is tracked (user data), but .sdd/backlog/ and .sdd/cache/ are not
+            const normalized = relativePath.replace(/\\/g, '/');
             if (relativePath.includes('node_modules') ||
                 relativePath.includes('.git') ||
                 relativePath.startsWith('.next' + path.sep) ||
                 relativePath.startsWith('dist' + path.sep) ||
                 relativePath.startsWith('build' + path.sep) ||
-                relativePath.startsWith('.sdd/')) {
+                normalized.startsWith('.sdd/backlog/') ||
+                normalized.startsWith('.sdd/cache/')) {
                 continue;
             }
 
