@@ -1,18 +1,18 @@
 import { execa } from 'execa';
-import { ChatMessage, ChatCompletionOptions, ToolCallResult, KotefLlmError } from './llm.js';
+import { CallChatResult, ChatMessage, ChatCompletionOptions, ToolCallResult, KotefLlmError } from './llm.js';
 import { KotefConfig } from './config.js';
-import { LlmBackend } from './llm_backend.js';
+import { AgentModelRuntime } from './llm_backend.js';
 
 /**
  * Kiro CLI LLM backend using Claude Sonnet 4.5.
  * Spawns kiro-cli process for each completion request.
  */
-export class KiroCliLlmBackend implements LlmBackend {
+export class KiroCliLlmBackend implements AgentModelRuntime {
     async callChat(
         config: KotefConfig,
         messages: ChatMessage[],
         options: ChatCompletionOptions = {}
-    ): Promise<{ messages: ChatMessage[]; toolCalls?: ToolCallResult[] }> {
+    ): Promise<CallChatResult> {
         // Validate kiro-cli is configured
         const kiroPath = config.kiroCliPath || 'kiro-cli';
         const kiroModel = config.kiroModel || 'claude-sonnet-4.5';

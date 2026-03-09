@@ -1,100 +1,57 @@
-# Plan Work (Batch Ticket Generation)
+<context>
+<goal>{{GOAL}}</goal>
+<architect>{{ARCHITECT_CONTENT}}</architect>
+<code_map>{{CODE_MAP}}</code_map>
+<ticket_limit>{{MAX_TICKETS_CONSTRAINT}}</ticket_limit>
+</context>
 
-You are an expert Project Manager. Generate ALL tickets for implementing the architecture in a single response.
+<mission>
+Generate the implementation backlog as machine-readable XML tickets for `.sdd/backlog/open/`.
+</mission>
 
-## Context
-- Goal: {{GOAL}}
-- Architecture: {{ARCHITECT_CONTENT}}
-- Code Map: {{CODE_MAP}}
+<instructions>
+1. Respect the architect document, scope appetite, and any explicit "do not" constraints from the goal.
+2. Sequence tickets in dependency order.
+3. Keep tickets execution-ready for an agent with file and tool access.
+4. Prefer surgical tickets for Small appetite; avoid setup/foundation churn unless the architect explicitly requires it.
+5. Include Janitor Signals so the implementation agent knows when to create follow-up cleanup tickets.
+</instructions>
 
-## CRITICAL: Scope Analysis (DO THIS FIRST)
+<output_format>
+Return raw XML only. No markdown fences. No commentary.
 
-Before generating tickets, analyze the GOAL for scope signals:
+<tickets>
+  <ticket filename="01-example.md" title="Example Ticket">
+  # Ticket: 01 Example Ticket
 
-**Detect Appetite:**
-- `Small`: "minor", "small", "tiny", "quick", "tweak", "мелкие", "небольшие", "слегка" → MAX 1-2 tickets, each <1 hour
-- `Batch`: "several", "few", "update", "improve" → MAX 3-5 tickets
-- `Big`: "refactor", "redesign", "rewrite", "major" → Up to 15 tickets
+  Spec version: v2.0
+  Context: [link or architect section]
 
-**Detect Constraints:**
-- "DO NOT", "don't", "NOT", "never", "без", "не делай" → Extract and RESPECT these
-- If goal says "DO NOT REDESIGN COMPLETELY" → tickets must be MINOR tweaks, not infrastructure overhauls
+  ## Objective & DoD
+  ...
 
-**STRICT RULE**: If the goal contains words like "мелкие", "minor", "small", "DO NOT REDESIGN":
-- Do NOT generate infrastructure tickets (design tokens, new components, new systems)
-- Do NOT generate "setup" or "foundation" tickets
-- Generate ONLY small, surgical changes to EXISTING files
-- Each ticket should touch 1-3 files maximum
+  ### Definition of Done
+  - [ ] ...
 
-## Ticket Template
-Each ticket must follow this structure:
-```markdown
-# Ticket: NN Title
+  ## Steps
+  1. ...
 
-Spec version: v1.0
-Context: [Link to relevant architect.md sections]
+  ## Affected Files
+  - path/to/file.ts - reason
 
-## Objective & DoD
-[What must be true when done]
+  ## Tests
+  - ...
 
-### Definition of Done
-- [ ] Checkbox items
+  ## Risks & Non-Goals
+  - Risk: ... - Mitigation: ...
+  - Non-goal: ...
 
-## Steps
-1. Step with concrete action
-2. ...
+  ## Dependencies
+  - Depends on: ...
+  - Blocks: ...
 
-## Affected Files
-- path/to/file.ts — rationale
-
-## Tests
-- Test case description
-
-## Risks & Non-Goals
-- Risk: [description] — Mitigation: [action]
-- Non-goal: [what we won't do]
-
-## Dependencies
-- Depends on: [ticket IDs]
-- Blocks: [ticket IDs]
-```
-
-## Output Format
-
-Respond with a JSON object:
-```json
-{
-  "tickets": [
-    {
-      "filename": "01-setup-project.md",
-      "title": "Setup Project Structure",
-      "content": "# Ticket: 01 Setup Project Structure\n\nSpec version: v1.0\n..."
-    },
-    {
-      "filename": "02-implement-core.md",
-      "title": "Implement Core Module",
-      "content": "..."
-    }
-  ]
-}
-```
-
-## Rules
-
-1. **Ordering**: Tickets numbered 01-NN in dependency order (foundations first)
-2. **Granularity**: Each ticket should be completable in 1-4 hours
-3. **Dependencies**: Explicitly state which tickets depend on which
-4. **Testability**: Each ticket must have verifiable DoD
-5. **Filename format**: `NN-kebab-case-title.md`
-
-## Constraints
-{{MAX_TICKETS_CONSTRAINT}}
-
-## Quality Checklist
-
-Before outputting, verify:
-- [ ] Tickets are in correct dependency order
-- [ ] No circular dependencies
-- [ ] Each ticket has clear DoD with checkboxes
-- [ ] Affected files are specific, not generic
-- [ ] Total ticket count respects constraints
+  ## Janitor Signals
+  - Create follow-up ticket if ...
+  </ticket>
+</tickets>
+</output_format>

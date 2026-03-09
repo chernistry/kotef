@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { deepResearch } from '../../src/tools/deep_research.js';
 import * as webSearchModule from '../../src/tools/web_search.js';
 import * as llmModule from '../../src/core/llm.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 
 describe('Deep Research Hardening', () => {
-    const mockConfig: KotefConfig = {
+    const mockConfig = createTestConfig({
         modelFast: 'mock-fast',
-        modelSmart: 'mock-smart',
+        modelStrong: 'mock-smart',
         rootDir: '/tmp',
         mockMode: false,
-    } as any;
+    });
 
     beforeEach(() => {
         vi.restoreAllMocks();

@@ -8,11 +8,11 @@ import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import chalk from 'chalk';
 import MarkdownIt from 'markdown-it';
+import { execa } from 'execa';
 
-import { loadConfig, KotefConfig } from './core/config.js';
+import { createKotefConfig, loadConfig } from './core/config.js';
 import { createLogger } from './core/logger.js';
 import { console_log } from './core/console.js';
-import { buildKotefGraph } from './agent/graph.js';
 import { bootstrapSddForProject } from './agent/bootstrap.js';
 import { buildSddSummaries } from './agent/sdd_summary.js';
 import { writeRunReport, RunSummary } from './agent/run_report.js';
@@ -22,6 +22,10 @@ import { ensureGitRepo, commitTicketRun, extractTicketTitle } from './tools/git.
 import { appendAdr, syncAssumptions } from './agent/utils/adr.js';
 import { computeFlowMetrics } from './agent/utils/flow_metrics.js';
 import { homedir } from 'node:os';
+import { inspectAgentRun, runAgentGraph } from './runtime/graph_runner.js';
+import { findTicketByPrefix, getBacklogPaths, inferTicketStatus, listOpenTickets } from './sdd/paths.js';
+import { migrateLegacySddLayout } from './sdd/migrate.js';
+import { McpManager } from './mcp/client.js';
 
 /**
  * Expand tilde (~) in paths to home directory
@@ -37,40 +41,13 @@ function expandTilde(filepath: string): string {
  * Find the next open ticket with the lowest number
  */
 async function findNextTicket(rootDir: string): Promise<{ id: string; path: string } | null> {
-    const openDir = path.join(rootDir, '.sdd', 'backlog', 'tickets', 'open');
     const blockedIds = await loadBlockedTicketIds(rootDir);
-    try {
-        const files = await fs.readdir(openDir);
-        const ticketFiles = files.filter(f => f.endsWith('.md') && /^\d+/.test(f));
-        if (ticketFiles.length === 0) return null;
-
-        // Filter out tickets that are explicitly blocked
-        const candidateFiles = ticketFiles.filter(f => {
-            const id = f.match(/^(\d+)/)?.[1];
-            if (!id) return false;
-            return !blockedIds.has(id);
-        });
-
-        if (candidateFiles.length === 0) {
-            return null;
-        }
-
-        // Sort by ticket number
-        candidateFiles.sort((a, b) => {
-            const numA = parseInt(a.match(/^(\d+)/)?.[1] || '999999');
-            const numB = parseInt(b.match(/^(\d+)/)?.[1] || '999999');
-            return numA - numB;
-        });
-
-        const nextFile = candidateFiles[0];
-        const ticketId = nextFile.match(/^(\d+)/)?.[1] || '';
-        return {
-            id: ticketId,
-            path: path.join(openDir, nextFile)
-        };
-    } catch {
-        return null;
-    }
+    const tickets = await listOpenTickets(rootDir);
+    const nextTicket = tickets.find(ticket => {
+        const numericId = ticket.fileName.match(/^(\d+)/)?.[1];
+        return numericId ? !blockedIds.has(numericId) : true;
+    });
+    return nextTicket ? { id: nextTicket.id, path: nextTicket.path } : null;
 }
 
 /**
@@ -308,12 +285,12 @@ class Spinner {
 
 program
     .name('kotef')
-    .description('Autonomous AI coding agent')
+    .description('Durable frontier coding and research agent')
     .version('0.1.0');
 
 program
     .command('run')
-    .description('Run the agent on a project')
+    .description('Run the durable frontier agent on a project')
     .option('--root <path>', 'Project root directory', process.cwd())
     .option('--ticket <id>', 'Ticket ID to work on')
     .option('--goal <text>', 'Natural language goal (triggers bootstrap if no SDD)')
@@ -325,6 +302,8 @@ program
     .option('--max-coder-turns <count>', 'Hard cap on coder tool-loop turns (default: profile-based)')
     .option('--yolo', 'Aggressive mode: minimal guardrails, more tool turns', false)
     .option('--auto-approve', 'Skip interactive approval', false)
+    .option('--thread <id>', 'Persistent thread ID for durable execution')
+    .option('--approval-mode <mode>', 'Approval mode (auto, confirm, human-gate)')
     .option('--continue', 'Auto-continue to next ticket after completion', false)
     .option('--nogit', 'Disable git integration', false)
     .option('--max-tickets <count>', 'Maximum number of tickets to generate (default: no limit)')
@@ -335,7 +314,7 @@ program
 
         // Load config with overrides
         const envConfig = loadConfig();
-        const cfg: KotefConfig = {
+        const cfg = createKotefConfig({
             ...envConfig,
             rootDir,
             dryRun: options.dryRun || envConfig.dryRun,
@@ -344,8 +323,9 @@ program
             maxTokensPerRun: options.maxTokens ? parseInt(options.maxTokens) : envConfig.maxTokensPerRun,
             maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns,
             maxTickets: options.maxTickets ? parseInt(options.maxTickets) : envConfig.maxTickets,
+            approvalMode: options.autoApprove ? 'auto' : (options.approvalMode || envConfig.approvalMode),
             debug: options.debug || envConfig.debug
-        };
+        });
 
         const log = createLogger(runId);
         log.info('Starting kotef run', { runId, rootDir, goal: options.goal, ticket: options.ticket });
@@ -406,17 +386,12 @@ program
             let ticketPath: string | undefined;
             let ticketId: string | undefined;
             if (options.ticket) {
-                // Try to find ticket file
-                // This is a simplification, ideally we search for matching ID
-                const ticketsDir = path.join(sddDir, 'backlog/tickets/open');
-                const files = await fs.readdir(ticketsDir).catch(() => []);
-                const ticketFile = files.find(f => f.startsWith(options.ticket));
-                if (ticketFile) {
-                    ticketFileName = ticketFile;
-                    ticketPath = path.join(ticketsDir, ticketFile);
+                const matchedTicket = await findTicketByPrefix(rootDir, options.ticket);
+                if (matchedTicket) {
+                    ticketFileName = matchedTicket.fileName;
+                    ticketPath = matchedTicket.path;
                     ticketContent = await fs.readFile(ticketPath, 'utf-8');
-                    // Extract ticketId from filename (remove .md extension)
-                    ticketId = ticketFile.replace(/\.md$/, '');
+                    ticketId = matchedTicket.id;
                 } else {
                     log.warn(`Ticket ${options.ticket} not found.`);
                 }
@@ -429,8 +404,7 @@ program
             // If scope is not tiny, and we are in an SDD project, and no ticket is provided/found...
             if (sddExists && taskScope !== 'tiny' && !options.ticket) {
                 // Check if any open tickets exist
-                const ticketsDir = path.join(sddDir, 'backlog/tickets/open');
-                const openTickets = await fs.readdir(ticketsDir).catch(() => []).then(files => files.filter(f => f.endsWith('.md')));
+                const openTickets = await listOpenTickets(rootDir);
 
                 if (openTickets.length === 0) {
                     log.info('Medium/Large task requires tickets. Auto-generating...', { taskScope, goal: effectiveGoal });
@@ -441,7 +415,7 @@ program
                         await runSddOrchestration(cfg, rootDir, effectiveGoal);
 
                         // Re-scan for tickets
-                        const newTickets = await fs.readdir(ticketsDir).catch(() => []).then(files => files.filter(f => f.endsWith('.md')));
+                        const newTickets = await listOpenTickets(rootDir);
                         if (newTickets.length === 0) {
                             throw new Error('Orchestrator finished but no tickets were found.');
                         }
@@ -504,8 +478,17 @@ program
 
             // Run Graph
             log.info('Building and running agent graph...');
-            const graph = buildKotefGraph(cfg);
-            const result = await graph.invoke(initialState, { recursionLimit: 100 });
+            const graphRun = await runAgentGraph(cfg, {
+                initialState,
+                threadId: options.thread,
+                runId,
+                recursionLimit: 100,
+            });
+            if (graphRun.interrupted) {
+                console.log(chalk.yellow(`Execution paused. Resume with: kotef resume ${graphRun.threadId}`));
+                return;
+            }
+            const result = graphRun.result as AgentState;
 
             log.info('Run completed.', { done: result.done });
 
@@ -627,7 +610,7 @@ program
             let ticketStatus: 'open' | 'closed' | undefined;
             const finalTicketPath = (result.sdd as any)?.ticketPath || ticketPath;
             if (finalTicketPath) {
-                ticketStatus = finalTicketPath.includes('/closed/') ? 'closed' : 'open';
+                ticketStatus = inferTicketStatus(finalTicketPath);
 
                 // Conservative warning: if done but ticket still open
                 if (result.done && ticketStatus === 'open') {
@@ -688,7 +671,7 @@ program
 
 program
     .command('chat')
-    .description('Interactive coding session (Voyant-style, Navan-like CLI)')
+    .description('Interactive frontier-agent session with live tool use')
     .option('--root <path>', 'Project root directory', process.cwd())
     .option('--goal <text>', 'Initial goal')
     .option('--max-coder-turns <count>', 'Hard cap on coder tool-loop turns')
@@ -700,12 +683,12 @@ program
     .action(async (options) => {
         const rootDir = path.resolve(expandTilde(options.root));
         const envConfig = loadConfig();
-        const cfg: KotefConfig = {
+        const cfg = createKotefConfig({
             ...envConfig,
             rootDir,
             maxCoderTurns: options.maxCoderTurns ? parseInt(options.maxCoderTurns) : envConfig.maxCoderTurns,
             debug: options.debug || envConfig.debug
-        };
+        });
 
         const rl = readline.createInterface({ input, output });
 
@@ -817,13 +800,8 @@ program
             }
 
             // List tickets
-            const ticketsDir = path.join(rootDir, '.sdd/backlog/tickets/open');
-            let tickets: string[] = [];
-            try {
-                tickets = (await fs.readdir(ticketsDir)).filter(f => f.endsWith('.md')).sort();
-            } catch {
-                tickets = [];
-            }
+            const tickets = (await listOpenTickets(rootDir)).map(ticket => ticket.fileName);
+            const ticketsDir = getBacklogPaths(rootDir).openDir;
 
             if (tickets.length === 0) {
                 console.log(chalk.yellow('\n⚠️  No tickets generated. Check .sdd/architect.md for details.\n'));
@@ -890,15 +868,22 @@ program
                     ticketSpinner.setStage('research');
                     ticketSpinner.setStatus('Analyzing ticket requirements...');
 
-                    const graph = buildKotefGraph(cfg);
-
                     ticketSpinner.setStage('plan');
                     ticketSpinner.setStatus('Creating execution plan...');
 
                     ticketSpinner.setStage('code');
                     ticketSpinner.setStatus('Writing code changes...');
 
-                    const result = await graph.invoke(initialState, { recursionLimit: 100 });
+                    const graphRun = await runAgentGraph(cfg, {
+                        initialState,
+                        runId,
+                        recursionLimit: 100,
+                    });
+                    if (graphRun.interrupted) {
+                        console.log(chalk.yellow(`Execution paused. Resume with: kotef resume ${graphRun.threadId}`));
+                        break;
+                    }
+                    const result = graphRun.result as AgentState;
 
                     ticketSpinner.setStage('verify');
                     ticketSpinner.setStatus('Running verification...');
@@ -954,7 +939,7 @@ program
                     let ticketStatus: 'open' | 'closed' | undefined;
                     const finalTicketPath = (result.sdd as any)?.ticketPath || ticketPath;
                     if (finalTicketPath) {
-                        ticketStatus = finalTicketPath.includes('/closed/') ? 'closed' : 'open';
+                        ticketStatus = inferTicketStatus(finalTicketPath);
 
                         // Conservative warning: if done but ticket still open
                         if (result.done && ticketStatus === 'open') {
@@ -1030,6 +1015,108 @@ program
 
         rl.close();
         console.log(chalk.gray('\n👋 Bye!'));
+    });
+
+program
+    .command('resume <threadId>')
+    .description('Resume a durable run from a saved LangGraph checkpoint')
+    .option('--root <path>', 'Project root directory', process.cwd())
+    .option('--deny', 'Resume with approval denied', false)
+    .action(async (threadId, options) => {
+        const rootDir = path.resolve(expandTilde(options.root));
+        const cfg = createKotefConfig({
+            ...loadConfig(),
+            rootDir,
+        });
+
+        const run = await runAgentGraph(cfg, {
+            threadId,
+            runId: randomUUID(),
+            resume: { approved: !options.deny },
+        });
+
+        if (run.interrupted) {
+            console.log(chalk.yellow(`Execution paused again. Resume with: kotef resume ${run.threadId}`));
+            return;
+        }
+
+        console.log(chalk.green(`Run resumed successfully for thread ${threadId}.`));
+    });
+
+const inspectCommand = program
+    .command('inspect')
+    .description('Inspect durable run state');
+
+inspectCommand
+    .command('run <threadId>')
+    .option('--root <path>', 'Project root directory', process.cwd())
+    .action(async (threadId, options) => {
+        const rootDir = path.resolve(expandTilde(options.root));
+        const cfg = createKotefConfig({
+            ...loadConfig(),
+            rootDir,
+        });
+
+        const inspection = await inspectAgentRun(cfg, threadId);
+        console.log(JSON.stringify({
+            threadId,
+            current: inspection.snapshot ? {
+                next: inspection.snapshot.next,
+                checkpointId: inspection.snapshot.config.configurable?.checkpoint_id,
+                values: inspection.snapshot.values,
+            } : null,
+            checkpoints: inspection.history.length,
+            events: inspection.events.length,
+        }, null, 2));
+    });
+
+const mcpCommand = program
+    .command('mcp')
+    .description('Inspect MCP servers, tools, resources, and prompts');
+
+mcpCommand
+    .command('doctor')
+    .option('--root <path>', 'Project root directory', process.cwd())
+    .action(async (options) => {
+        const rootDir = path.resolve(expandTilde(options.root));
+        const cfg = createKotefConfig({
+            ...loadConfig(),
+            rootDir,
+        });
+        const manager = new McpManager(cfg);
+        await manager.initialize();
+        try {
+            const report = await manager.doctor();
+            console.log(JSON.stringify(report, null, 2));
+        } finally {
+            await manager.closeAll();
+        }
+    });
+
+const migrateCommand = program
+    .command('migrate')
+    .description('Migrate legacy SDD layouts to the 2026 canonical structure');
+
+migrateCommand
+    .command('sdd')
+    .option('--root <path>', 'Project root directory', process.cwd())
+    .action(async (options) => {
+        const rootDir = path.resolve(expandTilde(options.root));
+        const result = await migrateLegacySddLayout(rootDir);
+        console.log(JSON.stringify({
+            rootDir,
+            copiedOpen: result.copiedOpen,
+            copiedClosed: result.copiedClosed,
+        }, null, 2));
+    });
+
+program
+    .command('eval')
+    .description('Run the Kotef eval and regression harness')
+    .option('--root <path>', 'Project root directory', process.cwd())
+    .action(async (options) => {
+        const rootDir = path.resolve(expandTilde(options.root));
+        await execa('npm', ['run', 'eval'], { cwd: rootDir, stdio: 'inherit' });
     });
 
 program.parse();

@@ -19,7 +19,7 @@ Operating Principles:
 - Keep tickets and ADRs consistent with any changes you make.
 
 Task:
-Update the architecture specification and backlog to reflect a mid‑flight change request, using a delta format that is easy to apply manually.
+Update the architecture specification and backlog to reflect a mid-flight change request, using a delta format that an agent can apply directly.
 
 Inputs (provided by user):
 1) Change request
@@ -51,7 +51,7 @@ Output Structure (Markdown):
   - Why the change is necessary (refer to risks, Definition of Done, or new constraints).
 
 ## 4. Ticket Changes
-- For the backlog in `.sdd/backlog/tickets/open/`:
+- For the backlog in `.sdd/backlog/open/`:
   - Tickets to deprecate/close as obsolete (with brief reasons).
   - Tickets to update:
     - Ticket ID / file path.
@@ -75,4 +75,3 @@ Requirements
 1) No chain‑of‑thought. Provide final decisions with brief, verifiable reasoning.
 2) Keep changes minimal and focused on the requested scope.
 3) Do not silently drop existing constraints or Definition of Done; if they must change, call this out explicitly.
-

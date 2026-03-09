@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildSddSummaries, SddSummaries } from '../../src/agent/sdd_summary.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { mkdtemp } from 'node:fs/promises';
@@ -21,9 +21,7 @@ describe('SDD Summaries', () => {
         await fs.writeFile(path.join(sddDir, 'architect.md'), architectMd, 'utf-8');
         await fs.writeFile(path.join(sddDir, 'best_practices.md'), bestPracticesMd, 'utf-8');
 
-        const cfg: KotefConfig = {
-            apiKey: 'test-key',
-            baseUrl: 'https://api.openai.com/v1',
+        const cfg = createTestConfig({
             modelFast: 'gpt-4o-mini',
             modelStrong: 'gpt-4o',
             rootDir: tempDir,
@@ -32,7 +30,7 @@ describe('SDD Summaries', () => {
             maxRunSeconds: 300,
             maxTokensPerRun: 100000,
             maxWebRequestsPerRun: 10
-        };
+        });
 
         const summaries: SddSummaries = await buildSddSummaries(cfg, tempDir);
 
@@ -60,9 +58,7 @@ describe('SDD Summaries', () => {
         await fs.writeFile(path.join(sddDir, 'architect.md'), '# Arch', 'utf-8');
         await fs.writeFile(path.join(sddDir, 'best_practices.md'), '# BP', 'utf-8');
 
-        const cfg: KotefConfig = {
-            apiKey: 'test-key',
-            baseUrl: 'https://api.openai.com/v1',
+        const cfg = createTestConfig({
             modelFast: 'gpt-4o-mini',
             modelStrong: 'gpt-4o',
             rootDir: tempDir,
@@ -71,7 +67,7 @@ describe('SDD Summaries', () => {
             maxRunSeconds: 300,
             maxTokensPerRun: 100000,
             maxWebRequestsPerRun: 10
-        };
+        });
 
         // First call should create cache
         await buildSddSummaries(cfg, tempDir);

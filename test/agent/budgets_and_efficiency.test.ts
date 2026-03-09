@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgentState, BudgetState } from '../../src/agent/state.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 
 describe('Budget Tracking and Efficiency', () => {
-    const mockConfig: KotefConfig = {
+    const mockConfig = createTestConfig({
         rootDir: '/mock/root',
         modelFast: 'mock-model',
         modelStrong: 'mock-model',
         maxTokensPerRun: 1000,
         dryRun: true
-    };
+    });
 
     beforeEach(() => {
         vi.resetAllMocks();

@@ -7,6 +7,7 @@ import { recordFunctionalProbe } from '../utils/functional_checks.js';
 import crypto from 'node:crypto';
 import { AgentState } from '../state.js';
 import { ExecutionProfile, PROFILE_POLICIES, looksLikeInstall } from '../profiles.js';
+import { RuntimeEventSink } from '../../runtime/events.js';
 
 const log = createLogger('tool_handlers');
 
@@ -21,6 +22,7 @@ export interface ToolContext {
     commandCount: number;
     testCount: number;
     diagnosticRun: boolean;
+    emitEvent?: RuntimeEventSink;
 }
 
 export interface ToolResult {

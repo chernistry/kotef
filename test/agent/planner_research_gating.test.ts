@@ -2,20 +2,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { plannerNode } from '../../src/agent/nodes/planner.js';
 import { AgentState } from '../../src/agent/state.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 import * as llmModule from '../../src/core/llm.js';
 import * as promptsModule from '../../src/core/prompts.js';
 import * as fs from 'node:fs/promises';
 
 // Mock dependencies
-const mockConfig: KotefConfig = {
+const mockConfig = createTestConfig({
     rootDir: '/tmp/test',
     modelFast: 'mock-fast',
     modelStrong: 'mock-strong',
     maxRunSeconds: 60,
     maxTokensPerRun: 1000,
     dryRun: true
-};
+});
 
 vi.mock('../../src/core/llm.js');
 vi.mock('../../src/core/prompts.js');

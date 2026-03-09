@@ -1,31 +1,25 @@
-import { ChatMessage, ChatCompletionOptions, ToolCallResult } from './llm.js';
+import { CallChatResult, ChatCompletionOptions, ChatMessage } from './llm.js';
 import { KotefConfig } from './config.js';
 
-/**
- * Abstract interface for LLM backends.
- * Allows pluggable providers (OpenAI, Kiro CLI, etc.)
- */
-export interface LlmBackend {
+export interface AgentModelRuntime {
     callChat(
         config: KotefConfig,
         messages: ChatMessage[],
         options: ChatCompletionOptions
-    ): Promise<{ messages: ChatMessage[]; toolCalls?: ToolCallResult[] }>;
+    ): Promise<CallChatResult>;
 }
 
-/**
- * Factory function to create the appropriate LLM backend based on configuration.
- */
-export async function createLlmBackend(config: KotefConfig): Promise<LlmBackend> {
-    const provider = config.llmProvider || 'openai';
-
-    if (provider === 'kiro') {
-        // Use conversation-based Kiro backend
+export async function createLlmBackend(config: KotefConfig): Promise<AgentModelRuntime> {
+    if (config.modelRuntime === 'kiro' || config.llmProvider === 'kiro') {
         const { KiroConversationBackend } = await import('./kiro_conversation_backend.js');
         return new KiroConversationBackend();
     }
 
-    // Default to OpenAI
-    const { OpenAiLlmBackend } = await import('./openai_backend.js');
-    return new OpenAiLlmBackend();
+    if (config.modelRuntime === 'legacy') {
+        const { LegacyChatRuntime } = await import('./legacy_chat_runtime.js');
+        return new LegacyChatRuntime();
+    }
+
+    const { OpenAiResponsesRuntime } = await import('./openai_backend.js');
+    return new OpenAiResponsesRuntime();
 }

@@ -64,7 +64,7 @@ describe('Janitor Node', () => {
 
         expect(fs.writeFile).toHaveBeenCalled();
         const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
-        expect(writeCall[0]).toContain('.sdd/backlog/tickets/open/');
+        expect(writeCall[0]).toContain('.sdd/backlog/open/');
         expect(writeCall[1]).toContain('# Ticket: Fix lint errors');
 
         expect(result.plan?.next).toBe('ticket_closer');

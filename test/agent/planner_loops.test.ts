@@ -1,18 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import { plannerNode } from '../../src/agent/nodes/planner.js';
 import { AgentState } from '../../src/agent/state.js';
-import { KotefConfig } from '../../src/core/config.js';
 import { ChatMessage } from '../../src/core/llm.js';
+import { createTestConfig } from '../helpers/config.js';
 
 describe('Planner Loop Detection', () => {
     it('should detect useless loops (Planner->Verifier without file changes)', async () => {
-        const config: KotefConfig = {
+        const config = createTestConfig({
             rootDir: '/tmp/test',
             modelFast: 'gpt-4o-mini',
             modelStrong: 'gpt-4o',
             dryRun: true,
             offlineMode: false
-        } as any;
+        });
 
         let capturedMessages: ChatMessage[] = [];
 
@@ -70,13 +70,13 @@ describe('Planner Loop Detection', () => {
     });
 
     it('should NOT warn if files have changed', async () => {
-        const config: KotefConfig = {
+        const config = createTestConfig({
             rootDir: '/tmp/test',
             modelFast: 'gpt-4o-mini',
             modelStrong: 'gpt-4o',
             dryRun: true,
             offlineMode: false
-        } as any;
+        });
 
         let capturedMessages: ChatMessage[] = [];
 

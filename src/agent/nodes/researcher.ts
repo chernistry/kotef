@@ -78,7 +78,10 @@ export function researcherNode(cfg: KotefConfig) {
             '{{EXECUTION_PROFILE}}': state.runProfile || 'fast',
             '{{TASK_SCOPE}}': state.taskScope || 'normal',
             '{{FILE_LIST}}': safe(state.contextScan?.files || []),
-            '{{IMPACT_HINT}}': '' // Will be populated below
+            '{{IMPACT_HINT}}': '', // Will be populated below
+            '{{MCP_CONTEXT}}': cfg.mcpMode === 'context' || cfg.mcpMode === 'full'
+                ? 'Use .sdd/context/mcp/*.json snapshots when relevant.'
+                : 'No MCP context available.'
         };
 
         // Run heuristic impact analysis

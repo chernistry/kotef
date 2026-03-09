@@ -518,6 +518,9 @@ export function plannerNode(cfg: KotefConfig, chatFn = callChat) {
             '{{IMPACT_MAP}}': state.impactMap ? JSON.stringify(state.impactMap, null, 2) : 'Not available',
             '{{RISK_MAP}}': state.riskMap ? JSON.stringify(state.riskMap, null, 2) : 'Not available',
             '{{OFFLINE_MODE}}': cfg.offlineMode ? 'true' : 'false',
+            '{{MCP_CONTEXT}}': cfg.mcpMode === 'context' || cfg.mcpMode === 'full'
+                ? 'Use cached MCP snapshots from .sdd/context/mcp/*.json when available.'
+                : 'No MCP context available.',
             // Intent Contract (Ticket 01)
             '{{INTENT_CONTRACT}}': intentContract ? summarizeIntent(intentContract) : 'Not available',
             // Project Memory (Ticket 04)

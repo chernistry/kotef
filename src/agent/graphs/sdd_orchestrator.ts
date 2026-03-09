@@ -8,6 +8,7 @@ import { parseLlmJson, setLlmJsonDebug } from '../utils/llm_json.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { validateBestPracticesDoc, validateArchitectDoc } from '../utils/sdd_validation.js';
+import { ensureCanonicalBacklogDirs } from '../../sdd/paths.js';
 
 /**
  * Call LLM for ticket building - switches between OpenAI and Kiro based on config
@@ -35,7 +36,6 @@ export interface SddOrchestratorState {
     scopeAnalysis?: {
         appetite: 'Small' | 'Batch' | 'Big';
         constraints: string[];
-        reasoning: string;
     };
 }
 
@@ -120,7 +120,7 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
     setLlmJsonDebug(config.debug || false);
 
     // 4. Parse JSON response
-    const parseResult = parseLlmJson<{ bestPractices?: string; architect?: string; scopeAnalysis?: { appetite: string; constraints: string[]; reasoning: string } }>(content, { knownKeys: ['scopeAnalysis', 'bestPractices', 'architect'] });
+    const parseResult = parseLlmJson<{ bestPractices?: string; architect?: string; scopeAnalysis?: { appetite: string; constraints: string[] } }>(content, { knownKeys: ['scopeAnalysis', 'bestPractices', 'architect'] });
     if (parseResult.ok === false) {
         console.error('Failed to parse consolidated response:', parseResult.error.message);
         if (config.debug) {
@@ -168,7 +168,6 @@ async function sddUnderstandAndDesign(state: SddOrchestratorState): Promise<Part
         scopeAnalysis: parsed.scopeAnalysis ? {
             appetite: parsed.scopeAnalysis.appetite as 'Small' | 'Batch' | 'Big',
             constraints: parsed.scopeAnalysis.constraints || [],
-            reasoning: parsed.scopeAnalysis.reasoning || ''
         } : undefined
     };
 }
@@ -297,8 +296,8 @@ Do NOT use JSON. Do NOT use markdown code blocks for the XML tags. Just output t
     }
 
     // Write tickets
-    const ticketsDir = path.join(rootDir, '.sdd/backlog/tickets/open');
-    await fs.mkdir(ticketsDir, { recursive: true });
+    const backlog = await ensureCanonicalBacklogDirs(rootDir);
+    const ticketsDir = backlog.openDir;
     const createdFiles: string[] = [];
 
     for (const ticket of tickets) {
@@ -714,8 +713,8 @@ async function sddTickets(state: SddOrchestratorState): Promise<Partial<SddOrche
     console.log(`Phase 1 complete. Planned ${plannedTickets.length} tickets.`);
 
     // --- PHASE 2: GENERATION ---
-    const ticketsDir = path.join(rootDir, '.sdd/backlog/tickets/open');
-    await fs.mkdir(ticketsDir, { recursive: true });
+    const backlog = await ensureCanonicalBacklogDirs(rootDir);
+    const ticketsDir = backlog.openDir;
     const createdFiles: string[] = [];
 
     for (const [index, ticket] of plannedTickets.entries()) {

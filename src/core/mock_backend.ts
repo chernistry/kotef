@@ -51,6 +51,27 @@ export class MockLlmBackend {
                 content = "I have applied the changes.";
             }
         }
+        // Consolidated SDD Brain Mock
+        else if (systemMsg.includes('software researcher and architect')) {
+            content = JSON.stringify({
+                scopeAnalysis: {
+                    appetite: 'Batch',
+                    constraints: [],
+                    reasoning: 'Mock scope analysis'
+                },
+                bestPractices: `# Best Practices & Research
+
+## 1. TL;DR
+- Mock best practices summary.`,
+                architect: `# Architect Specification
+
+## Hard Constraints
+- Mock constraint
+
+## Goals & Non-Goals
+- Goal: mock`
+            });
+        }
         // Bootstrap Best Practices Mock (software researcher)
         else if (systemMsg.includes('software researcher') || systemMsg.includes('expert software researcher')) {
             content = `# Best Practices & Research
@@ -92,12 +113,15 @@ TypeScript, Node.js
         }
         // Bootstrap Tickets Mock
         else if (systemMsg.includes('Project Manager') || lastMsg.includes('Project Manager')) {
-            content = JSON.stringify({
-                tickets: [{
-                    filename: '01-mock-ticket.md',
-                    content: '# Mock Ticket'
-                }]
-            });
+            content = `<ticket filename="01-mock-ticket.md" title="Mock Ticket">
+# Ticket: 01 Mock Ticket
+
+Spec version: v2.0
+Context: Mock SDD
+
+## Objective & DoD
+Ship the mock task.
+</ticket>`;
         }
         // Bootstrap Project MD Mock
         else if (systemMsg.includes('create a `project.md`') || systemMsg.includes('technical project manager')) {

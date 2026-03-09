@@ -25,7 +25,7 @@ export interface CodeContextRequest {
 // For now, we'll recreate it per request or rely on ts-morph's internal caching if we keep the instance alive.
 // However, since the agent runs nodes in a loop, keeping a global instance might be tricky if files change on disk.
 // Let's create a fresh project for now, or cache it with a simple invalidation strategy.
-// Given the "one-shot" nature of some tools, let's start with fresh project but restricted scope.
+// Some tools execute with narrow task-local context, so start with a fresh project and restricted scope.
 
 export async function getCodeContext(req: CodeContextRequest): Promise<CodeSnippet[]> {
     const { file, symbol, rootDir } = req;

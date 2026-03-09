@@ -1,6 +1,6 @@
 # Ticket Template (SDD)
 
-Use this as a canonical structure when creating tickets in `.sdd/backlog/tickets/open/`.
+Use this as a canonical structure when creating tickets in `.sdd/backlog/open/`.
 
 ```markdown
 # Ticket: {{TICKET_ID}} {{TICKET_TITLE}}
@@ -44,4 +44,3 @@ Spec version: vX.Y / <commit or ADR reference>
 - Upstream tickets: ...
 - Downstream tickets: ...
 ```
-

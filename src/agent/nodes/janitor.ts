@@ -6,6 +6,7 @@ import { createLogger } from '../../core/logger.js';
 import { jsonrepair } from 'jsonrepair';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import { ensureCanonicalBacklogDirs } from '../../sdd/paths.js';
 
 export function janitorNode(cfg: KotefConfig, chatFn = callChat) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
@@ -69,7 +70,8 @@ export function janitorNode(cfg: KotefConfig, chatFn = callChat) {
                         const ticketId = action.ticket_id || `TD-${Date.now()}`;
                         const ticketSlug = action.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                         const filename = `${ticketId}-${ticketSlug}.md`;
-                        const ticketPath = path.join(cfg.rootDir, '.sdd', 'backlog', 'tickets', 'open', filename);
+                        const backlog = await ensureCanonicalBacklogDirs(cfg.rootDir);
+                        const ticketPath = path.join(backlog.openDir, filename);
 
                         const ticketContent = `# Ticket: ${action.title}\n\n` +
                             `Spec version: v1.0\n` +

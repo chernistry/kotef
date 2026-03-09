@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { AgentState, ExecutionProfile } from '../../src/agent/state.js';
 import { verifierNode } from '../../src/agent/nodes/verifier.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 
 describe('Goal-First DoD & Yolo Behaviour', () => {
-    const baseCfg: KotefConfig = {
-        apiKey: 'test-key',
-        baseUrl: 'https://api.openai.com/v1',
+    const baseCfg = createTestConfig({
         modelFast: 'gpt-4o-mini',
         modelStrong: 'gpt-4o',
         rootDir: '/tmp/test',
@@ -15,7 +13,7 @@ describe('Goal-First DoD & Yolo Behaviour', () => {
         maxRunSeconds: 300,
         maxTokensPerRun: 100000,
         maxWebRequestsPerRun: 10
-    };
+    });
 
     it('should mark as done when tests pass in strict profile', async () => {
         const state: AgentState = {

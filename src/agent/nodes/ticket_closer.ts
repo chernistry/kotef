@@ -4,6 +4,7 @@ import { createLogger } from '../../core/logger.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { execa } from 'execa';
+import { getClosedTicketDestination } from '../../sdd/paths.js';
 
 export function ticketCloserNode(_cfg: KotefConfig) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
@@ -24,12 +25,10 @@ export function ticketCloserNode(_cfg: KotefConfig) {
 
         try {
             const openPath = ticketPath;
-            const openDir = path.dirname(openPath);
-            const closedDir = path.join(path.dirname(openDir), 'closed');
+            const destPath = getClosedTicketDestination(openPath);
+            const closedDir = path.dirname(destPath);
 
             await fs.mkdir(closedDir, { recursive: true });
-
-            const destPath = path.join(closedDir, path.basename(openPath));
 
             await fs.rename(openPath, destPath);
 
@@ -83,4 +82,3 @@ export function ticketCloserNode(_cfg: KotefConfig) {
         }
     };
 }
-

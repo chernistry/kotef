@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { researcherNode } from '../../../src/agent/nodes/researcher.js';
 import { AgentState } from '../../../src/agent/state.js';
-import { KotefConfig } from '../../../src/core/config.js';
 import * as deepResearchModule from '../../../src/tools/deep_research.js';
 import * as webSearchModule from '../../../src/tools/web_search.js';
 import * as llmModule from '../../../src/core/llm.js';
 import * as promptsModule from '../../../src/core/prompts.js';
+import { createTestConfig } from '../../helpers/config.js';
 
 vi.mock('../../../src/tools/deep_research.js');
 vi.mock('../../../src/tools/web_search.js');
@@ -13,10 +13,10 @@ vi.mock('../../../src/core/llm.js');
 vi.mock('../../../src/core/prompts.js');
 
 describe('Researcher Node Integration', () => {
-    const mockConfig: KotefConfig = {
+    const mockConfig = createTestConfig({
         modelFast: 'mock-fast',
         rootDir: '/tmp',
-    } as any;
+    });
 
     const baseState: AgentState = {
         messages: [],

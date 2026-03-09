@@ -1,12 +1,21 @@
 import { KotefConfig } from './config.js';
-import { LlmBackend, createLlmBackend } from './llm_backend.js';
+import { AgentModelRuntime, createLlmBackend } from './llm_backend.js';
+
+export interface ChatToolCall {
+    id: string;
+    type: 'function';
+    function: {
+        name: string;
+        arguments: string;
+    };
+}
 
 export interface ChatMessage {
     role: 'system' | 'user' | 'assistant' | 'tool';
     content: string | null;
     tool_call_id?: string;
     name?: string;
-    tool_calls?: any[]; // OpenAI tool calls structure
+    tool_calls?: ChatToolCall[];
 }
 
 export interface ToolCallResult {
@@ -15,16 +24,33 @@ export interface ToolCallResult {
     result: unknown;
 }
 
+export interface ModelRuntimeEvent {
+    type: string;
+    payload: unknown;
+}
+
 export interface ChatCompletionOptions {
     model?: string;
     temperature?: number;
     maxTokens?: number;
     signal?: AbortSignal;
-    tools?: any[]; // OpenAI.Chat.Completions.ChatCompletionTool[]
-    tool_choice?: any; // OpenAI.Chat.Completions.ChatCompletionToolChoiceOption
+    tools?: any[];
+    tool_choice?: any;
     response_format?: { type: 'json_object' | 'text' };
-    /** If true, use the strong model (modelStrong) instead of default (modelFast) */
     useStrongModel?: boolean;
+    onEvent?: (event: ModelRuntimeEvent) => Promise<void> | void;
+}
+
+export interface CallChatResult {
+    messages: ChatMessage[];
+    toolCalls?: ToolCallResult[];
+    responseId?: string;
+    usage?: {
+        inputTokens?: number;
+        outputTokens?: number;
+        totalTokens?: number;
+    };
+    refusal?: string | null;
 }
 
 export class KotefLlmError extends Error {
@@ -34,23 +60,34 @@ export class KotefLlmError extends Error {
     }
 }
 
-// Singleton backend instance (created lazily)
-let _backend: LlmBackend | null = null;
+let backendCache: { key: string; runtime: AgentModelRuntime } | null = null;
 
-/**
- * Main entry point for LLM chat completions.
- * Automatically selects the appropriate backend based on configuration.
- */
+function getBackendCacheKey(config: KotefConfig): string {
+    return JSON.stringify({
+        provider: config.llmProvider,
+        runtime: config.modelRuntime,
+        baseUrl: config.baseUrl,
+        modelFast: config.modelFast,
+        modelStrong: config.modelStrong,
+        mockMode: config.mockMode,
+    });
+}
+
+export function resetLlmBackend(): void {
+    backendCache = null;
+}
+
 export async function callChat(
     config: KotefConfig,
     messages: ChatMessage[],
     options: ChatCompletionOptions = {}
-): Promise<{ messages: ChatMessage[]; toolCalls?: ToolCallResult[] }> {
-    // Create backend on first use
-    if (!_backend) {
-        _backend = await createLlmBackend(config);
+): Promise<CallChatResult> {
+    const cacheKey = getBackendCacheKey(config);
+    if (!backendCache || backendCache.key !== cacheKey) {
+        backendCache = {
+            key: cacheKey,
+            runtime: await createLlmBackend(config),
+        };
     }
-
-    // Delegate to the selected backend
-    return _backend.callChat(config, messages, options);
+    return backendCache.runtime.callChat(config, messages, options);
 }

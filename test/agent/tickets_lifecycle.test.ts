@@ -3,20 +3,20 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { ticketCloserNode } from '../../src/agent/nodes/ticket_closer.js';
 import { AgentState } from '../../src/agent/state.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 
 // Mock fs
 vi.mock('node:fs/promises');
 
 describe('Ticket Lifecycle', () => {
-    const mockConfig: KotefConfig = {
+    const mockConfig = createTestConfig({
         rootDir: '/mock/root',
         modelFast: 'mock-model',
         modelStrong: 'mock-model',
         maxTokensPerRun: 1000,
         dryRun: false,
         gitEnabled: false
-    };
+    });
 
     beforeEach(() => {
         vi.resetAllMocks();
@@ -151,4 +151,3 @@ describe('Ticket Lifecycle', () => {
         });
     });
 });
-

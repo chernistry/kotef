@@ -2,9 +2,9 @@ import { execa } from 'execa';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
-import { ChatMessage, ChatCompletionOptions, ToolCallResult, KotefLlmError } from './llm.js';
+import { CallChatResult, ChatMessage, ChatCompletionOptions, ToolCallResult, KotefLlmError } from './llm.js';
 import { KotefConfig } from './config.js';
-import { LlmBackend } from './llm_backend.js';
+import { AgentModelRuntime } from './llm_backend.js';
 
 /**
  * Kiro CLI backend using directory-based conversation persistence.
@@ -21,7 +21,7 @@ import { LlmBackend } from './llm_backend.js';
  *   kiro-cli settings chat.uiMode "compact"
  *   kiro-cli settings chat.disableMarkdownRendering true
  */
-export class KiroConversationBackend implements LlmBackend {
+export class KiroConversationBackend implements AgentModelRuntime {
     private sessionDir: string;
     private turnCount: number = 0;
 
@@ -35,7 +35,7 @@ export class KiroConversationBackend implements LlmBackend {
         config: KotefConfig,
         messages: ChatMessage[],
         options: ChatCompletionOptions = {}
-    ): Promise<{ messages: ChatMessage[]; toolCalls?: ToolCallResult[] }> {
+    ): Promise<CallChatResult> {
         const kiroPath = config.kiroCliPath || 'kiro-cli';
         const kiroModel = config.kiroModel || 'claude-sonnet-4.5';
 

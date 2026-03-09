@@ -1,205 +1,235 @@
-
 import { z } from 'zod';
 import dotenv from 'dotenv';
-import path from 'path';
-import os from 'os';
+import path from 'node:path';
+import os from 'node:os';
 
-// Load environment variables from .env file
 dotenv.config();
 
-export const KotefConfigSchema = z.object({
+export const ModelRuntimeSchema = z.enum(['responses', 'legacy', 'kiro']);
+export const ReasoningEffortSchema = z.enum(['low', 'medium', 'high']);
+export const ApprovalModeSchema = z.enum(['auto', 'confirm', 'human-gate']);
+export const McpModeSchema = z.enum(['off', 'tools', 'context', 'full']);
+export const TraceExporterSchema = z.enum(['local', 'otlp', 'langsmith']);
+
+const RawKotefConfigSchema = z.object({
     rootDir: z.string().default(process.cwd()),
-    /** Generic OpenAI-compatible API key (OpenAI, Anthropic via proxy, etc.) */
-    apiKey: z.string().min(1, "API Key is required (OPENAI_API_KEY or KOTEF_API_KEY)").optional(),
-    /** Base URL for the LLM provider (OpenAI, OpenRouter, custom gateway, etc.). */
-    baseUrl: z.string().default("https://api.openai.com/v1"),
-    /** Default cheaper/faster model for planning, research, and non-critical calls. */
-    modelFast: z.string().default("gpt-4.1.1"),
-    /** Top-tier frontier model for final codegen or critical steps. */
-    modelStrong: z.string().default("gpt-4.1.1"),
+    apiKey: z.string().min(1, 'API Key is required (OPENAI_API_KEY or KOTEF_API_KEY)').optional(),
+    baseUrl: z.string().default('https://api.openai.com/v1'),
+    modelFast: z.string().default('gpt-5-mini'),
+    modelStrong: z.string().default('gpt-5'),
+    modelRuntime: ModelRuntimeSchema.default('responses'),
+    reasoningEffort: ReasoningEffortSchema.default('medium'),
+    structuredOutputs: z.boolean().default(true),
+    approvalMode: ApprovalModeSchema.default('auto'),
+    traceExporter: TraceExporterSchema.default('local'),
 
     searchApiKey: z.string().optional(),
     dryRun: z.boolean().default(false),
-
-    /** Soft budget for a single run; used for guardrails, not hard guarantees. */
     maxTokensPerRun: z.number().default(10000),
-    /** Max number of outbound web requests per run (search + fetch). */
     maxWebRequestsPerRun: z.number().default(30),
-    /** Skip web research entirely (offline mode). */
     offlineMode: z.boolean().default(false),
-    /** Max tool call turns in coder node (0 = use profile defaults, 1-500 = hard cap). */
     maxCoderTurns: z.number().int().min(0).max(500).default(0),
-    /** If true, use deterministic mock responses for LLM calls */
     mockMode: z.boolean().default(false),
-    /** Max wall-clock seconds per run before graceful stop. */
     maxRunSeconds: z.number().default(300),
 
-    /** LSP Diagnostics (Ticket 33) */
-    /** Enable TypeScript LSP diagnostics (default: true) */
+    runtimeDir: z.string().optional(),
+    eventsDir: z.string().optional(),
+    memoryDir: z.string().optional(),
+
     enableTsLspDiagnostics: z.boolean().default(true),
-    /** Timeout for LSP server operations in ms (default: 30000) */
     lspTimeout: z.number().default(30000),
-    /** Max number of files to check with LSP in one run (default: 50) */
     lspMaxFiles: z.number().default(50),
 
-    /**
-     * Enable experimental MCP integration
-     */
     mcpEnabled: z.boolean().default(false),
-
-    /**
-     * Map of MCP server names to their command lines (for stdio transport)
-     * e.g. { "serena": "npx serena-mcp" }
-     */
+    mcpMode: McpModeSchema.default('off'),
+    mcpApproval: ApprovalModeSchema.default('auto'),
     mcpServers: z.record(z.string(), z.string()).default({}),
+    mcpServerAllowlist: z.array(z.string()).default([]),
 
-    /** LLM provider: 'openai' (default) or 'kiro' */
     llmProvider: z.enum(['openai', 'kiro']).default('openai'),
-
-    /** Path to kiro-cli binary */
     kiroCliPath: z.string().default('kiro-cli'),
-
-    /** Kiro model to use (e.g., 'claude-sonnet-4.5') */
     kiroModel: z.string().default('claude-sonnet-4.5'),
-
-    /** Coder implementation: 'internal' (default) or 'kiro' */
     coderMode: z.enum(['internal', 'kiro']).default('internal'),
-
-    /** Ticket builder LLM: 'openai' (uses CHAT_LLM_PROVIDER) or 'kiro' */
     ticketBuilderLlm: z.enum(['openai', 'kiro']).default('openai'),
-
-    /** Timeout for Kiro agent sessions in ms (default: 5 minutes) */
     kiroSessionTimeout: z.number().default(300000),
 
-    /** Git integration: enable git features (default: true) */
     gitEnabled: z.boolean().default(true),
-    /** Git integration: auto-initialize repos when missing (default: true) */
     gitAutoInit: z.boolean().default(true),
-    /** Git integration: path to git binary (default: 'git') */
     gitBinary: z.string().default('git'),
 
-    /** Ticket 64: SDD Brain Config */
     sddBrainModel: z.string().optional(),
     sddBestPracticesMaxTokens: z.number().optional(),
     sddArchitectMaxTokens: z.number().optional(),
     sddTicketsMaxTokens: z.number().optional(),
 
-    /** Ticket 65: Deep Research Config */
     deepResearchMaxTokens: z.number().optional(),
     deepResearchMaxPages: z.number().optional(),
     deepResearchPageSnippetChars: z.number().optional(),
     deepResearchMaxFindings: z.number().optional(),
 
-    /** Ticket 65: SDD Summary Config */
     sddSummaryInputChars: z.number().optional(),
     sddSummaryMaxTokens: z.number().optional(),
 
-    /** Max number of tickets to generate during SDD orchestration (default: undefined = no limit) */
     maxTickets: z.number().int().min(1).optional(),
-
-    /** Enable debug mode with verbose logging */
     debug: z.boolean().default(false),
-
-    /** Ticket 02: Use consolidated prompts for SDD orchestration (reduces LLM calls) */
     useConsolidatedPrompts: z.boolean().default(true),
 });
 
-export type KotefConfig = z.infer<typeof KotefConfigSchema>;
+export type KotefConfig = z.infer<typeof RawKotefConfigSchema> & {
+    runtimeDir: string;
+    eventsDir: string;
+    memoryDir: string;
+};
 
-function expandPath(p: string): string {
-    if (p.startsWith('~/') || p === '~') {
-        return path.join(os.homedir(), p.slice(1));
+function expandPath(value: string): string {
+    if (value.startsWith('~/') || value === '~') {
+        return path.join(os.homedir(), value.slice(1));
     }
-    return p;
+    return value;
+}
+
+function resolvePath(rootDir: string, value: string | undefined, fallback: string): string {
+    if (!value) {
+        return fallback;
+    }
+    const expanded = expandPath(value);
+    return path.isAbsolute(expanded) ? expanded : path.resolve(rootDir, expanded);
+}
+
+function parseInteger(raw: string | undefined, fallback: number): number {
+    if (!raw) {
+        return fallback;
+    }
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function parseOptionalInteger(raw: string | undefined): number | undefined {
+    if (!raw) {
+        return undefined;
+    }
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isNaN(parsed) || parsed === 0 ? undefined : parsed;
+}
+
+function parseBoolean(raw: string | undefined, fallback: boolean): boolean {
+    if (raw === undefined) {
+        return fallback;
+    }
+    return raw === 'true';
+}
+
+function finalizeConfig(rawInput: z.input<typeof RawKotefConfigSchema>): KotefConfig {
+    const parsed = RawKotefConfigSchema.parse(rawInput);
+    const rootDir = path.resolve(expandPath(parsed.rootDir));
+    const runtimeDir = resolvePath(rootDir, parsed.runtimeDir, path.join(rootDir, '.sdd', 'runtime'));
+    const eventsDir = resolvePath(rootDir, parsed.eventsDir, path.join(runtimeDir, 'events'));
+    const memoryDir = resolvePath(rootDir, parsed.memoryDir, path.join(runtimeDir, 'memory'));
+
+    const modelRuntime = parsed.llmProvider === 'kiro' ? 'kiro' : parsed.modelRuntime;
+    const mcpMode = parsed.mcpEnabled && parsed.mcpMode === 'off' ? 'tools' : parsed.mcpMode;
+
+    const config: KotefConfig = {
+        ...parsed,
+        rootDir,
+        modelRuntime,
+        mcpMode,
+        mcpEnabled: mcpMode !== 'off',
+        runtimeDir,
+        eventsDir,
+        memoryDir,
+    };
+
+    if (config.modelRuntime !== 'kiro' && config.llmProvider === 'openai' && !config.apiKey && !config.mockMode) {
+        throw new Error(
+            'API Key is required when using the OpenAI runtime.\n' +
+            'Set OPENAI_API_KEY or KOTEF_API_KEY,\n' +
+            'or switch to Kiro: KOTEF_MODEL_RUNTIME=kiro'
+        );
+    }
+
+    return config;
+}
+
+export function createKotefConfig(overrides: Partial<KotefConfig> = {}): KotefConfig {
+    return finalizeConfig({
+        apiKey: 'test-key',
+        rootDir: process.cwd(),
+        ...overrides,
+    });
 }
 
 export function loadConfig(env = process.env, argv = process.argv): KotefConfig {
     const args = argv.slice(2);
     const rootDirIndex = args.indexOf('--root');
     const rootDirRaw = rootDirIndex !== -1 ? args[rootDirIndex + 1] : env.KOTEF_ROOT_DIR || process.cwd();
-    const rootDir = expandPath(rootDirRaw);
-
-    // Ticket 57: Default dryRun to false (git enabled by default).
-    // Allow opting OUT via --dry-run flag or env var.
     const explicitDryRun = args.includes('--dry-run');
-    const dryRun = explicitDryRun || (env.KOTEF_DRY_RUN === 'true');
+    const maxCoderTurns = Math.max(0, Math.min(500, parseInteger(env.MAX_CODER_TURNS, 0)));
 
-    // Parse and validate MAX_CODER_TURNS
-    const maxCoderTurnsEnv = parseInt(env.MAX_CODER_TURNS || '0', 10);
-    const maxCoderTurns = isNaN(maxCoderTurnsEnv) ? 0 : Math.max(0, Math.min(500, maxCoderTurnsEnv));
-
-    const config = {
-        rootDir: path.resolve(rootDir),
+    return finalizeConfig({
+        rootDir: rootDirRaw,
         apiKey: env.CHAT_LLM_API_KEY || env.KOTEF_API_KEY || env.OPENAI_API_KEY,
-        baseUrl: env.CHAT_LLM_BASE_URL || env.KOTEF_BASE_URL || env.OPENAI_BASE_URL,
-        modelFast: env.CHAT_LLM_MODEL || env.KOTEF_MODEL_FAST || env.OPENAI_MODEL || "gpt-4.1.1",
-        modelStrong: env.CHAT_LLM_MODEL || env.KOTEF_MODEL_STRONG || env.OPENAI_MODEL || "gpt-4.1.1",
+        baseUrl: env.CHAT_LLM_BASE_URL || env.KOTEF_BASE_URL || env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+        modelFast: env.KOTEF_MODEL_FAST || env.CHAT_LLM_MODEL || env.OPENAI_MODEL || 'gpt-5-mini',
+        modelStrong: env.KOTEF_MODEL_STRONG || env.CHAT_LLM_MODEL || env.OPENAI_MODEL || 'gpt-5',
+        modelRuntime: (env.KOTEF_MODEL_RUNTIME as z.infer<typeof ModelRuntimeSchema> | undefined)
+            || ((env.CHAT_LLM_PROVIDER || env.KOTEF_LLM_PROVIDER) === 'kiro' ? 'kiro' : 'responses'),
+        reasoningEffort: (env.KOTEF_REASONING_EFFORT as z.infer<typeof ReasoningEffortSchema> | undefined) || 'medium',
+        structuredOutputs: parseBoolean(env.KOTEF_STRUCTURED_OUTPUTS, true),
+        approvalMode: (env.KOTEF_APPROVAL_MODE as z.infer<typeof ApprovalModeSchema> | undefined) || 'auto',
+        traceExporter: (env.KOTEF_TRACE_EXPORTER as z.infer<typeof TraceExporterSchema> | undefined) || 'local',
+
         searchApiKey: env.SEARCH_API_KEY || env.TAVILY_API_KEY || env.SERPER_API_KEY,
-        dryRun,
-        maxRunSeconds: parseInt(env.MAX_RUN_SECONDS || '300', 10),
-        maxTokensPerRun: parseInt(env.MAX_TOKENS_PER_RUN || '100000', 10),
-        maxWebRequestsPerRun: parseInt(env.MAX_WEB_REQUESTS_PER_RUN || '20', 10),
-        offlineMode: env.KOTEF_OFFLINE === 'true',
+        dryRun: explicitDryRun || parseBoolean(env.KOTEF_DRY_RUN, false),
+        maxRunSeconds: parseInteger(env.MAX_RUN_SECONDS, 300),
+        maxTokensPerRun: parseInteger(env.MAX_TOKENS_PER_RUN, 100000),
+        maxWebRequestsPerRun: parseInteger(env.MAX_WEB_REQUESTS_PER_RUN, 20),
+        offlineMode: parseBoolean(env.KOTEF_OFFLINE, false),
         maxCoderTurns,
-        mockMode: env.KOTEF_MOCK_MODE === 'true',
+        mockMode: parseBoolean(env.KOTEF_MOCK_MODE, false),
 
-        // LSP config
+        runtimeDir: env.KOTEF_RUNTIME_DIR,
+        eventsDir: env.KOTEF_EVENTS_DIR,
+        memoryDir: env.KOTEF_MEMORY_DIR,
+
         enableTsLspDiagnostics: env.ENABLE_TS_LSP_DIAGNOSTICS !== 'false',
-        lspTimeout: parseInt(env.LSP_TIMEOUT || '30000', 10),
-        lspMaxFiles: parseInt(env.LSP_MAX_FILES || '50', 10),
+        lspTimeout: parseInteger(env.LSP_TIMEOUT, 30000),
+        lspMaxFiles: parseInteger(env.LSP_MAX_FILES, 50),
 
-        // MCP config
-        mcpEnabled: env.MCP_ENABLED === 'true',
+        mcpEnabled: parseBoolean(env.MCP_ENABLED, false),
+        mcpMode: (env.KOTEF_MCP_MODE as z.infer<typeof McpModeSchema> | undefined) || 'off',
+        mcpApproval: (env.KOTEF_MCP_APPROVAL as z.infer<typeof ApprovalModeSchema> | undefined) || 'auto',
         mcpServers: env.MCP_SERVERS ? JSON.parse(env.MCP_SERVERS) : {},
+        mcpServerAllowlist: env.KOTEF_MCP_ALLOWLIST
+            ? env.KOTEF_MCP_ALLOWLIST.split(',').map(value => value.trim()).filter(Boolean)
+            : [],
 
-        // LLM provider config
-        llmProvider: (env.CHAT_LLM_PROVIDER || 'openai') as 'openai' | 'kiro',
+        llmProvider: (env.CHAT_LLM_PROVIDER || env.KOTEF_LLM_PROVIDER || 'openai') as 'openai' | 'kiro',
         kiroCliPath: env.KIRO_CLI_PATH || 'kiro-cli',
         kiroModel: env.KIRO_MODEL || 'claude-sonnet-4.5',
-
-        // Coder mode config
         coderMode: (env.KOTEF_CODER_MODE || 'internal') as 'internal' | 'kiro',
         ticketBuilderLlm: (env.KOTEF_TICKET_BUILDER_LLM || 'openai') as 'openai' | 'kiro',
-        kiroSessionTimeout: parseInt(env.KIRO_SESSION_TIMEOUT || '300000', 10),
+        kiroSessionTimeout: parseInteger(env.KIRO_SESSION_TIMEOUT, 300000),
 
-        // Git integration config
         gitEnabled: env.KOTEF_NO_GIT !== 'true',
         gitAutoInit: env.KOTEF_GIT_AUTO_INIT !== 'false',
         gitBinary: env.GIT_BINARY || 'git',
 
-        // Ticket 64: SDD Brain Config
-        sddBrainModel: env.KOTEF_SDD_BRAIN_MODEL, // Optional, defaults to modelStrong/modelFast logic
-        sddBestPracticesMaxTokens: parseInt(env.KOTEF_SDD_BEST_PRACTICES_MAX_TOKENS || '0', 10) || undefined,
-        sddArchitectMaxTokens: parseInt(env.KOTEF_SDD_ARCHITECT_MAX_TOKENS || '0', 10) || undefined,
-        sddTicketsMaxTokens: parseInt(env.KOTEF_SDD_TICKETS_MAX_TOKENS || '0', 10) || undefined,
+        sddBrainModel: env.KOTEF_SDD_BRAIN_MODEL,
+        sddBestPracticesMaxTokens: parseOptionalInteger(env.KOTEF_SDD_BEST_PRACTICES_MAX_TOKENS),
+        sddArchitectMaxTokens: parseOptionalInteger(env.KOTEF_SDD_ARCHITECT_MAX_TOKENS),
+        sddTicketsMaxTokens: parseOptionalInteger(env.KOTEF_SDD_TICKETS_MAX_TOKENS),
 
-        // Ticket 65: Deep Research Config
-        deepResearchMaxTokens: parseInt(env.KOTEF_DEEP_RESEARCH_MAX_TOKENS || '0', 10) || undefined,
-        deepResearchMaxPages: parseInt(env.KOTEF_DEEP_RESEARCH_MAX_PAGES || '0', 10) || undefined,
-        deepResearchPageSnippetChars: parseInt(env.KOTEF_DEEP_RESEARCH_PAGE_SNIPPET_CHARS || '0', 10) || undefined,
-        deepResearchMaxFindings: parseInt(env.KOTEF_DEEP_RESEARCH_MAX_FINDINGS || '0', 10) || undefined,
+        deepResearchMaxTokens: parseOptionalInteger(env.KOTEF_DEEP_RESEARCH_MAX_TOKENS),
+        deepResearchMaxPages: parseOptionalInteger(env.KOTEF_DEEP_RESEARCH_MAX_PAGES),
+        deepResearchPageSnippetChars: parseOptionalInteger(env.KOTEF_DEEP_RESEARCH_PAGE_SNIPPET_CHARS),
+        deepResearchMaxFindings: parseOptionalInteger(env.KOTEF_DEEP_RESEARCH_MAX_FINDINGS),
 
-        // Ticket 65: SDD Summary Config
-        sddSummaryInputChars: parseInt(env.KOTEF_SDD_SUMMARY_INPUT_CHARS || '0', 10) || undefined,
-        sddSummaryMaxTokens: parseInt(env.KOTEF_SDD_SUMMARY_MAX_TOKENS || '0', 10) || undefined,
+        sddSummaryInputChars: parseOptionalInteger(env.KOTEF_SDD_SUMMARY_INPUT_CHARS),
+        sddSummaryMaxTokens: parseOptionalInteger(env.KOTEF_SDD_SUMMARY_MAX_TOKENS),
 
-        // Max tickets for SDD orchestration
-        maxTickets: parseInt(env.KOTEF_MAX_TICKETS || '0', 10) || undefined,
-
-        // Debug mode
-        debug: env.KOTEF_DEBUG === 'true' || args.includes('--debug'),
-    };
-
-    const parsed = KotefConfigSchema.parse(config);
-
-    // Validate: if using OpenAI provider, apiKey is required
-    if (parsed.llmProvider === 'openai' && !parsed.apiKey) {
-        throw new Error(
-            'API Key is required when using OpenAI provider.\n' +
-            'Set CHAT_LLM_API_KEY or OPENAI_API_KEY environment variable,\n' +
-            'or switch to Kiro provider: CHAT_LLM_PROVIDER=kiro'
-        );
-    }
-
-    return parsed;
+        maxTickets: parseOptionalInteger(env.KOTEF_MAX_TICKETS),
+        debug: parseBoolean(env.KOTEF_DEBUG, false) || args.includes('--debug'),
+        useConsolidatedPrompts: parseBoolean(env.KOTEF_USE_CONSOLIDATED_PROMPTS, true),
+    });
 }

@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { buildProjectSummary, ProjectSummary } from '../../src/agent/utils/project_summary.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 
 describe('Project Summary Detection', () => {
-    const mockConfig: KotefConfig = {
+    const mockConfig = createTestConfig({
         rootDir: '/mock/root',
         modelFast: 'mock-model',
         modelStrong: 'mock-model',
         maxTokensPerRun: 1000,
         mockMode: true
-    };
+    });
 
     // Helper to create mock file lists
     const createMockFiles = (files: string[]) => files;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { detectCommands } from '../../src/agent/utils/verification.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 import * as fs from 'node:fs/promises';
 import { listFiles } from '../../src/tools/fs.js';
 
@@ -19,13 +19,13 @@ vi.mock('../../src/tools/package_manager.js', () => ({
 }));
 
 describe('Verification Policy - detectCommands', () => {
-    const mockConfig: KotefConfig = {
+    const mockConfig = createTestConfig({
         rootDir: '/mock/root',
         modelFast: 'mock-model',
         modelStrong: 'mock-model',
         maxTokensPerRun: 1000,
         dryRun: true
-    };
+    });
 
     beforeEach(() => {
         vi.resetAllMocks();

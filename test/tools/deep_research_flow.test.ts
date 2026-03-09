@@ -1,21 +1,21 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { deepResearch } from '../../src/tools/deep_research.js';
-import { KotefConfig } from '../../src/core/config.js';
 import * as webSearchModule from '../../src/tools/web_search.js';
 import * as fetchPageModule from '../../src/tools/fetch_page.js';
 import * as llmModule from '../../src/core/llm.js';
 import * as promptsModule from '../../src/core/prompts.js';
+import { createTestConfig } from '../helpers/config.js';
 
 // Mock dependencies
-const mockConfig: KotefConfig = {
+const mockConfig = createTestConfig({
     rootDir: '/tmp/test',
     modelFast: 'mock-fast',
     modelStrong: 'mock-strong',
     maxRunSeconds: 60,
     maxTokensPerRun: 1000,
     dryRun: true
-};
+});
 
 vi.mock('../../src/tools/web_search.js');
 vi.mock('../../src/tools/fetch_page.js');

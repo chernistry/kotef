@@ -75,7 +75,7 @@ describe('MCP Integration', () => {
 
         expect(tools).toHaveLength(2);
         expect(tools[0].server).toBe('test-server');
-        expect(tools[0].name).toBe('tool1');
+        expect(tools[0].name).toBe('mcp__test_server__tool1');
     });
 
     it('should route tool calls to correct server', async () => {

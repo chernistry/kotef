@@ -47,7 +47,7 @@ export interface SddContext {
     architect: string;     // raw text from .sdd/architect.md
     bestPractices?: string;
     ticket?: string;       // current ticket markdown
-    ticketPath?: string;   // absolute path to current ticket file (in backlog/tickets/open)
+    ticketPath?: string;   // absolute path to current ticket file (prefer .sdd/backlog/open)
     ticketId?: string;     // simple identifier like "17-goal-aware-verification"
     issues?: string;       // issues encountered
 }
@@ -84,12 +84,32 @@ export interface RiskEntry {
     links?: string[];
 }
 
+export interface RunControlState {
+    runId?: string;
+    threadId?: string;
+    approvalMode?: 'auto' | 'confirm' | 'human-gate';
+    approvalRequested?: boolean;
+    approvalGranted?: boolean;
+    approvalGrantedAt?: number;
+    startedAt?: number;
+    endedAt?: number;
+}
+
+export interface TurnState {
+    stage?: string;
+    status?: string;
+    lastNode?: string;
+    updatedAt?: number;
+}
+
 export interface AgentState {
     messages: ChatMessage[];
     designDecisions?: DesignDecision[];
     assumptions?: Assumption[];
     riskEntries?: RiskEntry[];
     sdd: SddContext;
+    runControl?: RunControlState;
+    turnState?: TurnState;
     plan?: any;
     researchResults?: any;
     fileChanges?: Record<string, number | string>;

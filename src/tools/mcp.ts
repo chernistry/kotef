@@ -1,26 +1,24 @@
-import { McpManager } from "../mcp/client.js";
-import { createLogger } from "../core/logger.js";
+import { McpManager } from '../mcp/client.js';
+import { createLogger } from '../core/logger.js';
 
-const log = createLogger("mcp-tools");
+const log = createLogger('mcp-tools');
 
 export async function createMcpTools(manager: McpManager) {
-    const mcpTools = await manager.listAllTools();
-
-    return mcpTools.map(tool => ({
+    const tools = await manager.listAllTools();
+    return tools.map(tool => ({
         type: 'function',
         function: {
             name: tool.name,
-            description: tool.description || `MCP tool: ${tool.name}`,
-            parameters: tool.inputSchema || { type: 'object', properties: {} }
+            description: tool.description || `MCP tool from ${tool.server}: ${tool.actualName}`,
+            parameters: tool.inputSchema || { type: 'object', properties: {} },
         }
     }));
 }
 
-export async function executeMcpTool(manager: McpManager, toolName: string, args: any) {
+export async function executeMcpTool(manager: McpManager, toolName: string, args: unknown) {
     try {
         log.info(`Executing MCP tool ${toolName}`, { args });
-        const result = await manager.callTool(toolName, args);
-        return result;
+        return await manager.callTool(toolName, args);
     } catch (error: any) {
         log.error(`MCP tool execution failed: ${toolName}`, { error: error.message });
         throw error;

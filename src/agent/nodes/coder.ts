@@ -7,8 +7,9 @@ import { resolveExecutionProfile, PROFILE_POLICIES, ExecutionProfile } from '../
 import { safeParse } from '../../utils/json.js';
 import { CODER_TOOLS } from '../tools/definitions.js';
 import { ToolHandlers, ToolContext } from '../tools/handlers.js';
+import { RuntimeEventSink } from '../../runtime/events.js';
 
-export function coderNode(cfg: KotefConfig, chatFn = callChat) {
+export function coderNode(cfg: KotefConfig, chatFn = callChat, eventSink?: RuntimeEventSink) {
     return async (state: AgentState): Promise<Partial<AgentState>> => {
         const log = createLogger('coder');
         log.info('Coder node started', { taskScope: state.taskScope });
@@ -57,6 +58,7 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             '{{EXECUTION_PROFILE}}': executionProfile,
             '{{TASK_SCOPE}}': state.taskScope || 'normal',
             '{{DIAGNOSTICS}}': (await import('../utils/diagnostics.js')).summarizeDiagnostics(state.diagnosticsLog),
+            '{{MCP_CONTEXT}}': 'No MCP context available.',
         };
 
         let systemPrompt = promptTemplate;
@@ -79,14 +81,21 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
         // Initialize MCP
         let mcpManager: any;
         let mcpTools: any[] = [];
-        if (cfg.mcpEnabled) {
+        if (cfg.mcpMode !== 'off') {
             try {
                 const { McpManager } = await import('../../mcp/client.js');
                 const { createMcpTools } = await import('../../tools/mcp.js');
                 mcpManager = new McpManager(cfg);
                 await mcpManager.initialize();
-                mcpTools = await createMcpTools(mcpManager);
-                log.info('MCP initialized', { toolCount: mcpTools.length });
+                if (cfg.mcpMode === 'tools' || cfg.mcpMode === 'full') {
+                    mcpTools = await createMcpTools(mcpManager);
+                }
+                if (cfg.mcpMode === 'context' || cfg.mcpMode === 'full') {
+                    const snapshot = await mcpManager.createContextSnapshot();
+                    replacements['{{MCP_CONTEXT}}'] = JSON.stringify(snapshot, null, 2);
+                    systemPrompt = systemPrompt.replaceAll('{{MCP_CONTEXT}}', replacements['{{MCP_CONTEXT}}']);
+                }
+                log.info('MCP initialized', { toolCount: mcpTools.length, mode: cfg.mcpMode });
             } catch (error: any) {
                 log.error('Failed to initialize MCP', { error: error.message });
             }
@@ -109,7 +118,8 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
             functionalChecks: state.functionalChecks || [],
             commandCount: 0,
             testCount: 0,
-            diagnosticRun: false
+            diagnosticRun: false,
+            emitEvent: eventSink
         };
 
         const trimHistory = (all: ChatMessage[]): ChatMessage[] => {
@@ -143,6 +153,11 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                 log.info('Executing tool', { tool: toolCall.function.name, args });
 
                 try {
+                    await eventSink?.('tool.started', {
+                        toolName: toolCall.function.name,
+                        threadId: state.runControl?.threadId ?? 'unknown',
+                        node: 'coder'
+                    });
                     const handler = ToolHandlers[toolCall.function.name];
                     if (handler) {
                         const toolOutput = await handler(args, ctx);
@@ -159,6 +174,12 @@ export function coderNode(cfg: KotefConfig, chatFn = callChat) {
                 } catch (e: any) {
                     result = `Error: ${e.message}`;
                     log.error('Tool execution failed', { tool: toolCall.function.name, error: e.message });
+                } finally {
+                    await eventSink?.('tool.completed', {
+                        toolName: toolCall.function.name,
+                        threadId: state.runControl?.threadId ?? 'unknown',
+                        node: 'coder'
+                    });
                 }
 
                 currentMessages.push({

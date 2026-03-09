@@ -1,6 +1,7 @@
-import { StateGraph, END, START } from '@langchain/langgraph';
+import { BaseCheckpointSaver, StateGraph, END, START } from '@langchain/langgraph';
 import { AgentState, ExecutionProfile } from './state.js';
 import { KotefConfig } from '../core/config.js';
+import { approvalGateNode } from './nodes/approval_gate.js';
 import { plannerNode } from './nodes/planner.js';
 import { researcherNode } from './nodes/researcher.js';
 import { coderNode } from './nodes/coder.js';
@@ -12,9 +13,12 @@ import { ticketCloserNode } from './nodes/ticket_closer.js';
 import { retrospectiveNode } from './nodes/retrospective.js';
 
 import { callChat } from '../core/llm.js';
+import { RuntimeEventSink } from '../runtime/events.js';
 
 export interface AgentDeps {
     chatFn?: typeof callChat;
+    checkpointer?: BaseCheckpointSaver;
+    eventSink?: RuntimeEventSink;
 }
 
 export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
@@ -30,6 +34,14 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
             sdd: {
                 reducer: (a, b) => ({ ...a, ...b }),
                 default: () => ({ project: '', architect: '' }),
+            },
+            runControl: {
+                reducer: (a, b) => ({ ...(a || {}), ...(b || {}) }),
+                default: () => ({})
+            },
+            turnState: {
+                reducer: (a, b) => ({ ...(a || {}), ...(b || {}) }),
+                default: () => ({})
             },
             plan: {
                 reducer: (a, b) => b, // Latest wins
@@ -115,13 +127,14 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
     });
 
     // Add nodes (cast to any to avoid LangGraph.js type inference issues)
+    graph.addNode("approval_gate" as any, approvalGateNode(cfg));
     graph.addNode("planner" as any, plannerNode(cfg, chatFn));
     graph.addNode("researcher" as any, researcherNode(cfg));
 
     // Select coder implementation based on config
     const coderImpl = cfg.coderMode === 'kiro'
         ? (state: AgentState) => kiroCoderNode(state, cfg)
-        : coderNode(cfg, chatFn);
+        : coderNode(cfg, chatFn, deps.eventSink);
 
     graph.addNode("coder" as any, coderImpl);
     graph.addNode("verifier" as any, verifierNode(cfg));
@@ -131,7 +144,8 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
     graph.addNode("retrospective" as any, retrospectiveNode(cfg, chatFn));
 
     // Add edges
-    graph.addEdge(START, "planner" as any);
+    graph.addEdge(START, "approval_gate" as any);
+    graph.addEdge("approval_gate" as any, "planner" as any);
 
     // Planner decides where to go
     graph.addConditionalEdges(
@@ -244,5 +258,7 @@ export function buildKotefGraph(cfg: KotefConfig, deps: AgentDeps = {}) {
     // Retrospective -> END
     graph.addEdge("retrospective" as any, END);
 
-    return graph.compile();
+    return graph.compile({
+        checkpointer: deps.checkpointer,
+    });
 }

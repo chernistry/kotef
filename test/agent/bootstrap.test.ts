@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { bootstrapSddForProject } from '../../src/agent/bootstrap.js';
-import { KotefConfig } from '../../src/core/config.js';
+import { createTestConfig } from '../helpers/config.js';
 
 describe('SDD Bootstrap', () => {
     let tempDir: string;
@@ -23,15 +23,14 @@ describe('SDD Bootstrap', () => {
             dependencies: { 'typescript': '^5.0.0' }
         }));
 
-        const config: KotefConfig = {
-            apiKey: 'dummy',
+        const config = createTestConfig({
             mockMode: true,
             modelFast: 'gpt-4o-mini',
             modelStrong: 'gpt-4o',
             maxRunSeconds: 60,
             maxTokensPerRun: 1000,
-            maxWebRequestsPerRun: 5
-        };
+            maxWebRequestsPerRun: 5,
+        });
 
 
 
