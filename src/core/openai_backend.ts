@@ -12,6 +12,7 @@ import { KotefConfig } from './config.js';
 import { AgentModelRuntime } from './llm_backend.js';
 import { CallChatResult, ChatCompletionOptions, ChatMessage, ChatToolCall, KotefLlmError, ToolCallResult } from './llm.js';
 import { safeParse } from '../utils/json.js';
+import { LegacyChatRuntime } from './legacy_chat_runtime.js';
 
 function toResponsesTools(tools: ChatCompletionOptions['tools']): ResponseCreateParamsBase['tools'] | undefined {
     if (!tools || tools.length === 0) {
@@ -187,6 +188,7 @@ export class OpenAiResponsesRuntime implements AgentModelRuntime {
         });
 
         const model = options.model || (options.useStrongModel ? config.modelStrong : config.modelFast);
+        const isOpenAiNativeEndpoint = config.baseUrl.includes('api.openai.com');
         const request: ResponseCreateParamsBase = {
             model,
             input: toResponsesInput(messages),
@@ -194,15 +196,19 @@ export class OpenAiResponsesRuntime implements AgentModelRuntime {
             tool_choice: toToolChoice(options.tool_choice),
             temperature: options.temperature ?? 0,
             max_output_tokens: options.maxTokens,
-            reasoning: {
-                effort: config.reasoningEffort,
-            },
-            text: {
-                format: config.structuredOutputs && options.response_format
-                    ? { type: options.response_format.type }
-                    : { type: 'text' },
-            },
         };
+
+        if (isOpenAiNativeEndpoint) {
+            request.reasoning = {
+                effort: config.reasoningEffort,
+            };
+        }
+
+        if (config.structuredOutputs && options.response_format) {
+            request.text = {
+                format: { type: options.response_format.type },
+            };
+        }
 
         try {
             let response: Response;
@@ -219,6 +225,14 @@ export class OpenAiResponsesRuntime implements AgentModelRuntime {
 
             const { text, refusal } = getAssistantText(response.output, response.output_text);
             const { legacy, parsed } = extractToolCalls(response.output);
+
+            // Some OpenAI-compatible providers partially support Responses and may
+            // return empty text without tool calls. Fall back to legacy chat once.
+            if (!text && legacy.length === 0) {
+                const fallback = new LegacyChatRuntime();
+                return await fallback.callChat(config, messages, options);
+            }
+
             const assistantMessage: ChatMessage = {
                 role: 'assistant',
                 content: text,
