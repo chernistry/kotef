@@ -1,118 +1,85 @@
-<div align="center">
-
 # kotef
 
-_A durable frontier coding and research agent for spec-driven delivery._
+Kotef is a durable coding and research agent for spec-driven delivery.
 
-![kotef in action](assets/screenshot.png)
+It is built for real repository work, not one-shot demos: `OpenAI Responses` by default, `LangGraph` checkpoints and resume, `MCP` for tools/resources/prompts, and an SDD loop that keeps specs, tickets, verification, and cleanup in sync.
 
-</div>
+## Why Kotef
 
-Kotef is no longer just an "SDD brain". It is a 2026-style agent runtime built around:
-
-- `OpenAI Responses` as the primary model runtime
-- `LangGraph` durable execution with persistent thread checkpoints
-- `MCP` as a context plane for tools, prompts, and resources
-- an agent-first SDD workflow with machine-readable ticket generation
-- backlog v2 at `.sdd/backlog/open/` and `.sdd/backlog/closed/`
+- Runs as a supervisor graph: `planner -> researcher -> coder -> verifier -> janitor`
+- Survives long tasks with resumable checkpoints and thread IDs
+- Uses MCP as a context layer, not just a tool bridge
+- Maintains canonical backlog state in `.sdd/backlog/open` and `.sdd/backlog/closed`
+- Ships with evals, prompt contracts, and ticket lifecycle tests
 
 ## Quick Start
+
+Requirements:
+
+- Node `>=24`
+- an LLM API key via `OPENAI_API_KEY` or `CHAT_LLM_API_KEY`
+- optional web research key via `TAVILY_API_KEY`
 
 ```bash
 cp .env.example .env
 npm install
 npm run build
 
-node bin/kotef run \
+./bin/kotef run \
   --root /path/to/repo \
   --goal "Add user login with minimal surface area"
 ```
 
-Interactive mode still exists:
+## Core Commands
 
 ```bash
-node bin/kotef chat --root /path/to/repo
+# run a durable agent thread
+./bin/kotef run --root /path/to/repo --thread auth-login
+
+# resume after an interrupt or approval gate
+./bin/kotef resume auth-login --root /path/to/repo
+
+# inspect checkpoints, state, and runtime events
+./bin/kotef inspect run auth-login --root /path/to/repo
+
+# inspect MCP connectivity and capabilities
+./bin/kotef mcp doctor --root /path/to/repo
+
+# migrate old SDD backlog layout into the 2026 canonical layout
+./bin/kotef migrate sdd --root /path/to/repo
+
+# run the eval harness
+./bin/kotef eval --root /path/to/repo
 ```
 
-## Durable Workflow
+## What It Maintains
 
-Run with an explicit thread:
-
-```bash
-node bin/kotef run --root /path/to/repo --thread auth-login --approval-mode human-gate
+```text
+.sdd/
+  project.md
+  architect.md
+  best_practices.md
+  backlog/
+    open/
+    closed/
+  context/mcp/
+  runtime/
+    kotef.sqlite
+    events/
+    memory/
 ```
 
-Resume after an interrupt:
+Each run writes durable graph state into `.sdd/runtime/kotef.sqlite`, JSONL events into `.sdd/runtime/events/`, and memory artifacts into `.sdd/runtime/memory/`.
 
-```bash
-node bin/kotef resume auth-login --root /path/to/repo
-```
+## Runtime Defaults
 
-Inspect run state and checkpoint history:
+- `KOTEF_MODEL_RUNTIME=responses`
+- `KOTEF_REASONING_EFFORT=medium`
+- `KOTEF_STRUCTURED_OUTPUTS=true`
+- `KOTEF_MCP_MODE=off|tools|context|full`
+- `KOTEF_MCP_APPROVAL=auto|human-gate`
 
-```bash
-node bin/kotef inspect run auth-login --root /path/to/repo
-```
-
-## MCP and Migration
-
-Inspect MCP server health and capabilities:
-
-```bash
-node bin/kotef mcp doctor --root /path/to/repo
-```
-
-Migrate legacy SDD backlog layout into backlog v2:
-
-```bash
-node bin/kotef migrate sdd --root /path/to/repo
-```
-
-Run the eval harness:
-
-```bash
-node bin/kotef eval --root /path/to/repo
-```
-
-## Runtime Model
-
-Kotef uses a supervisor graph:
-
-1. `approval_gate`
-2. `planner`
-3. `researcher`
-4. `coder`
-5. `verifier`
-6. `janitor`
-7. `ticket_closer`
-8. `retrospective`
-
-Each run is checkpointed into `.sdd/runtime/kotef.sqlite` and emits JSONL events under `.sdd/runtime/events/`. MCP snapshots are cached under `.sdd/context/mcp/`.
-
-## SDD 2.0 Flow
-
-Kotef expects and maintains:
-
-- `.sdd/project.md`
-- `.sdd/architect.md`
-- `.sdd/best_practices.md`
-- `.sdd/backlog/open/*.md`
-- `.sdd/backlog/closed/*.md`
-
-The brain prompts are XML-structured and agent-first:
-
-- `understand_and_design` emits best practices plus architect spec
-- `plan_work` emits machine-readable XML tickets
-- runtime prompts assume direct file access, tool access, MCP context, and resumable execution
-
-## Positioning
-
-Kotef is optimized for teams that want:
-
-- spec-first execution instead of one-shot codegen
-- grounded coding with fresh research and MCP context
-- durable, resumable runs instead of fragile single sessions
-- explicit ADRs, assumptions, verification, and cleanup signals
+Legacy layers still exist as fallback, but the primary path is the new runtime.
 
 ## Development
 

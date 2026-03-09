@@ -1,7 +1,7 @@
 {
     "name": "kotef",
     "version": "0.1.0",
-    "description": "Autonomous AI coding & research agent",
+    "description": "Durable frontier coding and research agent",
     "type": "module",
     "main": "dist/src/index.js",
     "bin": {
