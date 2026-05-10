@@ -19,4 +19,4 @@ It stores durable state in `.sdd/runtime/`, uses MCP when local context is not e
 - MCP-aware context and tool orchestration without turning the repo into folklore.
 - SDD backlog hygiene built in, from open tickets to cleanup.
 
-Built by Alex Chernysh — alex@hireex.ai
+Built by Alex Chernysh — alex@alexchernysh.com
